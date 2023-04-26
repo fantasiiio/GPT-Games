@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avion contrôlable avec des flèches</title>
+    <style>
+        body {
+            background-color: skyblue;
+        }
+
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- <div class="sky" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div> -->
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const avion = {
+            x: 100,
+            y: 200,
+            angle: 0,
+            vitesse: 2,
+            rayonLooping: 100,
+        };
+
+        let direction = {
+            gauche: false,
+            droite: false,
+            haut: false,
+            bas: false,
+        };
+        const width = 80;
+        const height = 40;
+
+        function dessinerAvion(x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(-angle);
+
+            // Dessin de l'avion
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(0 + width, y);
+            ctx.lineTo(0 + width, y + height / 2);
+            ctx.lineTo(0, y + height / 2);
+            ctx.closePath();
+            ctx.fillStyle = '#999';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(0 + width, y + height / 2);
+            ctx.lineTo(0 + width / 2, y + height / 2);
+            ctx.lineTo(0 + width / 2, y + height);
+            ctx.lineTo(0 + width / 4, y + height);
+            ctx.lineTo(0, y + height / 2);
+            ctx.closePath();
+            ctx.fillStyle = '#ccc';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(0 + width / 4, y + height / 4, height / 4, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.fillStyle = '#ccc';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(0 + width / 4, y + height * 3 / 4, height / 4, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.fillStyle = '#ccc';
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function animer() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (direction.gauche) {
+                avion.vitesse -= 0.1;
+            }
+            if (direction.droite) {
+                avion.vitesse += 0.1;
+            }
+            if (direction.haut) {
+                avion.angle -= 0.02;
+            }
+            if (direction.bas) {
+                avion.angle += 0.02;
+            }
+
+            deplacerElements();
+
+            dessinerNuages();
+            dessinerMontagnes();
+            dessinerAvion(canvas.width / 2, canvas.height / 2, avion.angle);
+
+            requestAnimationFrame(animer);
+        }
+
+
+
+
+        const montagnes = [];
+        const nuages = [];
+
+        function genererMontagne(x, y) {
+            const hauteurMax = canvas.height / 2;
+            const largeur = canvas.width / 10;
+            let hauteur = (Math.random() * hauteurMax * 0.5) + (hauteurMax * 0.5);
+            let deltaX = largeur;
+            let deltaY = hauteur - y;
+
+            return {
+                x1: x,
+                y1: y,
+                x2: x + deltaX,
+                y2: y + deltaY,
+                x3: x + (2 * deltaX),
+                y3: hauteur,
+            };
+        }
+
+        function genererMontagnes(nombre) {
+            let x = 0;
+            let y = canvas.height / 2;
+
+            for (let i = 0; i < nombre; i++) {
+                let montagne = genererMontagne(x, y);
+                montagnes.push(montagne);
+                x = montagne.x3;
+                y = montagne.y3;
+            }
+        }
+
+        function dessinerMontagnes() {
+            ctx.fillStyle = 'darkgreen';
+            montagnes.forEach((montagne) => {
+                ctx.beginPath();
+                ctx.moveTo(montagne.x1, montagne.y1);
+                ctx.lineTo(montagne.x2, montagne.y2);
+                ctx.lineTo(montagne.x3, montagne.y3);
+                ctx.lineTo(montagne.x3, canvas.height);
+                ctx.lineTo(montagne.x1, canvas.height);
+                ctx.closePath();
+                ctx.fill();
+            });
+        }
+
+        function genererNuages(nombre) {
+            for (let i = 0; i < nombre; i++) {
+                nuages.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() *
+                        (canvas.height / 2),
+                    rayon: Math.random() * 30 + 20,
+                });
+            }
+        }
+
+        function dessinerNuages() {
+            ctx.fillStyle = 'white';
+            nuages.forEach((nuage) => {
+                ctx.beginPath();
+                ctx.arc(nuage.x, nuage.y, nuage.rayon, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.fill();
+            });
+        }
+
+        function deplacerElements() {
+            const dx = avion.vitesse * Math.cos(avion.angle);
+            const dy = avion.vitesse * Math.sin(avion.angle);
+
+            montagnes.forEach((montagne, index) => {
+                montagne.x1 -= dx;
+                montagne.x2 -= dx;
+                montagne.x3 -= dx;
+                montagne.y1 += dy;
+                montagne.y2 += dy;
+                montagne.y3 += dy;
+
+                if (montagne.x1 < -canvas.width / 10) {
+                    montagnes.splice(index, 1);
+                    let lastMontagne = montagnes[montagnes.length - 1];
+                    montagnes.push(genererMontagne(lastMontagne.x3, lastMontagne.y3));
+                }
+            });
+
+            nuages.forEach((nuage) => {
+                nuage.x -= dx / 2;
+                nuage.y += dy / 2;
+                if (nuage.x - nuage.rayon < 0) {
+                    nuage.x = canvas.width + nuage.rayon;
+                    nuage.y = Math.random() * (canvas.height / 2);
+                    nuage.rayon = Math.random() * 30 + 20;
+                }
+            });
+        }
+
+        function gererTouches(e) {
+            const
+                etat = e.type === 'keydown';
+            switch (e.key) {
+                case 'ArrowLeft':
+                    direction.gauche = etat;
+                    break;
+                case 'ArrowRight':
+                    direction.droite = etat;
+                    break;
+                case 'ArrowUp':
+                    direction.haut = etat;
+                    break;
+                case 'ArrowDown':
+                    direction.bas = etat;
+                    break;
+            }
+        }
+        window.addEventListener('keydown', gererTouches);
+        window.addEventListener('keyup', gererTouches);
+
+        genererMontagnes(10);
+        genererNuages(20);
+
+        animer();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Jeux d'avion</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas" width="500" height="500"></canvas>
+
+    <script>
+        // Récupération du canvas et du contexte 2D
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+
+        // Position et vitesse de l'avion
+        var x = 250;
+        var y = 250;
+        var speedX = 0;
+        var speedY = 0;
+
+        // Angle de rotation de l'avion
+        var angle = 0;
+
+        // Tableau pour stocker les tirs
+        var bullets = [];
+
+        // Tableau pour stocker les ennemis
+        var enemies = [];
+
+        // Fonction pour dessiner l'avion
+        function drawPlane() {
+            // Sauvegarde du contexte
+            ctx.save();
+
+            // Translation et rotation du contexte
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+
+            // Dessin de l'avion
+            ctx.fillStyle = "blue";
+            ctx.beginPath();
+            ctx.moveTo(0, -10);
+            ctx.lineTo(20, 0);
+            ctx.lineTo(0, 10);
+            ctx.lineTo(-20, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            // Restauration du contexte
+            ctx.restore();
+        }
+
+        // Fonction pour mettre à jour la position de l'avion
+        function updatePlane() {
+            // Mise à jour de la position
+            x += speedX;
+            y += speedY;
+
+            // Gestion des collisions avec les bords du canvas
+            if (x < 0) {
+                x = 0;
+            }
+            if (x > canvas.width) {
+                x = canvas.width;
+            }
+            if (y < 0) {
+                y = 0;
+            }
+            if (y > canvas.height) {
+                y = canvas.height;
+            }
+        }
+
+        // Fonction pour dessiner les tirs
+        function drawBullets() {
+            for (var i = 0; i < bullets.length; i++) {
+                ctx.fillStyle = "red";
+                ctx.fillRect(bullets[i].x, bullets[i].y, 5, 5);
+            }
+        }
+
+        // Fonction pour mettre à jour la position des tirs
+        function updateBullets() {
+            for (var i = 0; i < bullets.length; i++) {
+                bullets[i].x += bullets[i].speedX;
+                bullets[i].y += bullets[i].speedY;
+            }
+
+            // Suppression des tirs sortis du canvas
+            bullets = bullets.filter(function (bullet) {
+                return bullet.x >= 0 && bullet.x <= canvas.width && bullet.y >= 0 && bullet.y <= canvas.height;
+            });
+        }
+
+        // Fonction pour dessiner les ennemis
+        function drawEnemies() {
+            for (var i = 0; i < enemies.length; i++) {
+                ctx.fillStyle = "green";
+                ctx.fillRect(enemies[i].x, enemies[i].y, 10, 10);
+
+            }
+        }
+
+        // Fonction pour mettre à jour la position des ennemis
+        function updateEnemies() {
+            for (var i = 0; i < enemies.length; i++) {
+                enemies[i].x += enemies[i].speedX;
+                enemies[i].y += enemies[i].speedY;
+            }
+
+            // Suppression des ennemis sortis du canvas
+            enemies = enemies.filter(function (enemy) {
+                return enemy.x >= 0 && enemy.x <= canvas.width && enemy.y >= 0 && enemy.y <= canvas.height;
+            });
+        }
+
+        // Fonction pour détecter les collisions entre les tirs et les ennemis
+        function detectCollisions() {
+            for (var i = 0; i < bullets.length; i++) {
+                for (var j = 0; j < enemies.length; j++) {
+                    if (bullets[i].x >= enemies[j].x && bullets[i].x <= enemies[j].x + 10 && bullets[i].y >= enemies[j]
+                        .y && bullets[i].y <= enemies[j].y + 10) {
+                        bullets.splice(i, 1);
+                        enemies.splice(j, 1);
+                        i--;
+                        j--;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Fonction pour dessiner le jeu
+        function draw() {
+            // Effacement du canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Dessin de l'avion, des tirs et des ennemis
+            drawPlane();
+            drawBullets();
+            drawEnemies();
+
+            // Mise à jour de la position de l'avion, des tirs et des ennemis
+            updatePlane();
+            updateBullets();
+            updateEnemies();
+
+            // Détection des collisions entre les tirs et les ennemis
+            detectCollisions();
+
+            // Appel récursif de la fonction
+            requestAnimationFrame(draw);
+        }
+
+        // Événements clavier pour diriger l'avion et tirer
+        document.addEventListener("keydown", function (event) {
+            switch (event.keyCode) {
+                case 37: // Flèche gauche
+                    angle -= Math.PI / 180 * 5;
+                    break;
+                case 38: // Flèche haut
+                    speedX += Math.sin(angle) * 0.1;
+                    speedY -= Math.cos(angle) * 0.1;
+                    break;
+                case 39: // Flèche droite
+                    angle += Math.PI / 180 * 5;
+                    break;
+                case 40: // Flèche bas
+                    speedX -= Math.sin(angle) * 0.1;
+                    speedY += Math.cos(angle) * 0.1;
+                    break;
+                case 32: // Barre d'espace
+                    bullets.push({
+                        x: x + Math.sin(angle) * 20,
+                        y: y - Math.cos(angle) * 20,
+                        speedX: Math.sin(angle) * 5,
+                        speedY: -Math.cos(angle) * 5
+                    });
+                    break;
+            }
+        });
+
+        // Création des ennemis toutes les 2 secondes
+        setInterval(function () {
+            enemies.push({
+                x: Math.random() * canvas.width,
+                y: 0,
+                speedX: Math.random() * 2 - 1,
+                speedY: Math.random() * 2 + 1
+            });
+        }, 2000);
+        // Appel initial de la fonction pour dessiner le jeu
+        draw();
+    </script>
+</body>
+
+</html>

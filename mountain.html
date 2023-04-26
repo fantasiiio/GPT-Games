@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Random Sine Waves</title>
+	<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+	<div id="plot"></div>
+	<script>
+		// Generate random frequencies, amplitudes, and offsets
+		var num_waves = 4;
+		var freq_range = [1, 10];
+		var amp_range = [-1, 1];
+		var offset_range = [0, 2*Math.PI];
+		
+		var f = [];
+		var a = [];
+		var o = [];
+		for (var i = 0; i < num_waves; i++) {
+			f.push(Math.random() * (freq_range[1] - freq_range[0]) + freq_range[0]);
+			a.push(Math.random() * (amp_range[1] - amp_range[0]) + amp_range[0]);
+			o.push(Math.random() * (offset_range[1] - offset_range[0]) + offset_range[0]);
+		}
+		
+		// Define the function to plot
+		function f_x(x) {
+			var sum = 0;
+			for (var i = 0; i < num_waves; i++) {
+				sum += a[i] * Math.sin(f[i] * (x + o[i]));
+			}
+			return sum;
+		}
+		
+		// Create the plot
+		var x_vals = [];
+		var y_vals = [];
+		var num_points = 1000;
+		var x_min = 0;
+		var x_max = 10;
+		var x_range = x_max - x_min;
+		var delta_x = x_range / num_points;
+		for (var i = 0; i < num_points; i++) {
+			var x = x_min + i*delta_x;
+			x_vals.push(x);
+			y_vals.push(f_x(x));
+			}
+		var trace1 = {
+			x: x_vals,
+			y: y_vals,
+			mode: 'lines',
+			line: {color: 'blue'}
+		};
+		var data = [trace1];
+		var layout = {
+			title: 'Random Sine Waves',
+			xaxis: {
+				title: 'x'
+			},
+			yaxis: {
+				title: 'y'
+			}
+		};
+		Plotly.newPlot('plot', data, layout);
+	</script>
+</body>
+</html>

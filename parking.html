@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stationnement de voitures</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+
+        .wheel {
+            width: 100px;
+            height: 100px;
+            background-color: gray;
+            border-radius: 50%;
+            transform-origin: 50% 50%;
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="parking" width="700" height="400"></canvas>
+    <script src="parking.js"></script>
+</body>
+
+</html>

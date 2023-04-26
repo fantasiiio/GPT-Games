@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Midpoint Displacement Fractal</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            background-color: #87CEEB;
+            /* Set canvas background color to sky blue */
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas" width="800" height="600"></canvas>
+    <script>
+        // Define the function to generate the fractal line
+        function generateFractalLine(x0, y0, x1, y1, roughness) {
+            // Calculate the midpoint and displacement
+            var xmid = (x0 + x1) / 2;
+            var ymid = (y0 + y1) / 2;
+            var displacement = (Math.random() - 0.5) * roughness * (x1 - x0);
+
+            // Calculate the coordinates of the displaced midpoint
+            var xmidDisplaced = Math.round(xmid + displacement);
+            var ymidDisplaced = Math.round(ymid + displacement);
+
+            if (x1 - x0 > 1) {
+                // Recursively generate the fractal line for the left and right intervals
+                var leftPoints = generateFractalLine(x0, y0, xmidDisplaced, ymidDisplaced, roughness);
+                var rightPoints = generateFractalLine(xmidDisplaced, ymidDisplaced, x1, y1, roughness);
+
+                // Combine the points from the left and right intervals
+                return leftPoints.concat(rightPoints);
+            } else {
+                // Base case: return the two endpoints of the interval plus two additional points at the bottom corners
+                return [
+                    [Math.round(x0), Math.round(y0)],
+                    [Math.round(x0), canvas.height],
+                    [Math.round(x1), canvas.height],
+                    [Math.round(x1), Math.round(y1)]
+                ];
+            }
+        }
+
+        // Define the function to draw the fractal line on a canvas
+        function drawFractalLine(ctx, points) {
+            ctx.beginPath();
+            ctx.moveTo(points[0][0], points[0][1]);
+            for (var i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i][0], points[i][1]);
+            }
+            // Set the stroke and fill color to green to make the fractal line and inside green
+            ctx.strokeStyle = "#008000";
+            ctx.stroke();
+        }
+
+        // Define the function to generate a new fractal line
+        function regenerateFractal(ctx, canvas, dx, dy) {
+            var x0 = points[0][0] + dx;
+            var y0 = canvas.height / 2 + dy; // Add dy to the initial y coordinate to move the fractal vertically
+            var x1 = canvas.width * 2;
+            var y1 = canvas.height / 2 + dy; // Add dy to the final y coordinate to move the fractal vertically
+            var roughness = 0.3; // Decrease roughness to smooth the fractal
+
+            points = generateFractalLine(x0, y0, x1, y1, roughness);
+            drawFractalLine(ctx, points);
+        }
+
+        // Define the function to scroll the fractal to the left or right
+        function scrollFractal(ctx, points, dx, dy) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < points.length; i++) {
+                points[i][0] += dx;
+                points[i][1] += dy; // Add dy to move the points vertically
+            }
+            drawFractalLine(ctx, points);
+
+        }
+
+        // Generate the initial fractal line and draw it on the canvas
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+        var dy = 0; // Initialize dy to zero
+        var points = generateFractalLine(0, canvas.height / 2 + dy, canvas.width, canvas.height / 2 + dy, 0.3);
+        drawFractalLine(ctx, points);
+
+        // Scroll the fractal to the left or right when arrow keys are pressed
+        document.addEventListener("keydown", function (event) {
+            if (event.code === "ArrowLeft") {
+                scrollFractal(ctx, points, -10, 0);
+            } else if (event.code === "ArrowRight") {
+                scrollFractal(ctx, points, 10, 0);
+            } else if (event.code === "ArrowUp") { // Move the fractal up when the up arrow key is pressed
+                dy -= 10;
+                scrollFractal(ctx, points, 0, -10);
+            } else if (event.code === "ArrowDown") { // Move the fractal down when the down arrow key is pressed
+                dy += 10;
+                scrollFractal(ctx, points, 0, 10);
+            }
+
+            if (points[points.length - 1][0] <= canvas.width) {
+                var newPoints = generateFractalLine(points[points.length - 1][0], canvas.height / 2 + dy, canvas
+                    .width * 2, canvas.height / 2 + dy, 0.3);
+                points = points.concat(newPoints);
+            }            
+        });
+
+        // Regenerate the fractal line when the canvas is resized
+        window.addEventListener("resize", function (event) {
+            regenerateFractal(ctx, canvas, -points[0][0], dy);
+        });
+    </script>

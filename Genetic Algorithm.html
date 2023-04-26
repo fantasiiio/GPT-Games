@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <input type="file" id="fileInput" onchange="handleFileUpload()" />
+    <canvas id="gameCanvas" width="1200" height="1000"></canvas>
+    <script>
+        class Gene {
+            static random() {
+                return Math.random() * 2 - 1;
+            }
+        }
+
+        class NeuralNetwork {
+            constructor(inputSize, hiddenSize, outputSize) {
+                this.inputLayer = Array.from({
+                    length: inputSize * hiddenSize
+                }, () => Gene.random());
+                this.hiddenLayer = Array.from({
+                    length: hiddenSize * outputSize
+                }, () => Gene.random());
+                this.biasHidden = Array.from({
+                    length: hiddenSize
+                }, () => Gene.random());
+                this.biasOutput = Array.from({
+                    length: outputSize
+                }, () => Gene.random());
+                this.isDead = false;
+            }
+
+            static sigmoid(x) {
+                return 1 / (1 + Math.exp(-x));
+            }
+
+            apply(input) {
+                const inputSize = input.length;
+                const hiddenSize = this.biasHidden.length;
+                const outputSize = this.biasOutput.length;
+
+                const hidden = Array(hiddenSize).fill(0);
+                const output = Array(outputSize).fill(0);
+
+                for (let h = 0; h < hiddenSize; h++) {
+                    for (let i = 0; i < inputSize; i++) {
+                        hidden[h] += input[i] * this.inputLayer[h * inputSize + i];
+                    }
+                    hidden[h] = NeuralNetwork.sigmoid(hidden[h] + this.biasHidden[h]);
+                }
+
+                for (let o = 0; o < outputSize; o++) {
+                    for (let h = 0; h < hiddenSize; h++) {
+                        output[o] += hidden[h] * this.hiddenLayer[o * hiddenSize + h];
+                    }
+                    output[o] = NeuralNetwork.sigmoid(output[o] + this.biasOutput[o]);
+                }
+
+                return output;
+            }
+
+            simulate(inputs) {
+                return this.apply(inputs);
+            }
+
+            fitness(inputs, expectedOutputs) {
+                const simulatedOutputs = this.simulate(inputs).flat();
+                let error = 0;
+                for (let i = 0; i < expectedOutputs.length; i++) {
+                    error += Math.abs(simulatedOutputs[i] - expectedOutputs[i]);
+                }
+                return 1 / (error + 1);
+            }
+
+
+            crossover(partner) {
+                const child = new NeuralNetwork(geneticAlgorithm.inputSize, geneticAlgorithm.hiddenSize, geneticAlgorithm.outputSize);
+
+                for (let i = 0; i < child.inputLayer.length; i++) {
+                    child.inputLayer[i] = i % 2 === 0 ? this.inputLayer[i] : partner.inputLayer[i];
+                }
+
+                for (let i = 0; i < child.hiddenLayer.length; i++) {
+                    child.hiddenLayer[i] = i % 2 === 0 ? this.hiddenLayer[i] : partner.hiddenLayer[i];
+                }
+
+                for (let i = 0; i < child.biasHidden.length; i++) {
+                    child.biasHidden[i] = i % 2 === 0 ? this.biasHidden[i] : partner.biasHidden[i];
+                }
+
+                for (let i = 0; i < child.biasOutput.length; i++) {
+                    child.biasOutput[i] = i % 2 === 0 ? this.biasOutput[i] : partner.biasOutput[i];
+                }
+
+                return child;
+            }
+
+            mutate(mutationRate) {
+                function mutateGene(gene) {
+                    if (Math.random() < mutationRate) {
+                        return Gene.random();
+                    } else {
+                        return gene;
+                    }
+                }
+
+                this.inputLayer = this.inputLayer.map(mutateGene);
+                this.hiddenLayer = this.hiddenLayer.map(mutateGene);
+                this.biasHidden = this.biasHidden.map(mutateGene);
+                this.biasOutput = this.biasOutput.map(mutateGene);
+            }
+
+            saveGenes() {
+                const genes = {
+                    inputLayer: this.inputLayer,
+                    hiddenLayer: this.hiddenLayer,
+                    biasHidden: this.biasHidden,
+                    biasOutput: this.biasOutput
+                };
+
+                const json = JSON.stringify(genes);
+                localStorage.setItem('neuralNetworkGenes', json);
+            }
+
+            loadGenes() {
+                const json = localStorage.getItem('neuralNetworkGenes');
+                if (json) {
+                    const genes = JSON.parse(json);
+                    this.inputLayer = genes.inputLayer;
+                    this.hiddenLayer = genes.hiddenLayer;
+                    this.biasHidden = genes.biasHidden;
+                    this.biasOutput = genes.biasOutput;
+                } else {
+                    console.error('No saved genes found in localStorage.');
+                }
+            }
+        }
+
+        class GeneticAlgorithm {
+            constructor(populationSize, inputSize, hiddenSize, outputSize, mutationRate, maxGenerations, inputs,
+                expectedOutputs) {
+                this.populationSize = populationSize;
+                this.inputSize = inputSize;
+                this.hiddenSize = hiddenSize;
+                this.outputSize = outputSize;
+                this.mutationRate = mutationRate;
+                this.maxGenerations = maxGenerations;
+                this.inputs = inputs;
+                this.expectedOutputs = expectedOutputs;
+            }
+            evaluatePopulation(population) {
+                // Mettez à jour les positions de vos individus, détectez les collisions, etc.
+                // Marquez un individu comme "mort" lorsque cela est approprié.
+                // Pour cet exemple, nous marquons tous les individus comme "morts" après un certain temps.
+                setTimeout(() => {
+                    population.forEach(individual => {
+                        individual.isDead = true;
+                    });
+                }, 1000);
+            }
+
+            allIndividualsDead(population) {
+                return population.every(individual => individual.isDead);
+            }
+
+            run(callback) {
+                let population = [];
+                for (let i = 0; i < this.populationSize; i++) {
+                    population.push(new NeuralNetwork(this.inputSize, this.hiddenSize, this.outputSize));
+                }
+
+                const runGeneration = (generation) => {
+                    if (generation >= this.maxGenerations) {
+                        callback(population[0]);
+                        return;
+                    }
+
+                    this.evaluatePopulation(population);
+
+                    const checkPopulation = () => {
+                        if (this.allIndividualsDead(population)) {
+                            const simulatedOutputsList = population.map(individual => individual
+                                .simulate(this.inputs));
+                            population.forEach((individual, index) => {
+                                individual.currentFitness = individual.fitness(
+                                    simulatedOutputsList[index],
+                                    this.expectedOutputs);
+                            });
+                            population.sort((a, b) => b.currentFitness - a.currentFitness);
+                            console.log(
+                                `Génération ${generation}: Meilleure fitness = ${population[0].currentFitness}`
+                            );
+
+                            population = this.createNewGeneration(population);
+                            runGeneration(generation + 1);
+                        } else {
+                            requestAnimationFrame(checkPopulation);
+                        }
+                    };
+
+                    requestAnimationFrame(checkPopulation);
+                };
+
+                runGeneration(0);
+            }
+
+
+
+            selectParents(population) {
+                let parent1 = population[Math.floor(Math.random() * population.length)];
+                let parent2 = population[Math.floor(Math.random() * population.length)];
+
+                return parent1.fitness(this.inputs, this.expectedOutputs) > parent2.fitness(this.inputs, this
+                    .expectedOutputs) ? [parent1, parent2] : [parent2, parent1];
+            }
+
+            createNewGeneration(population) {
+                const newGeneration = [];
+                for (let i = 0; i < population.length; i++) {
+                    const parents = this.selectParents(population);
+                    const child = parents[0].crossover(parents[1]);
+                    child.mutate(this.mutationRate);
+                    newGeneration.push(child);
+                }
+                return newGeneration;
+            }
+
+        }
+
+        function handleFileUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            NeuralNetwork.loadGenes(file, (neuralNetwork) => {
+                // Use the loaded neural network
+                console.log('Loaded neural network:', neuralNetwork);
+            });
+        }
+
+        // Exemple d'utilisation
+        const populationSize = 100;
+        const inputSize = 5;
+        const hiddenSize = 5;
+        const outputSize = 1;
+        const mutationRate = 0.1;
+        const maxGenerations = 50;
+        const inputs = [
+            [0],
+            [0.5],
+            [1],
+            [1.5],
+            [2]
+        ];
+        const expectedOutputs = [0];
+
+        const geneticAlgorithm = new GeneticAlgorithm(populationSize, inputSize, hiddenSize, outputSize,
+            mutationRate,
+            maxGenerations, inputs, expectedOutputs);
+
+        geneticAlgorithm.run((bestNeuralNetwork) => {
+            console.log('Meilleur réseau de neurones:', bestNeuralNetwork);
+            const simulatedOutputs = bestNeuralNetwork.simulate(inputs);
+            console.log('Fitness:', fitness(simulatedOutputs, expectedOutputs));
+        });
+    </script>
+</body>
+
+</html>

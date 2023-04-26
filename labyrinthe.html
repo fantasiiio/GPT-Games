@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Labyrinthe</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="labyrinthe" width="500" height="500"></canvas>
+    <script>
+        const canvas = document.getElementById('labyrinthe');
+        const ctx = canvas.getContext('2d');
+        const tailleCellule = 20;
+        const largeur = canvas.width / tailleCellule;
+        const hauteur = canvas.height / tailleCellule;
+
+        class Cellule {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.murs = [true, true, true, true]; // haut, droite, bas, gauche
+                this.visite = false;
+            }
+
+            draw() {
+                const x = this.x * tailleCellule;
+                const y = this.y * tailleCellule;
+
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 2;
+
+                if (this.murs[0]) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + tailleCellule, y);
+                    ctx.stroke();
+                }
+
+                if (this.murs[1]) {
+                    ctx.beginPath();
+                    ctx.moveTo(x + tailleCellule, y);
+                    ctx.lineTo(x + tailleCellule, y + tailleCellule);
+                    ctx.stroke();
+                }
+
+                if (this.murs[2]) {
+                    ctx.beginPath();
+                    ctx.moveTo(x + tailleCellule, y + tailleCellule);
+                    ctx.lineTo(x, y + tailleCellule);
+                    ctx.stroke();
+                }
+
+                if (this.murs[3]) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, y + tailleCellule);
+                    ctx.lineTo(x, y);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function creerGrille() {
+            const grille = [];
+
+            for (let y = 0;y < hauteur; y++) {
+                const rangee = [];
+                for (let x = 0; x < largeur; x++) {
+                    rangee.push(new Cellule(x, y));
+                }
+                grille.push(rangee);
+            }
+
+            return grille;
+        }
+
+        function voisinsNonVisites(cellule, grille) {
+            const voisins = [];
+
+            if (cellule.y > 0) {
+                const haut = grille[cellule.y - 1][cellule.x];
+                if (!haut.visite) voisins.push(haut);
+            }
+
+            if (cellule.x < largeur - 1) {
+                const droite = grille[cellule.y][cellule.x + 1];
+                if (!droite.visite) voisins.push(droite);
+            }
+
+            if (cellule.y < hauteur - 1) {
+                const bas = grille[cellule.y + 1][cellule.x];
+                if (!bas.visite) voisins.push(bas);
+            }
+
+            if (cellule.x > 0) {
+                const gauche = grille[cellule.y][cellule.x - 1];
+                if (!gauche.visite) voisins.push(gauche);
+           }
+
+            return voisins;
+        }
+
+        function retirerMur(cellule1, cellule2) {
+            const x = cellule1.x - cellule2.x;
+            const y = cellule1.y - cellule2.y;
+
+            if (x === 1) {
+                cellule1.murs[3] = false;
+                cellule2.murs[1] = false;
+            } else if (x === -1) {
+                cellule1.murs[1] = false;
+                cellule2.murs[3] = false;
+            }
+
+            if (y === 1) {
+                cellule1.murs[0] = false;
+                cellule2.murs[2] = false;
+            } else if (y === -1) {
+                cellule1.murs[2] = false;
+                cellule2.murs[0] = false;
+            }
+        }
+
+        function genererLabyrinthe(grille) {
+            const depart = grille[0][0];
+            const pile = [depart];
+
+            depart.visite = true;
+
+            while (pile.length > 0) {
+                const cellule = pile[pile.length - 1];
+                const voisins = voisinsNonVisites(cellule, grille);
+
+                if (voisins.length > 0) {
+                    const voisin = voisins[Math.floor(Math.random() * voisins.length)];
+                    retirerMur(cellule, voisin);
+                    voisin.visite = true;
+                    pile.push(voisin);
+                } else {
+                    pile.pop();
+                }
+            }
+        }
+
+        function dessinerLabyrinthe(grille) {
+            for (let y = 0; y < hauteur; y++) {
+                for (let x = 0; x < largeur; x++) {
+                    grille[y][x].draw();
+                }
+            }
+        }
+
+        const grille = creerGrille();
+        genererLabyrinthe(grille);
+        dessinerLabyrinthe(grille);
+
+    </script>
+</body>
+</html>
