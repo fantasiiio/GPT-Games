@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Circuit de course sur une grille</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="circuit" width="800" height="400"></canvas>
+    <script>
+        const canvas = document.getElementById('circuit');
+        const ctx = canvas.getContext('2d');
+        const gridSize = 40;
+
+        // Dessiner la grille
+        function drawGrid() {
+            ctx.beginPath();
+            for (let x = gridSize; x < canvas.width; x += gridSize) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+            }
+            for (let y = gridSize; y < canvas.height; y += gridSize) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+            }
+            ctx.strokeStyle = 'lightgray';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        // Dessiner un quart de cercle
+        function drawQuarterCircle(x, y, orientation) {
+            ctx.beginPath();
+            let startAngle, endAngle;
+
+            switch (orientation) {
+                case 0:
+                    startAngle = Math.PI;
+                    endAngle = 1.5 * Math.PI;
+                    //x += 0.25;
+                    break;
+                case 1:
+                    startAngle = 1.5 * Math.PI;
+                    endAngle = 2 * Math.PI;
+                    //y += 0.5;
+                    break;
+                case 2:
+                    startAngle = 0;
+                    endAngle = 0.5 * Math.PI;
+                    //x -= 0.5;
+                    //y += 0.5;
+                    break;
+                case 3:
+                    startAngle = 0.5 * Math.PI;
+                    endAngle = Math.PI;
+                    //x += 0.5;
+                    //y -= 0.5;
+                    break;
+            }
+
+            ctx.arc(x * gridSize, y * gridSize , gridSize * 0.75, startAngle, endAngle);
+            //ctx.lineTo(x * gridSize + gridSize / 2, y * gridSize + gridSize / 2);
+            ctx.closePath();
+            ctx.fillStyle = 'gray';
+            ctx.fill();
+        }
+
+
+        // Dessiner un segment droit
+        function drawStraightSegment(x, y, orientation) {
+            ctx.beginPath();
+            if (orientation === 0) {
+                ctx.rect(x * gridSize, y * gridSize + gridSize / 4, gridSize, gridSize / 2);
+            } else {
+                ctx.rect(x * gridSize + gridSize / 4, y * gridSize, gridSize / 2, gridSize);
+            }
+            ctx.fillStyle = 'gray';
+            ctx.fill();
+        }
+
+        function generateTrack() {
+            drawGrid();
+
+            // Quarts de cercle
+            drawQuarterCircle(5, 5, 0);
+            drawQuarterCircle(9, 5, 1);
+            drawQuarterCircle(5, 9, 3);
+            drawQuarterCircle(9, 9, 2);
+
+            // Segments droits
+            for (let i = 6; i < 9; i++) {
+                drawStraightSegment(i, 5, 0);
+                drawStraightSegment(i, 9, 0);
+            }
+            for (let i = 6; i < 9; i++) {
+                drawStraightSegment(5, i, 1);
+                drawStraightSegment(9, i, 1);
+            }
+        }
+
+
+        generateTrack();
+    </script>
+</body>
+
+</html>
