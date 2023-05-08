@@ -6,6 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Track Editor</title>
     <style>
+        body {
+            background-color: green;
+        }
         html {
             height: 100%;
         }
@@ -108,7 +111,7 @@
             <input id="eraseTrackBtn" name="drawErase" type="radio">
             <span class="slider"></span>
         </label>
-        <span>Run</span>
+        <span id="runLbl">Run</span>
         <label class="switch">
             <input id="runBtn" name="drawErase" type="radio" checked>
             <span class="slider"></span>
@@ -116,7 +119,7 @@
         <button id="validateTrackBtn">Valider la piste</button>
         <button id="saveTrackBtn">Sauvegarder la piste</button>
         <button id="loadTrackBtn">Charger la piste</button>
-        <button id="editCheckpointsBtn">Modifier les points de contrôle</button>
+        <button id="clearTrackBtn">Vider la piste</button>
     </div>
     <section>
         <div id="divCanvas">
@@ -125,6 +128,8 @@
     </section>
     <script src="race-track-editor.js"></script>
     <script src="parking.js"></script>
+    <script src="Genetic Algorithm.js"></script>
+        
 </body>
 
 </html>

@@ -1,9 +1,14 @@
 class Track {
     constructor(canvas) {
+        this.pan = {
+            x: 0,
+            y: 0
+        };
+        this.path = [];
         this.canvas = canvas;
         this.ctx = this.canvas.getContext("2d");
 
-        this.squareSize = 200;
+        this.squareSize = 500;
         this.gridWidth = 30;
         this.gridHeight = 30;
         this.gridSize = this.squareSize * this.gridWidth;
@@ -16,16 +21,17 @@ class Track {
             x: 0,
             y: 0,
             dir: "",
+            revert: true
         };
 
         this.zoomLevel = 0.5;
         this.maxSquareSize = 300;
 
-        this.drawGrid();
+        //this.drawGrid();
     }
 
     drawGrid() {
-        ctx.strokeStyle = '#ccc';
+        ctx.strokeStyle = 'darkGreen';
         for (let i = 0; i <= this.gridWidth; i++) {
             ctx.beginPath();
             ctx.moveTo(i * this.squareSize, 0);
@@ -41,39 +47,73 @@ class Track {
         }
     }
 
-    drawTrack(x, y) {
-        //ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setTrack(x, y) {
         this.grid[x][y] = true;
-        this.drawGrid();
+    }
 
+    drawTrack() {
         for (let x = 0; x < this.gridWidth; x++) {
             for (let y = 0; y < this.gridHeight; y++) {
                 if (this.grid[x][y]) {
                     ctx.fillStyle = "darkgray";
                     ctx.strokeStyle = 'darkgray';
 
-                    let isBottomRightCorner = x > 0 && y > 0 && this.grid[x - 1][y] && this.grid[x][y - 1];
-                    let isBottomLeftCorner = x < this.gridWidth - 1 && y > 0 && this.grid[x + 1][y] && this.grid[x][y - 1];
-                    let isTopRightCorner = x > 0 && y < this.gridHeight - 1 && this.grid[x - 1][y] && this.grid[x][y + 1];
-                    let isTopLeftCorner = x < this.gridWidth - 1 && y < this.gridHeight - 1 && this.grid[x + 1][y] && this.grid[x][y + 1];
+                    const neighbors = [{
+                            x: x + 1,
+                            y
+                        },
+                        {
+                            x: x - 1,
+                            y
+                        },
+                        {
+                            x,
+                            y: y + 1
+                        },
+                        {
+                            x,
+                            y: y - 1
+                        },
+                    ];
+                    let neighborCount = 0;
+                    for (let neighbor of neighbors) {
+                        if (
+                            neighbor.x >= 0 &&
+                            neighbor.x < this.gridWidth &&
+                            neighbor.y >= 0 &&
+                            neighbor.y < this.gridHeight &&
+                            this.grid[neighbor.x][neighbor.y]
+                        ) {
+                            neighborCount++;
+                        }
+                    }
 
-                    ctx.beginPath();
-                    if (isTopLeftCorner) {
-                        ctx.arc(x * this.squareSize + this.squareSize, y * this.squareSize + this.squareSize, this.squareSize, Math.PI, 1.5 * Math.PI, false);
-                        ctx.lineTo(x * this.squareSize + this.squareSize, y * this.squareSize + this.squareSize);
-                        ctx.lineTo(x * this.squareSize, y * this.squareSize + this.squareSize);
-                    } else if (isTopRightCorner) {
-                        ctx.arc(x * this.squareSize, y * this.squareSize + this.squareSize, this.squareSize, 1.5 * Math.PI, 2 * Math.PI, false);
-                        ctx.lineTo(x * this.squareSize, y * this.squareSize + this.squareSize);
-                        ctx.lineTo(x * this.squareSize, y * this.squareSize + this.squareSize);
-                    } else if (isBottomLeftCorner) {
-                        ctx.arc(x * this.squareSize + this.squareSize, y * this.squareSize, this.squareSize, Math.PI / 2, Math.PI, false);
-                        ctx.lineTo(x * this.squareSize + this.squareSize, y * this.squareSize);
-                        ctx.lineTo(x * this.squareSize + this.squareSize, y * this.squareSize + this.squareSize);
-                    } else if (isBottomRightCorner) {
-                        ctx.arc(x * this.squareSize, y * this.squareSize, this.squareSize, 0, Math.PI / 2, false);
-                        ctx.lineTo(x * this.squareSize, y * this.squareSize + this.squareSize);
-                        ctx.lineTo(x * this.squareSize, y * this.squareSize);
+                    if (neighborCount == 2) {
+                        const top = this.grid[neighbors[3].x][neighbors[3].y];
+                        const bottom = this.grid[neighbors[2].x][neighbors[2].y];
+                        const left = this.grid[neighbors[1].x][neighbors[1].y];
+                        const right = this.grid[neighbors[0].x][neighbors[0].y];
+
+                        ctx.beginPath();
+                        if (right && bottom) {
+                            ctx.arc(x * this.squareSize + this.squareSize, y * this.squareSize + this.squareSize, this.squareSize, Math.PI, 1.5 * Math.PI, false);
+                            ctx.lineTo(x * this.squareSize + this.squareSize, y * this.squareSize + this.squareSize);
+                            ctx.lineTo(x * this.squareSize, y * this.squareSize + this.squareSize);
+                        } else if (left && bottom) {
+                            ctx.arc(x * this.squareSize, y * this.squareSize + this.squareSize, this.squareSize, 1.5 * Math.PI, 2 * Math.PI, false);
+                            ctx.lineTo(x * this.squareSize, y * this.squareSize + this.squareSize);
+                            ctx.lineTo(x * this.squareSize, y * this.squareSize + this.squareSize);
+                        } else if (right && top) {
+                            ctx.arc(x * this.squareSize + this.squareSize, y * this.squareSize, this.squareSize, Math.PI / 2, Math.PI, false);
+                            ctx.lineTo(x * this.squareSize + this.squareSize, y * this.squareSize);
+                            ctx.lineTo(x * this.squareSize + this.squareSize, y * this.squareSize + this.squareSize);
+                        } else if (left && top) {
+                            ctx.arc(x * this.squareSize, y * this.squareSize, this.squareSize, 0, Math.PI / 2, false);
+                            ctx.lineTo(x * this.squareSize, y * this.squareSize + this.squareSize);
+                            ctx.lineTo(x * this.squareSize, y * this.squareSize);
+                        } else {
+                            ctx.rect(x * this.squareSize, y * this.squareSize, this.squareSize, this.squareSize);
+                        }
                     } else {
                         ctx.rect(x * this.squareSize, y * this.squareSize, this.squareSize, this.squareSize);
                     }
@@ -84,7 +124,142 @@ class Track {
             }
         }
         this.drawDashedLines();
+    }
 
+    getTrackGeometry() {
+        let geometry = {
+            lines: [],
+            arcs: []
+        };
+
+        for (let x = 0; x < this.gridWidth; x++) {
+            for (let y = 0; y < this.gridHeight; y++) {
+                if (this.grid[x][y]) {
+                    const neighbors = [{
+                            x: x + 1,
+                            y
+                        },
+                        {
+                            x: x - 1,
+                            y
+                        },
+                        {
+                            x,
+                            y: y + 1
+                        },
+                        {
+                            x,
+                            y: y - 1
+                        },
+                    ];
+                    let neighborCount = 0;
+                    for (let neighbor of neighbors) {
+                        if (
+                            neighbor.x >= 0 &&
+                            neighbor.x < this.gridWidth &&
+                            neighbor.y >= 0 &&
+                            neighbor.y < this.gridHeight &&
+                            this.grid[neighbor.x][neighbor.y]
+                        ) {
+                            neighborCount++;
+                        }
+                    }
+
+                    if (neighborCount == 2) {
+                        const top = this.grid[neighbors[3].x][neighbors[3].y];
+                        const bottom = this.grid[neighbors[2].x][neighbors[2].y];
+                        const left = this.grid[neighbors[1].x][neighbors[1].y];
+                        const right = this.grid[neighbors[0].x][neighbors[0].y];
+                        if (top && bottom) { // Vertical
+                            geometry.lines.push({
+                                p1: new Vector(x * this.squareSize, y * this.squareSize),
+                                p2: new Vector(x * this.squareSize, y * this.squareSize + this.squareSize)
+                            });
+                            geometry.lines.push({
+                                p1: new Vector(x * this.squareSize + this.squareSize, y * this.squareSize),
+                                p2: new Vector(x * this.squareSize + this.squareSize, y * this.squareSize + this.squareSize)
+                            });
+                        } else if (left && right) { // Horizontal
+                            geometry.lines.push({
+                                p1: new Vector(x * this.squareSize, y * this.squareSize),
+                                p2: new Vector(x * this.squareSize + this.squareSize, y * this.squareSize)
+                            });
+                            geometry.lines.push({
+                                p1: new Vector(x * this.squareSize, y * this.squareSize + this.squareSize),
+                                p2: new Vector(x * this.squareSize + this.squareSize, y * this.squareSize + this.squareSize)
+                            });
+                        } else if (top && left) { // Top left corner
+                            geometry.arcs.push({
+                                center: new Vector(x * this.squareSize, y * this.squareSize),
+                                radius: this.squareSize,
+                                startAngle: 0,
+                                endAngle: Math.PI / 2,
+                                anticlockwise: false
+                            });
+                        } else if (top && right) { // Top right corner
+                            geometry.arcs.push({
+                                center: new Vector(x * this.squareSize + this.squareSize, y * this.squareSize),
+                                radius: this.squareSize,
+                                startAngle: Math.PI / 2,
+                                endAngle: Math.PI,
+                                anticlockwise: false
+                            });
+                        } else if (bottom && left) { // Bottom left corner
+                            geometry.arcs.push({
+                                center: new Vector(x * this.squareSize, y * this.squareSize + this.squareSize),
+                                radius: this.squareSize,
+                                startAngle: 1.5 * Math.PI,
+                                endAngle: 2 * Math.PI,
+                                anticlockwise: false
+                            });
+                        } else if (bottom && right) { // Bottom right corner
+                            geometry.arcs.push({
+                                center: new Vector(x * this.squareSize + this.squareSize, y * this.squareSize + this.squareSize),
+                                radius: this.squareSize,
+                                startAngle: Math.PI,
+                                endAngle: 1.5 * Math.PI,
+                                anticlockwise: false
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        return geometry;
+    }
+
+
+
+
+    drawTrackGeometry(geometry, ctx) {
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 10;
+        ctx.fillStyle = 'black';
+
+        ctx.beginPath();
+        for (let i = 0; i < geometry.lines.length; i++) {
+            const {
+                p1,
+                p2
+            } = geometry.lines[i];
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+        }
+        ctx.stroke();
+
+        for (let i = 0; i < geometry.arcs.length; i++) {
+            const {
+                center,
+                radius,
+                startAngle,
+                endAngle,
+                anticlockwise
+            } = geometry.arcs[i];
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, radius, startAngle, endAngle, anticlockwise);
+            ctx.stroke();
+        }
     }
 
     clearSquare(x, y) {
@@ -103,48 +278,119 @@ class Track {
         ctx.stroke();
     }
 
+    panEvent(event) {
+        event.preventDefault();
+        this.pan.x += event.movementX;
+        this.pan.y += event.movementY;
+        this.redraw();
+    }
+
     zoom(event) {
+        event.preventDefault();
         const scaleFactor = 1.1;
         const zoomFactor = event.deltaY < 0 ? scaleFactor : 1 / scaleFactor;
         this.zoomLevel *= zoomFactor;
+
         this.redraw();
     }
 
     redraw() {
+        if (!this.redraw.debounced) {
+            this.redraw.debounced = true;
+            setTimeout(() => {
+                this.redraw.debounced = false;
+                // The code that needs to be debounced goes here:
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.save();
+                ctx.translate(this.pan.x, this.pan.y);
+                ctx.scale(this.zoomLevel, this.zoomLevel);
+                this.drawGrid();
+                this.drawTrack();
+                let geometry = this.getTrackGeometry();
+                this.drawTrackGeometry(geometry, ctx);
+                let carIndex = 0;
+                for (let redCar of redCars) {
+                    if (carIndex == 0)
+                        redCar.drawLaserSensors(ctx);
+                    redCar.draw(ctx);
+                    for (let laserSensor of redCar.laserSensors) {
+                        let intersection = laserSensor.calculateTrackIntersection(geometry);
+                        laserSensor.intersectionInfo = intersection;
+                        if (carIndex == 0)
+                            drawIntersectionPoint(ctx, intersection);
+                    }
+                    // Check for collisions walls
+                    let intersect = redCar.calculateIntersectionWithTrack(geometry);
+                    if (intersect.objectType) {
+                        intersect.objectType = "other"
+                        drawIntersectionPoint(ctx, intersect)
+                    }
+                    carIndex++;;
+                }
+
+                ctx.restore();
+
+            }, 1000 / 60);
+        }
+    }
+
+    redrawNormal() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.save();
+        ctx.translate(this.pan.x, this.pan.y);
         ctx.scale(this.zoomLevel, this.zoomLevel);
         this.drawGrid();
-        for (let x = 0; x < this.gridWidth; x++) {
-            for (let y = 0; y < this.gridHeight; y++) {
-                if (this.grid[x][y]) {
-                    this.drawTrack(x, y);
-                }
+        this.drawTrack();
+        let geometry = this.getTrackGeometry();
+        this.drawTrackGeometry(geometry, ctx);
+        let carIndex = 0;
+        for (let redCar of redCars) {
+            if (carIndex == 0)
+                redCar.drawLaserSensors(ctx);
+            redCar.draw(ctx);
+            for (let laserSensor of redCar.laserSensors) {
+                let intersection = laserSensor.calculateTrackIntersection(geometry);
+                laserSensor.intersectionInfo = intersection;
+                if (carIndex == 0)
+                    drawIntersectionPoint(ctx, intersection);
             }
+            carIndex++;;
         }
 
-        for (let redCar of redCars) {
-            redCar.draw(ctx);
-        }
         ctx.restore();
     }
+
+
 
 
     getTrackPath() {
         const visited = new Array(this.gridWidth).fill(null).map(() => new Array(this.gridHeight).fill(false));
         let path = [];
 
-        let visit = (x, y, dir)=> {
+        let visit = (x, y, dir) => {
             visited[x][y] = true;
 
             const cellPos = {
                 x,
                 y
             };
-            let cellDir = dir || this.getTrackDirectionSimple({
-                x,
-                y
-            });
+            if (!dir) {
+                dir = this.getTrackDirectionSimple({
+                    x,
+                    y
+                });
+                if (dir == "horizontal" && startPoint.revert)
+                    dir = "right";
+                else if (dir == "horizontal" && !startPoint.revert)
+                    dir = "left";
+                else if (dir == "vertical" && startPoint.revert)
+                    dir = "down";
+                else if (dir == "vertical" && !startPoint.revert)
+                    dir = "up";
+            }
+
+            let cellDir = dir;
             path.push({
                 pos: cellPos,
                 dir: cellDir
@@ -179,7 +425,10 @@ class Track {
                 ) {
                     //const neighborPos = { x: neighbor.x, y: neighbor.y };
                     let neighborDir;
-                    if (neighbor.x === x + 1) {
+                    if (neighbor.x === x + 1 && neighbor.y === y + 1) {
+                        neighborDir = "upleft";
+                        0
+                    } else if (neighbor.x === x + 1) {
                         neighborDir = "left";
                     } else if (neighbor.x === x - 1) {
                         neighborDir = "right";
@@ -200,20 +449,38 @@ class Track {
 
 
     isTrackClosed() {
-        let path2 = this.getTrackPath();
+        const trackPath = this.getTrackPath();
+        const trackCellCount = this.grid.flat().filter(cell => cell).length;
 
-        if (path2.length < 4) {
+        if (trackPath.length !== trackCellCount) {
             return false;
         }
 
-        const first = path2[0];
-        const last = path2[path2.length - 1];
+        const firstCell = trackPath[0];
+        const lastCell = trackPath[trackPath.length - 1];
+        const neighbors = [{
+                x: lastCell.pos.x + 1,
+                y: lastCell.pos.y
+            },
+            {
+                x: lastCell.pos.x - 1,
+                y: lastCell.pos.y
+            },
+            {
+                x: lastCell.pos.x,
+                y: lastCell.pos.y + 1
+            },
+            {
+                x: lastCell.pos.x,
+                y: lastCell.pos.y - 1
+            },
+        ];
 
-        return first.pos.x === last.pos.x && first.pos.y === last.pos.y;
+        return neighbors.some(neighbor => neighbor.x === firstCell.pos.x && neighbor.y === firstCell.pos.y);
     }
 
     getTrackDirection(pos) {
-        let path = this.getTrackPath();
+        let path = this.path;
 
         for (let i = 0; i < path.length; i++) {
             if (path[i].pos.x === pos.x && path[i].pos.y === pos.y) {
@@ -321,10 +588,56 @@ class Track {
                             x,
                             y
                         });
-                        car.angle = direction === "horizontal" ? 0 : 90;
+                        car.angle = direction === 'left' ? 180 : direction === 'down' ? 90 : direction === 'right' ? 0 : 270;
                     }
                 }
             }
+        }
+    }
+
+
+    drawMultipleArrowheads(ctx, fromX, fromY, toX, toY, headLength, headWidth, numArrowheads, reverseDirection) {
+        const dx = toX - fromX;
+        const dy = toY - fromY;
+        const angle = Math.atan2(dy, dx);
+        const halfHeadWidthAngle = Math.atan2(headWidth / 2, headLength);
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const step = length / (numArrowheads);
+
+        const direction = reverseDirection ? -1 : 1;
+
+        for (let i = 1; i <= numArrowheads; i++) {
+            const arrowX = fromX + i * step * Math.cos(angle);
+            const arrowY = fromY + i * step * Math.sin(angle);
+
+            ctx.beginPath();
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - direction * headLength * Math.cos(angle - halfHeadWidthAngle), arrowY - direction * headLength * Math.sin(angle - halfHeadWidthAngle));
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - direction * headLength * Math.cos(angle + halfHeadWidthAngle), arrowY - direction * headLength * Math.sin(angle + halfHeadWidthAngle));
+            ctx.stroke();
+        }
+    }
+
+
+    drawMultipleArrowheadsOnArc(ctx, centerX, centerY, radius, startAngle, endAngle, headLength, headWidth, numArrowheads, counterClockwise) {
+        const angleDifference = counterClockwise ? startAngle - endAngle : endAngle - startAngle;
+        const angleStep = angleDifference / (numArrowheads);
+        const halfHeadWidthAngle = Math.atan2(headWidth / 2, headLength);
+
+        for (let i = 0; i <= numArrowheads; i++) {
+            const currentAngle = counterClockwise ? startAngle - i * angleStep : startAngle + i * angleStep;
+            const arrowX = centerX + radius * Math.cos(currentAngle);
+            const arrowY = centerY + radius * Math.sin(currentAngle);
+
+            const angle = currentAngle + (counterClockwise ? -Math.PI / 2 : Math.PI / 2);
+
+            ctx.beginPath();
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - headLength * Math.cos(angle - halfHeadWidthAngle), arrowY - headLength * Math.sin(angle - halfHeadWidthAngle));
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - headLength * Math.cos(angle + halfHeadWidthAngle), arrowY - headLength * Math.sin(angle + halfHeadWidthAngle));
+            ctx.stroke();
         }
     }
 
@@ -332,42 +645,77 @@ class Track {
     drawDashedLines() {
         ctx.strokeStyle = '#FF0';
         ctx.lineWidth = 5;
-        ctx.setLineDash([50, 50]);
+        //ctx.setLineDash([50, 50]);
 
-        for (let x = 0; x < this.gridWidth; x++) {
-            for (let y = 0; y < this.gridHeight; y++) {
-                if (this.grid[x][y]) {
-                    const top = this.grid[x][y - 1];
-                    const bottom = this.grid[x][y + 1];
-                    const left = this.grid[x - 1][y];
-                    const right = this.grid[x + 1][y];
-
-                    ctx.beginPath();
-
-                    if (top && bottom) {
-                        ctx.moveTo(x * this.squareSize + this.squareSize / 2, y * this.squareSize);
-                        ctx.lineTo(x * this.squareSize + this.squareSize / 2, (y + 1) * this.squareSize);
-                    } else if (left && right) {
-                        ctx.moveTo(x * this.squareSize, y * this.squareSize + this.squareSize / 2);
-                        ctx.lineTo((x + 1) * this.squareSize, y * this.squareSize + this.squareSize / 2);
-                    } else if (top && left) {
-                        ctx.arc(x * this.squareSize, y * this.squareSize, this.squareSize / 2, 0, Math.PI / 2, false);
-                    } else if (top && right) {
-                        ctx.arc(x * this.squareSize + this.squareSize, y * this.squareSize, this.squareSize / 2, Math.PI / 2, Math.PI, false);
-                    } else if (bottom && left) {
-                        ctx.arc(x * this.squareSize, y * this.squareSize + this.squareSize, this.squareSize / 2, 1.5 * Math.PI, 2 * Math.PI, false);
-                    } else if (bottom && right) {
-                        ctx.arc(x * this.squareSize + this.squareSize, y * this.squareSize + this.squareSize, this.squareSize / 2, Math.PI, 1.5 * Math.PI, false);
-                    }
-
-                    ctx.stroke();
+        const arrowHeadLength = 20;
+        const arrowHeadWidth = 15;
+        const numArrowheads = 8;
+        const numArrowheadsArc = 6;
+        for (let path of this.path) {
+            let x = path.pos.x;
+            let y = path.pos.y;
+            const neighbors = [{
+                    x: x + 1,
+                    y
+                },
+                {
+                    x: x - 1,
+                    y
+                },
+                {
+                    x,
+                    y: y + 1
+                },
+                {
+                    x,
+                    y: y - 1
+                },
+            ];
+            let neighborCount = 0;
+            for (let neighbor of neighbors) {
+                if (
+                    neighbor.x >= 0 &&
+                    neighbor.x < this.gridWidth &&
+                    neighbor.y >= 0 &&
+                    neighbor.y < this.gridHeight &&
+                    this.grid[neighbor.x][neighbor.y]
+                ) {
+                    neighborCount++;
                 }
             }
-        }
 
-        ctx.setLineDash([]); // Reset the line dash to solid
-        ctx.lineWidth = 1; // Reset the lineWidth to 1
+            if (neighborCount == 2) {
+                const top = this.grid[neighbors[3].x][neighbors[3].y];
+                const bottom = this.grid[neighbors[2].x][neighbors[2].y];
+                const left = this.grid[neighbors[1].x][neighbors[1].y];
+                const right = this.grid[neighbors[0].x][neighbors[0].y];
+
+                ctx.beginPath();
+                ctx.stroke();
+                if (top && bottom) {
+                    let reverse = path.dir == 'up';
+                    this.drawMultipleArrowheads(ctx, x * this.squareSize + this.squareSize / 2, y * this.squareSize, x * this.squareSize + this.squareSize / 2, (y + 1) * this.squareSize, arrowHeadLength, arrowHeadWidth, numArrowheads, reverse);
+                } else if (left && right) {
+                    let reverse = path.dir == 'left';
+                    this.drawMultipleArrowheads(ctx, x * this.squareSize, y * this.squareSize + this.squareSize / 2, (x + 1) * this.squareSize, y * this.squareSize + this.squareSize / 2, arrowHeadLength, arrowHeadWidth, numArrowheads, reverse);
+                } else if (top && left) {
+                    let clockwise = path.dir == 'up';
+                    this.drawMultipleArrowheadsOnArc(ctx, x * this.squareSize, y * this.squareSize, this.squareSize / 2, 0, Math.PI / 2, arrowHeadLength, arrowHeadWidth, numArrowheadsArc, clockwise);
+                } else if (top && right) {
+                    let clockwise = path.dir == 'right';
+                    this.drawMultipleArrowheadsOnArc(ctx, x * this.squareSize + this.squareSize, y * this.squareSize, this.squareSize / 2, Math.PI / 2, Math.PI, arrowHeadLength, arrowHeadWidth, numArrowheadsArc, clockwise);
+                } else if (bottom && left) {
+                    let clockwise = path.dir == 'left';
+                    this.drawMultipleArrowheadsOnArc(ctx, x * this.squareSize, y * this.squareSize + this.squareSize, this.squareSize / 2, 1.5 * Math.PI, 2 * Math.PI, arrowHeadLength, arrowHeadWidth, numArrowheadsArc, clockwise);
+                } else if (bottom && right) {
+                    let clockwise = path.dir == 'down';
+                    this.drawMultipleArrowheadsOnArc(ctx, x * this.squareSize + this.squareSize, y * this.squareSize + this.squareSize, this.squareSize / 2, Math.PI, 1.5 * Math.PI, arrowHeadLength, arrowHeadWidth, numArrowheadsArc, clockwise);
+                }
+            }
+            ctx.stroke();
+        }
     }
+
 
     saveTrack() {
         const data = {
@@ -385,6 +733,7 @@ class Track {
             this.grid = savedData.grid;
             startPoint.x = savedData.startPoint.x;
             startPoint.y = savedData.startPoint.y;
+            track.path = track.getTrackPath();
             this.redraw();
             for (let redCar of redCars) {
                 this.placeCarAtStartPos(redCar);
@@ -398,17 +747,35 @@ class Track {
     getMousePosition(event) {
         const rect = canvas.getBoundingClientRect();
         return {
-            x: Math.floor(((event.clientX - rect.left) / this.zoomLevel) / this.squareSize),
-            y: Math.floor(((event.clientY - rect.top) / this.zoomLevel) / this.squareSize),
+            x: Math.floor(((event.clientX - rect.left - this.pan.x) / this.zoomLevel) / this.squareSize),
+            y: Math.floor(((event.clientY - rect.top - this.pan.y) / this.zoomLevel) / this.squareSize),
         };
-    }    
+    }
+
+    clearTrack() {
+        for (let x = 0; x < this.gridWidth; x++) {
+            for (let y = 0; y < this.gridHeight; y++) {
+                this.grid[x][y] = false;
+            }
+        }
+        this.startPoint = {
+            x: 0,
+            y: 0,
+            dir: "",
+            revert: true
+        };
+        //this.drawGrid();
+    }
+
 }
+
+
 
 const canvas = document.getElementById('track-editor');
 const ctx = canvas.getContext('2d');
 const track = new Track(canvas);
 
-
+let isPanning = false;
 let drawing = false;
 let erasing = false;
 
@@ -426,22 +793,34 @@ canvas.addEventListener('wheel', (event) => {
 });
 
 
-function updateTrack() {
+function updateTrack(event) {
     if (!mouseDown)
         return;
+
     const pos = track.getMousePosition(event);
 
     if (currentTool === 'draw') {
-        track.drawTrack(pos.x, pos.y);
+        track.setTrack(pos.x, pos.y);
     } else if (currentTool === 'erase') {
         track.clearSquare(pos.x, pos.y);
     }
+
+    track.path = track.getTrackPath();
 }
 
 let mouseDown = false;
 canvas.addEventListener('mousedown', (event) => {
+    if (event.button == 1) {
+        isPanning = true;
+        event.preventDefault();
+    }
+
     if (currentTool == "run")
         return;
+
+    if (event.button != 0) {
+        return;
+    }
     const pos = track.getMousePosition(event);
 
     if (drawTrackBtn.checked) {
@@ -450,12 +829,12 @@ canvas.addEventListener('mousedown', (event) => {
         if (track.grid[pos.x][pos.y]) {
             startPoint.x = pos.x;
             startPoint.y = pos.y;
-            startPoint.dir = getTrackDirection(startPoint);
+            startPoint.dir = track.getTrackDirection(startPoint);
             for (let redCar of redCars) {
                 track.placeCarAtStartPos(redCar);
             }
         }
-        track.drawTrack(pos.x, pos.y);
+        track.setTrack(pos.x, pos.y);
     } else if (eraseTrackBtn.checked) {
         drawing = true;
         track.clearSquare(pos.x, pos.y);
@@ -464,35 +843,46 @@ canvas.addEventListener('mousedown', (event) => {
 });
 
 canvas.addEventListener('mouseup', (event) => {
+    isPanning = false;
     if (currentTool == "run")
         return;
     mouseDown = false;
 });
 canvas.addEventListener('mousemove', (event) => {
+    if (isPanning) {
+        track.panEvent(event);
+    }
+
     if (currentTool == "run")
         return;
-    updateTrack();
+    updateTrack(event);
 });
 
-track.drawGrid();
+//track.drawGrid();
 
 
 // Toolbar buttons
 const saveTrackBtn = document.getElementById('saveTrackBtn');
 const loadTrackBtn = document.getElementById('loadTrackBtn');
 const validateTrackBtn = document.getElementById('validateTrackBtn');
-const editCheckpointsBtn = document.getElementById('editCheckpointsBtn');
+const clearTrackBtn = document.getElementById('clearTrackBtn');
 const runBtn = document.getElementById('runBtn');
 const drawTrackBtn = document.getElementById('drawTrackBtn');
 const eraseTrackBtn = document.getElementById('eraseTrackBtn');
 const buttonContents = document.getElementsByClassName('button-content');
 const divCanvas = document.getElementById('divCanvas');
+const runLbl = document.getElementById('runLbl');
+
 
 canvas.width = divCanvas.clientWidth;
 canvas.height = divCanvas.clientHeight;
 
 //divCanvas.clientWidth
 let currentTool = 'run';
+
+clearTrackBtn.addEventListener('click', () => {
+    track.clearTrack();
+});
 
 drawTrackBtn.addEventListener('change', () => {
     if (drawTrackBtn.checked) {
@@ -515,7 +905,7 @@ loadTrackBtn.addEventListener('click', () => {
 });
 
 validateTrackBtn.addEventListener('click', () => {
-    if (isTrackClosed()) {
+    if (track.isTrackClosed()) {
         alert('Piste fermée');
     } else {
         alert('Piste non-fermée');
@@ -523,14 +913,11 @@ validateTrackBtn.addEventListener('click', () => {
 });
 
 
-editCheckpointsBtn.addEventListener('click', () => {
-    console.log('Modifier les points de contrôle');
-    // Implement the functionality for editing checkpoints
-});
-
-
 runBtn.addEventListener('click', () => {
-    currentTool = 'run';
+    if (runBtn.checked) {
+        currentTool = 'run';
+        runLbl.focus();
+    }
 });
 
 
@@ -544,42 +931,50 @@ addEventListener("resize", (event) => {
 document.addEventListener('DOMContentLoaded', function () {
 
     const numRedCars = 1;
+    let keyPressed = {};
+
     // Create red cars
     for (let i = 0; i < numRedCars; i++) {
-        //const neuralNetwork = new NeuralNetwork(8, 4, 2);
-        const redCar = new Car(canvas.width / 2, canvas.height / 2, 80, 40, 'red', 180, null);
+        const neuralNetwork = new NeuralNetwork(8, 4, 2);
+        const redCar = new Car(canvas.width / 2, canvas.height / 2, 80, 40, 'red', 180, neuralNetwork);
         track.placeCarAtStartPos({
             x: 0,
             y: 0
         });
-        redCar.draw(ctx);
+
         redCars.push(redCar);
     }
 
     track.loadTrack();
 
+    function handleKeypress() {
+        if (currentTool != "run")
+            return;
+
+        if (keyPressed['ArrowUp'])
+            redCars[0].acceleration = 0.1;
+        else if (keyPressed['ArrowDown'])
+            redCars[0].acceleration = -0.1;
+        else 
+            redCars[0].acceleration = 0;
+
+        if (keyPressed['ArrowLeft'])
+            redCars[0].Steering.update(-0.5);
+        else if (keyPressed['ArrowRight'])
+            redCars[0].Steering.update(0.5);
+        else
+            redCars[0].Steering.reset();
+
+        if (keyPressed['r'])
+            restartGame();
+    }
+
     function gameLoop() {
+        let trackGeometry = track.getTrackGeometry();
+        handleKeypress();
         for (let redCar of redCars) {
-
-
             //redCar.updateControls();
-
-            // Mettre à jour la position de la voiture rouge
-            const prevX = redCar.x;
-            const prevY = redCar.y;
-            const prevWidth = redCar.width;
-            const prevHeight = redCar.height;
-            const prevAngle = redCar.angle;
-
-            redCar.update();
-
-            // Effacer la position précédente de la voiture rouge
-            ctx.save();
-            ctx.translate(prevX + prevWidth / 2, prevY + prevHeight / 2);
-            ctx.rotate(prevAngle * Math.PI / 180);
-            ctx.clearRect(-prevWidth / 2, -prevHeight / 2, prevWidth, prevHeight);
-            ctx.restore();
-            redCar.draw(ctx);
+            redCar.update(trackGeometry);
 
         }
 
@@ -592,41 +987,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     gameLoop();
 
+
     // Event listeners for keyboard input
     document.addEventListener('keydown', (event) => {
-        if (!currentTool == "run")
-            return;
         const key = event.key;
-
-        switch (key) {
-            case 'ArrowUp':
-                redCars[0].acceleration = 0.1;
-                break;
-            case 'ArrowDown':
-                redCars[0].acceleration = -0.1;
-                break;
-            case 'ArrowLeft':
-                redCars[0].steeringAngle = -30;
-                break;
-            case 'ArrowRight':
-                redCars[0].steeringAngle = 30;
-                break;
-            case 'r':
-            case 'R':
-                restartGame();
-                break;
-        }
+        keyPressed[key] = true;
     });
 
     document.addEventListener('keyup', (event) => {
-        if (!currentTool == "run")
-            return;
         const key = event.key;
-
-        if (key === 'ArrowUp' || key === 'ArrowDown') {
-            redCars[0].acceleration = 0;
-        } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
-            redCars[0].steeringAngle = 0;
-        }
+        keyPressed[key] = false;
     });
 });

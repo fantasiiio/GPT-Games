@@ -33,7 +33,9 @@ class NeuralNetwork {
 
         const hidden = Array(hiddenSize).fill(0);
         const output = Array(outputSize).fill(0);
-
+        if(this.isDead)
+            return output;
+            
         for (let h = 0; h < hiddenSize; h++) {
             for (let i = 0; i < inputSize; i++) {
                 hidden[h] += input[i] * this.inputLayer[h * inputSize + i];

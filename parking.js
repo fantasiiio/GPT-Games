@@ -1,3 +1,134 @@
+class Steering {
+    constructor(maxAngle) {
+        this.angle = 0;
+        this.velocity = 0;
+        this.acceleration = 0;
+        this.maxAngle = maxAngle;
+    }
+
+    update(velocity) {
+        if(Math.abs(this.angle) < this.maxAngle)
+            this.angle += velocity;
+    }
+
+    reset(){
+        this.angle = 0;
+    }
+}
+
+
+class IntersectionUtil {
+    constructor() {}
+
+    static lineIntersection(p1, p2, lineStart, lineEnd) {
+        let x1 = p1.x;
+        let y1 = p1.y;
+        let x2 = p2.x;
+        let y2 = p2.y;
+        let x3 = lineStart.x;
+        let y3 = lineStart.y;
+        let x4 = lineEnd.x;
+        let y4 = lineEnd.y;
+
+        let denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+
+        if (denominator === 0) {
+            return null;
+        }
+
+        let t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
+        let u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denominator;
+
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+            let intersectionPoint = new Vector(x1 + t * (x2 - x1), y1 + t * (y2 - y1));
+            let distance = p1.distanceTo(intersectionPoint);
+            return {
+                point: intersectionPoint,
+                distance: distance
+            };
+        }
+
+        return null;
+    }
+
+
+    static lineArcIntersection(p1, p2, center, radius, startAngle, endAngle) {
+
+        function isWithinArc(point) {
+            let angle = point.subtract(center).angle();
+            if (angle < 0)
+                angle += 2 * Math.PI;
+            if (startAngle <= endAngle) {
+                return angle >= startAngle && angle <= endAngle;
+            } else {
+                return angle >= startAngle || angle <= endAngle;
+            }
+        }
+
+        let d = p2.subtract(p1);
+        let f = p1.subtract(center);
+
+        let a = d.dot(d);
+        let b = 2 * f.dot(d);
+        let c = f.dot(f) - radius * radius;
+
+        let discriminant = b * b - 4 * a * c;
+
+        if (discriminant < 0) {
+            return null;
+        }
+
+        let t1 = (-b + Math.sqrt(discriminant)) / (2 * a);
+        let t2 = (-b - Math.sqrt(discriminant)) / (2 * a);
+
+        let intersectPoints = [];
+
+        if (t1 >= 0 && t1 <= 1) {
+            let p = p1.add(d.multiply(t1));
+            if (isWithinArc(p)) {
+                let distance = p1.distanceTo(p);
+                intersectPoints.push({
+                    point: p,
+                    distance
+                });
+            }
+
+        }
+
+        if (t2 >= 0 && t2 <= 1) {
+            let p = p1.add(d.multiply(t2));
+            if (isWithinArc(p)) {
+                let distance = p1.distanceTo(p);
+                intersectPoints.push({
+                    point: p,
+                    distance
+                });
+            }
+        }
+
+        if (intersectPoints.length > 0) {
+            // Find the closest intersection point to the start of the line
+            let closestIntersection = null;
+            let closestDistance = Infinity;
+
+            for (let i = 0; i < intersectPoints.length; i++) {
+                const intersection = intersectPoints[i];
+                const distance = intersection.point.subtract(p1).length();
+                if (distance < closestDistance) {
+                    closestIntersection = intersection;
+                    closestDistance = distance;
+                }
+            }
+
+            return closestIntersection;
+        }
+
+        return null;
+    }
+
+}
+
+
 class Polygon {
     constructor(points) {
         this.vertices = [];
@@ -102,12 +233,16 @@ class Rectangle {
     }
 
     corners() {
-        const topLeft = new Vector(this.x, this.y);
-        const topRight = new Vector(this.x + this.width, this.y);
-        const bottomLeft = new Vector(this.x, this.y + this.height);
-        const bottomRight = new Vector(this.x + this.width, this.y + this.height);
+        const halfWidth = this.width / 2;
+        const halfHeight = this.height / 2;
+
+        const topLeft = new Vector(this.x - halfWidth, this.y - halfHeight);
+        const topRight = new Vector(this.x + halfWidth, this.y - halfHeight);
+        const bottomLeft = new Vector(this.x - halfWidth, this.y + halfHeight);
+        const bottomRight = new Vector(this.x + halfWidth, this.y + halfHeight);
         const corners = [topLeft, topRight, bottomRight, bottomLeft];
-        const center = new Vector(this.x + this.width / 2, this.y + this.height / 2);
+        const center = new Vector(this.x, this.y);
+
         for (let i = 0; i < corners.length; i++) {
             corners[i] = this.rotatePoint(corners[i], center, this.angle * Math.PI / 180);
         }
@@ -142,6 +277,76 @@ class Rectangle {
         const intersection = poly1.clip(poly2);
         const area = intersection.area();
         return area;
+    }
+
+    calculateIntersectionWithTrack(trackGeometry) {
+        let closestIntersection = null;
+        let closestDistance = Infinity;
+        let closestObjectType = null;
+
+        // Check for intersections with lines
+        for (const line of trackGeometry.lines) {
+            const intersection = this.calculateLineIntersection(line);
+            if (intersection) {
+                const distance = this.corners().reduce((minDistance, corner) => {
+                    const dist = corner.distanceTo(intersection.point);
+                    return Math.min(minDistance, dist);
+                }, Infinity);
+                if (distance < closestDistance) {
+                    closestIntersection = intersection;
+                    closestDistance = distance;
+                    closestObjectType = 'line';
+                }
+            }
+        }
+
+        // Check for intersections with arcs
+        for (const arc of trackGeometry.arcs) {
+            const intersection = this.calculateArcIntersection(arc);
+            if (intersection) {
+                const distance = this.corners().reduce((minDistance, corner) => {
+                    const dist = corner.distanceTo(intersection.point);
+                    return Math.min(minDistance, dist);
+                }, Infinity);
+                if (distance < closestDistance) {
+                    closestIntersection = intersection;
+                    closestDistance = distance;
+                    closestObjectType = 'arc';
+                }
+            }
+        }
+
+        return {
+            intersection: closestIntersection,
+            distance: closestDistance,
+            objectType: closestObjectType
+        };
+    }
+
+    calculateArcIntersection(arc) {
+        const corners = this.corners();
+        for (let i = 0; i < corners.length; i++) {
+            const startCorner = corners[i];
+            const endCorner = corners[(i + 1) % corners.length];
+            const intersection = IntersectionUtil.lineArcIntersection(startCorner, endCorner, arc.center, arc.radius, arc.startAngle, arc.endAngle);
+            if (intersection) {
+                return intersection;
+            }
+        }
+        return null;
+    }
+
+    calculateLineIntersection(line) {
+        const corners = this.corners();
+        for (let i = 0; i < corners.length; i++) {
+            const startCorner = corners[i];
+            const endCorner = corners[(i + 1) % corners.length];
+            const intersection = IntersectionUtil.lineIntersection(startCorner, endCorner, line.p1, line.p2);
+            if (intersection) {
+                return intersection;
+            }
+        }
+        return null;
     }
 }
 
@@ -266,13 +471,13 @@ class LaserSensor {
         };
         this.length = 1000;
         this.origin = origin;
-        this.end = this.calculateEndPoint();
+        this.endPoint = this.calculateEndPoint();
     }
 
     calculateEndPoint() {
-        const dx = Math.cos(this.angle) * this.length;
-        const dy = Math.sin(this.angle) * this.length;
-        return new Vector(this.origin.x + dx, this.origin.y + dy);
+        let x = this.origin.x + this.length * Math.cos(this.angle + this.offsetAngle);
+        let y = this.origin.y + this.length * Math.sin(this.angle + this.offsetAngle);
+        return new Vector(x, y);
     }
 
     calculateIntersection(rectangles) {
@@ -303,7 +508,6 @@ class LaserSensor {
             objectType: closestObjectType
         };
     }
-
 
     updateIntersectionInfo(rectangles, maxLength = 1000) {
         let shortestDistance = maxLength;
@@ -347,7 +551,7 @@ class LaserSensor {
         ctx.strokeStyle = 'white';
         ctx.beginPath();
         ctx.moveTo(this.origin.x, this.origin.y);
-        ctx.lineTo(this.origin.x + this.direction.x * this.length, this.origin.y + this.direction.y * this.length);
+        ctx.lineTo(this.endPoint.x, this.endPoint.y);
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.restore();
@@ -377,58 +581,64 @@ class LaserSensor {
     }
 
 
-    calculateLineIntersection(lineStart, lineEnd) {
-        let x1 = this.origin.x;
-        let y1 = this.origin.y;
-        let x2 = this.origin.x + this.length * Math.cos(this.angle + this.offsetAngle);
-        let y2 = this.origin.y + this.length * Math.sin(this.angle + this.offsetAngle);
-        let x3 = lineStart.x;
-        let y3 = lineStart.y;
-        let x4 = lineEnd.x;
-        let y4 = lineEnd.y;
 
-        let denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    calculateTrackIntersection(trackGeometry) {
+        let closestIntersection = null;
+        let closestDistance = this.length;
+        let closestObjectType = null;
 
-        if (denominator === 0) {
-            return null;
+        // Check for intersections with lines
+        for (const line of trackGeometry.lines) {
+            const intersection = IntersectionUtil.lineIntersection(this.origin, this.endPoint, line.p1, line.p2);
+            if (intersection) {
+                const distance = this.origin.distanceTo(intersection.point);
+                if (distance < closestDistance) {
+                    closestIntersection = intersection;
+                    closestDistance = distance;
+                    closestObjectType = 'line';
+                }
+            }
         }
 
-        let t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator;
-        let u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denominator;
-
-        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-            let intersectionPoint = new Vector(x1 + t * (x2 - x1), y1 + t * (y2 - y1));
-            let distance = this.origin.distanceTo(intersectionPoint);
-            return {
-                point: intersectionPoint,
-                distance: distance
-            };
+        // Check for intersections with arcs
+        for (const arc of trackGeometry.arcs) {
+            let intersection = IntersectionUtil.lineArcIntersection(this.origin, this.endPoint, arc.center, arc.radius, arc.startAngle, arc.endAngle);
+            if (intersection) {
+                const distance = this.origin.distanceTo(intersection.point);
+                if (distance < closestDistance) {
+                    closestIntersection = intersection;
+                    closestDistance = distance;
+                    closestObjectType = 'arc';
+                }
+            }
         }
 
-        return null;
-    }
-
-    drawIntersectionPoint(ctx, detectedObject) {
-        if (!detectedObject.intersection)
-            return;
-        let color;
-        if (detectedObject.objectType === 'blueCar') {
-            color = 'lightblue';
-        } else if (detectedObject.objectType === 'goal') {
-            color = 'lightgreen';
-        } else {
-            color = 'black';
-        }
-
-        ctx.beginPath();
-        ctx.arc(detectedObject.intersection.point.x, detectedObject.intersection.point.y, 5, 0, 2 * Math.PI, false);
-        ctx.fillStyle = color;
-        ctx.fill();
-        ctx.closePath();
+        return {
+            intersection: closestIntersection,
+            distance: closestDistance,
+            objectType: closestObjectType
+        };
     }
 }
 
+function drawIntersectionPoint(ctx, detectedObject) {
+    if (!detectedObject.intersection)
+        return;
+    let color;
+    if (detectedObject.objectType === 'arc') {
+        color = 'lightblue';
+    } else if (detectedObject.objectType === 'line') {
+        color = 'lightblue';
+    } else {
+        color = 'white';
+    }
 
+    ctx.beginPath();
+    ctx.arc(detectedObject.intersection.point.x, detectedObject.intersection.point.y, 10, 0, 2 * Math.PI, false);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.closePath();
+}
 
 class Vector {
     constructor(x, y) {
@@ -477,6 +687,10 @@ class Vector {
         const dx = this.x - other.x;
         const dy = this.y - other.y;
         return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    angle() {
+        return Math.atan2(this.y, this.x);
     }
 }
 
@@ -534,20 +748,20 @@ class Car extends Rectangle {
         this.angle = angle;
         this.velocity = 0;
         this.acceleration = 0;
-        this.steeringAngle = 0;
         this.wheelAngle = 0;
         this.speed = 0;
         this.laserSensors = [];
         this.createLaserSensors();
         this.objectType = `${color}Car`;
         this.neuralNetwork = neuralNetwork;
+        this.Steering = new Steering(20);
     }
 
 
 
     draw(ctx) {
         ctx.save();
-        ctx.translate(this.x , this.y );
+        ctx.translate(this.x, this.y);
         ctx.rotate(this.angle * Math.PI / 180);
 
         // Draw the car body
@@ -643,7 +857,7 @@ class Car extends Rectangle {
         return false;
     }
 
-    update() {
+    update(trackGeometry) {
         this.velocity += this.acceleration;
         this.velocity *= 0.99; // Friction
 
@@ -654,27 +868,31 @@ class Car extends Rectangle {
         this.y += this.velocity * Math.sin(this.angle * Math.PI / 180);
 
         // Calculate wheel angle based on velocity and steering angle
-        this.wheelAngle = this.steeringAngle * Math.PI / 180;
+        this.wheelAngle = this.Steering.angle * Math.PI / 180;
 
         const dx = this.x - oldX;
         const dy = this.y - oldY;
 
         // Calculate new angle based on steering angle and velocity
-        if (Math.abs(this.steeringAngle) > 0.1 && Math.abs(this.velocity) > 0.1) {
-            const radius = Math.sqrt(dx * dx + dy * dy) / Math.sin(this.steeringAngle * Math.PI / 180);
-            const angleDelta = this.velocity * this.velocity * Math.PI / (180 * radius);
+        if (Math.abs(this.Steering.angle) > 0 && Math.abs(this.velocity) > 0) {
+            const radius = Math.sqrt(dx * dx + dy * dy) / Math.sin(this.Steering.angle * Math.PI / 180);
+            const angleDelta = Math.abs(this.velocity) * this.velocity * Math.PI / (180 * radius);
 
             this.angle += angleDelta * 180 / Math.PI;
         }
-        // Check for collisions with parked cars
-        // if (this.checkCollisionWithParkedCars(parkedCars) || this.checkScreenCollision(ctx.canvas.clientWidth, ctx.canvas.clientHeight)) {
-        //     // Undo the movement if there is a collision
-        //     this.x = oldX;
-        //     this.y = oldY;
-        //     this.velocity = 0;
-        // }
 
-        // this.updateLaserSensors([...parkedCars, goal]);
+        //     // Undo the movement if there is a collision
+        let intersect = this.calculateIntersectionWithTrack(trackGeometry);
+        if (intersect.objectType) {
+            this.x = oldX;
+            this.y = oldY;
+            this.velocity = 0;
+            this.acceleration = 0;
+            this.Steering.angle = 0;
+            this.neuralNetwork.isDead = true;
+        }
+
+        this.updateLaserSensors();
     }
 
     reset(x, y, angle = 0) {
@@ -683,32 +901,26 @@ class Car extends Rectangle {
         this.angle = angle;
         this.velocity = 0;
         this.acceleration = 0;
-        this.steeringAngle = 0;
+        this.Steering.angle = 0;
         this.wheelAngle = 0;
         this.speed = 0;
     }
 
-    updateLaserSensors(objects) {
-        const center = new Vector(this.x + this.width / 2, this.y + this.height / 2);
+    updateLaserSensors() {
+        const center = new Vector(this.x, this.y);
         for (let laser of this.laserSensors) {
             laser.updateOrigin(center, this.angle * Math.PI / 180);
-            const result = laser.calculateIntersection(objects);
-
-            if (result.intersection) {
-                laser.intersectionInfo = result.intersection;
-                laser.closestObject = result.object;
-            } else {
-                laser.intersectionInfo = null;
-                laser.closestObject = null;
-            }
+            laser.endPoint = laser.calculateEndPoint();
         }
     }
 
     updateControls() {
+        if (this.neuralNetwork.isDead)
+            return;
         const inputs = this.laserSensors.map(sensor => (sensor.intersectionInfo || {}).distance / 1000 || 0);
         const [acceleration, steering] = this.neuralNetwork.apply(inputs);
         this.acceleration = (acceleration - 0.5) * 2 * 0.1;
-        this.steeringAngle = (steering - 0.5) * 2 * 30;
+        this.Steering.angle = (steering - 0.5) * 2 * 30;
     }
 
 }
