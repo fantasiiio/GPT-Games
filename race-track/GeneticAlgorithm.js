@@ -1,0 +1,111 @@
+class GeneticAlgorithm {
+    constructor(population, inputSize, hiddenSize, outputSize, mutationRate, maxGenerations,
+        expectedOutputs) {
+        this.populationSize = population.length;
+        this.population = population;
+        this.inputSize = inputSize;
+        this.hiddenSize = hiddenSize;
+        this.outputSize = outputSize;
+        this.mutationRate = mutationRate;
+        this.maxGenerations = maxGenerations;
+        this.expectedOutputs = expectedOutputs;
+    }
+
+    allIndividualsDead() {
+        return this.population.every(neuralNetwork => neuralNetwork.isDead);
+    }
+
+    run(callback) {
+
+        const runGeneration = (generation) => {
+            if (generation >= this.maxGenerations) {
+                callback(this.population);
+                return;
+            }
+
+            const checkPopulation = () => {
+                if (this.allIndividualsDead()) {
+                    this.population.sort((a, b) => b.currentFitness - a.currentFitness);
+                    console.log(`Génération ${generation}: Meilleure fitness = ${this.population[0].currentFitness}`);
+
+                    this.population = this.createNewGeneration();
+                    runGeneration(generation + 1);
+                } else {
+                    requestAnimationFrame(checkPopulation);
+                }
+            };
+
+            requestAnimationFrame(checkPopulation);
+        };
+
+        runGeneration(0);
+    }
+
+
+
+    selectParents() {
+        let selectOne = () => {
+            const tournamentSize = 3; // Adjust this value to control the selection pressure
+            const selected = [];
+            for (let i = 0; i < tournamentSize; i++) {
+                const randomIndex = Math.floor(Math.random() * this.population.length);
+                selected.push(this.population[randomIndex]);
+            }
+            return selected.sort((a, b) => b.currentFitness - a.currentFitness)[0];
+        }
+
+        const parent1 = selectOne();
+        const parent2 = selectOne();
+
+        return [parent1, parent2];
+    }
+
+
+    createNewGeneration() {
+        const newGeneration = [];
+        for (let i = 0; i < this.population.length; i++) {
+            const parents = this.selectParents();
+            const childNetwork = parents[0].crossover(parents[1]);
+            childNetwork.mutate(this.mutationRate);
+            newGeneration.push(childNetwork);
+        }
+        return newGeneration;
+    }
+
+}
+
+function handleFileUpload() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+
+    NeuralNetwork.loadGenes(file, (neuralNetwork) => {
+        // Use the loaded neural network
+        console.log('Loaded neural network:', neuralNetwork);
+    });
+}
+
+// // Exemple d'utilisation
+// const populationSize = 100;
+// const inputSize = 5;
+// const hiddenSize = 5;
+// const outputSize = 1;
+// const mutationRate = 0.1;
+// const maxGenerations = 50;
+// const inputs = [
+//     [0],
+//     [0.5],
+//     [1],
+//     [1.5],
+//     [2]
+// ];
+// const expectedOutputs = [0];
+
+// const geneticAlgorithm = new GeneticAlgorithm(populationSize, inputSize, hiddenSize, outputSize,
+//     mutationRate,
+//     maxGenerations, inputs, expectedOutputs);
+
+// geneticAlgorithm.run((bestNeuralNetwork) => {
+//     console.log('Meilleur réseau de neurones:', bestNeuralNetwork);
+//     const simulatedOutputs = bestNeuralNetwork.simulate(inputs);
+//     console.log('Fitness:', fitness(simulatedOutputs, expectedOutputs));
+// });
