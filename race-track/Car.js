@@ -1,5 +1,5 @@
 class Car extends Rectangle {
-    constructor(x, y, width, height, color, angle, neuralNetwork) {
+    constructor(x, y, width, height, color, angle, neuralNetwork, gridSize) {
         super(x, y, width, height);
         this.x = x;
         this.y = y;
@@ -16,6 +16,9 @@ class Car extends Rectangle {
         this.objectType = `${color}Car`;
         this.neuralNetwork = neuralNetwork;
         this.Steering = new Steering(20);
+        this.timeOnSameGridSquare = 0;
+        this.lastGridPosition = {x: 0, y: 0};
+        this.gridSize = gridSize;
     }
 
 
@@ -122,6 +125,7 @@ class Car extends Rectangle {
         this.velocity += this.acceleration;
         this.velocity *= 0.99; // Friction
 
+            
         const oldX = this.x;
         const oldY = this.y;
 
@@ -145,18 +149,39 @@ class Car extends Rectangle {
         //     // Undo the movement if there is a collision
         let intersect = this.calculateIntersectionWithTrack(trackGeometry);
         if (intersect.objectType) {
-            this.x = oldX;
-            this.y = oldY;
-            this.velocity = 0;
-            this.acceleration = 0;
-            this.Steering.angle = 0;
-            this.neuralNetwork.isDead = true;
+            this.die(oldX, oldY);
         }
+
+        const currentGridPosition = new Vector(Math.floor(this.x / this.gridSize), Math.floor(this.y / this.gridSize));
+        if (currentGridPosition.equals(this.lastGridPosition)) {
+          this.timeOnSameGridSquare++;
+          if (this.timeOnSameGridSquare >= 60*5) {
+            this.die(oldX, oldY);
+          }
+        } else {
+          this.timeOnSameGridSquare = 0;
+          this.lastGridPosition = currentGridPosition;
+        }
+
+        if(this.velocity < 0)
+            this.die(oldX, oldY);
 
         this.updateLaserSensors();
     }
 
+    die(oldX, oldY){
+        this.x = oldX;
+        this.y = oldY;
+        this.velocity = 0;
+        this.acceleration = 0;
+        this.Steering.angle = 0;
+        this.neuralNetwork.isDead = true;
+        this.color = 'gray'
+    }
+
+
     reset(x, y, angle = 0) {
+        this.timeOnSameGridSquare = 0;
         this.x = x;
         this.y = y;
         this.angle = angle;
@@ -165,6 +190,7 @@ class Car extends Rectangle {
         this.Steering.angle = 0;
         this.wheelAngle = 0;
         this.speed = 0;
+        this.color = 'red'
     }
 
     updateLaserSensors() {
@@ -180,47 +206,9 @@ class Car extends Rectangle {
             return;
         const inputs = this.laserSensors.map(sensor => (sensor.intersectionInfo || {}).distance / 1000 || 0);
         const [acceleration, steering] = this.neuralNetwork.apply(inputs);
-        this.acceleration = (acceleration) * 0.1;
+        this.acceleration = (acceleration - 0.5) * 2 * 0.1;
         this.Steering.angle = (steering - 0.5) * 2 * 30;
     }
 
 }
 
-
-
-function restartGame() {
-    const initialX = canvas.width - 80;
-    const initialY = (canvas.height - 40) / 2;
-    const initialAngle = 180;
-
-    redCar.reset(initialX, initialY, initialAngle);
-}
-let redCars = [];
-
-// const canvas = document.getElementById('parking');
-// const ctx = canvas.getContext('2d');
-// const parkingLot = new ParkingLot(100, 60, 100, 6, 10);
-
-function initGeneticAlgorithm(population) {
-    const populationSize = 50;
-    const inputSize = 8;
-    const hiddenSize = 4;
-    const outputSize = 2;
-    const mutationRate = 0.1;
-    const maxGenerations = 100;
-    const inputs = []; // Vous pouvez ajouter des données d'entrée spécifiques ici
-    const expectedOutputs = []; // Vous pouvez ajouter des sorties attendues spécifiques ici
-
-    const ga = new GeneticAlgorithm(
-        population,
-        inputSize,
-        hiddenSize,
-        outputSize,
-        mutationRate,
-        maxGenerations,
-        inputs,
-        expectedOutputs
-    );
-
-    return ga;
-}

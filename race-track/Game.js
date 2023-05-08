@@ -27,6 +27,49 @@ function drawText(ctx, text, x, y) {
     ctx.fillText(text, x, y);
 }
 
+
+
+function restartGame() {
+    const initialX = canvas.width - 80;
+    const initialY = (canvas.height - 40) / 2;
+    const initialAngle = 180;
+
+    redCar.reset(initialX, initialY, initialAngle);
+}
+let redCars = [];
+
+// const canvas = document.getElementById('parking');
+// const ctx = canvas.getContext('2d');
+// const parkingLot = new ParkingLot(100, 60, 100, 6, 10);
+
+function initGeneticAlgorithm(populationSize) {
+    //const populationSize = 50;
+    const inputSize = 8;
+    const hiddenSize = 4;
+    const outputSize = 2;
+    const mutationRate = 0.1;
+    const maxGenerations = 100;
+    const inputs = []; // Vous pouvez ajouter des données d'entrée spécifiques ici
+    const expectedOutputs = []; // Vous pouvez ajouter des sorties attendues spécifiques ici
+    let population = [];
+    for (let i = 0; i < populationSize; i++) {
+        const neuralNetwork = new NeuralNetwork(8, 4, 2);
+        population.push(neuralNetwork);
+    }
+    const ga = new GeneticAlgorithm(
+        population,
+        inputSize,
+        hiddenSize,
+        outputSize,
+        mutationRate,
+        maxGenerations,
+        inputs,
+        expectedOutputs
+    );
+
+    return ga;
+}
+
 function updateTrack(event) {
     if (!mouseDown)
         return;
@@ -162,15 +205,25 @@ addEventListener("resize", (event) => {
     canvas.height = divCanvas.clientHeight;
 });
 
+var population;
+var geneticAlgorithm;
 document.addEventListener('DOMContentLoaded', function () {
 
-    const numRedCars = 1;
+    const numRedCars = 50;
     let keyPressed = {};
+    geneticAlgorithm = initGeneticAlgorithm(numRedCars);
+    geneticAlgorithm.onNewGenerationCreatedFn = (newPopulation) => {
+        for (let i = 0; i < newPopulation.length; i++) {
+            redCars[i].neuralNetwork = geneticAlgorithm.population[i];
+            redCars[i].neuralNetwork.isDead = false;
+            redCars[i].reset();
+            track.placeCarAtStartPos(redCars[i]);
+        }        
+    }
 
     // Create red cars
-    for (let i = 0; i < numRedCars; i++) {
-        const neuralNetwork = new NeuralNetwork(8, 4, 2);
-        const redCar = new Car(canvas.width / 2, canvas.height / 2, 80, 40, 'red', 180, neuralNetwork);
+    for (let i = 0; i < geneticAlgorithm.population.length; i++) {
+        const redCar = new Car(canvas.width / 2, canvas.height / 2, 80, 40, 'red', 180, geneticAlgorithm.population[i], track.squareSize);
         track.placeCarAtStartPos({
             x: 0,
             y: 0
@@ -178,6 +231,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         redCars.push(redCar);
     }
+
+    population = redCars.map(car => car.neuralNetwork);
+
+
+    geneticAlgorithm.run(bestIndividual => {
+        console.log("L'algorithme génétique a terminé. Meilleur individu : ", bestIndividual);
+    });
 
     track.loadTrack();
 
@@ -206,12 +266,15 @@ document.addEventListener('DOMContentLoaded', function () {
     function gameLoop() {
         let trackGeometry = track.getTrackGeometry();
         handleKeypress();
+        let index = 0;
         for (let redCar of redCars) {
-            //redCar.applyNeuralNetwork();
+            redCar.applyNeuralNetwork();
             redCar.update(trackGeometry);
-
             let completionPct = track.calculateCompletionPercentage(redCar)
-            drawText(ctx, "completion: " + (completionPct*100).toFixed(1), 10, 30)
+            redCar.neuralNetwork.currentFitness = completionPct;           
+            if(redCar.neuralNetwork == geneticAlgorithm.bestIndividual) 
+                drawText(ctx, "completion: " + (completionPct*100).toFixed(1), 10, 30)
+            index++;
         }
 
         // Redessiner tout

@@ -307,26 +307,26 @@ class Track {
                 ctx.scale(this.zoomLevel, this.zoomLevel);
                 this.drawGrid();
                 this.drawTrack();
-                let geometry = this.getTrackGeometry();
-                this.drawTrackGeometry(geometry, ctx);
+                let trackGeometry = this.getTrackGeometry();
+                this.drawTrackGeometry(trackGeometry, ctx);
                 let carIndex = 0;
                 for (let redCar of redCars) {
-                    if (carIndex == 0)
+                    if (!redCar.neuralNetwork.isDead && redCar.neuralNetwork == geneticAlgorithm.bestIndividual)
                         redCar.drawLaserSensors(ctx);
                     redCar.draw(ctx);
                     for (let laserSensor of redCar.laserSensors) {
-                        let intersection = laserSensor.calculateTrackIntersection(geometry);
+                        let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
                         laserSensor.intersectionInfo = intersection;
                         if (carIndex == 0)
                             drawIntersectionPoint(ctx, intersection);
                     }
                     // Check for collisions walls
-                    let intersect = redCar.calculateIntersectionWithTrack(geometry);
+                    let intersect = redCar.calculateIntersectionWithTrack(trackGeometry);
                     if (intersect.objectType) {
                         intersect.objectType = "other"
                         drawIntersectionPoint(ctx, intersect)
                     }
-                    carIndex++;;
+                    carIndex++;
                 }
 
                 ctx.restore();
@@ -588,7 +588,8 @@ class Track {
                             x,
                             y
                         });
-                        car.angle = direction === 'left' ? 180 : direction === 'up' ? 90 : direction === 'right' ? 0 : 270;
+                        car.angle = direction === 'right' ? 180 : direction === 'up' ? 90 : direction === 'left' ? 0 : 270;
+                        car.color = 'red'
                     }
                 }
             }
@@ -772,21 +773,21 @@ class Track {
         let nearestCheckpoint = null;
         let nearestDistance = Number.MAX_VALUE;
         let nearestIndex;
-      
+
         let index = 0;
         for (let checkpoint of checkpoints) {
-          let distance = vehiclePosition.distanceTo(new Vector(checkpoint.pos.x, checkpoint.pos.y).multiply(this.squareSize));
-      
-          if (distance < nearestDistance) {
-            nearestCheckpoint = checkpoint;
-            nearestDistance = distance;
-            nearestIndex = index;
-          }
-          index++;
+            let distance = vehiclePosition.distanceTo(new Vector(checkpoint.pos.x, checkpoint.pos.y).multiply(this.squareSize));
+
+            if (distance < nearestDistance) {
+                nearestCheckpoint = checkpoint;
+                nearestDistance = distance;
+                nearestIndex = index;
+            }
+            index++;
         }
-      
+
         return nearestIndex;
-      }
+    }
 
     calculateCompletionPercentage(car) {
         const path = this.getTrackPath();
@@ -795,34 +796,34 @@ class Track {
         let checkpointIndex = this.findNearestCheckpoint(carPosition, path);
         let checkpointDistance = 0;
         let totalDistance = 0;
-        
+
         // Calculate distance covered and total distance
         for (let i = 0; i < path.length - 1; i++) {
-          const current = new Vector(path[i].pos.x * this.squareSize + this.squareSize / 2, path[i].pos.y * this.squareSize + this.squareSize / 2);
-          const next = new Vector(path[i + 1].pos.x * this.squareSize + this.squareSize / 2, path[i + 1].pos.y * this.squareSize + this.squareSize / 2);
-          const distance = next.subtract(current).length();
-          totalDistance += distance;
-          if (i >= checkpointIndex) {
-            checkpointDistance += distance;
-          }
+            const current = new Vector(path[i].pos.x * this.squareSize + this.squareSize / 2, path[i].pos.y * this.squareSize + this.squareSize / 2);
+            const next = new Vector(path[i + 1].pos.x * this.squareSize + this.squareSize / 2, path[i + 1].pos.y * this.squareSize + this.squareSize / 2);
+            const distance = next.subtract(current).length();
+            totalDistance += distance;
+            if (i >= checkpointIndex) {
+                checkpointDistance += distance;
+            }
         }
-        
+
         // Calculate distance from car to next checkpoint
         const checkpointPos = new Vector(path[checkpointIndex].pos.x * this.squareSize + this.squareSize / 2, path[checkpointIndex].pos.y * this.squareSize + this.squareSize / 2);
         const nextCheckpointIndex = (checkpointIndex + 1) % path.length;
         const nextCheckpointPos = new Vector(path[nextCheckpointIndex].pos.x * this.squareSize + this.squareSize / 2, path[nextCheckpointIndex].pos.y * this.squareSize + this.squareSize / 2);
         const distanceToCheckpoint = checkpointPos.subtract(carPosition).length();
         const distanceToNextCheckpoint = distanceToCheckpoint + nextCheckpointPos.subtract(checkpointPos).length();
-        
+
 
         distanceCovered += totalDistance - checkpointDistance + (this.squareSize - distanceToCheckpoint) - this.squareSize;
-        
+
         // Calculate completion percentage
-        let completionPercentage = distanceCovered  / totalDistance;
+        let completionPercentage = distanceCovered / totalDistance;
         completionPercentage = Math.min(Math.max(completionPercentage, 0), 1);
-        
+
         return completionPercentage;
-      }
-           
+    }
+
 
 }

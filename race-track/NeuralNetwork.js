@@ -76,7 +76,7 @@ class NeuralNetwork {
 
         function mutateGene(gene) {
             if (Math.random() < mutationRate) {
-                const mutationStrength = 0.1; // Adjust this value to control the magnitude of mutation
+                const mutationStrength = 0.5; // Adjust this value to control the magnitude of mutation
                 return gene + gaussianRandom() * mutationStrength;
             } else {
                 return gene;

@@ -1,6 +1,6 @@
 class GeneticAlgorithm {
     constructor(population, inputSize, hiddenSize, outputSize, mutationRate, maxGenerations,
-        expectedOutputs) {
+        expectedOutputs, onNewGenerationCreatedFn) {
         this.populationSize = population.length;
         this.population = population;
         this.inputSize = inputSize;
@@ -9,6 +9,8 @@ class GeneticAlgorithm {
         this.mutationRate = mutationRate;
         this.maxGenerations = maxGenerations;
         this.expectedOutputs = expectedOutputs;
+        this.onNewGenerationCreatedFn = onNewGenerationCreatedFn;
+        this.bestIndividual = null;
     }
 
     allIndividualsDead() {
@@ -24,11 +26,14 @@ class GeneticAlgorithm {
             }
 
             const checkPopulation = () => {
+                this.bestIndividual = this.population.reduce((max, curren) => !curren.isDead && max.currentFitness > curren.currentFitness ? max : curren);
+
                 if (this.allIndividualsDead()) {
                     this.population.sort((a, b) => b.currentFitness - a.currentFitness);
                     console.log(`Génération ${generation}: Meilleure fitness = ${this.population[0].currentFitness}`);
 
                     this.population = this.createNewGeneration();
+                    this.onNewGenerationCreatedFn(this.population);
                     runGeneration(generation + 1);
                 } else {
                     requestAnimationFrame(checkPopulation);
@@ -48,7 +53,7 @@ class GeneticAlgorithm {
             const tournamentSize = 3; // Adjust this value to control the selection pressure
             const selected = [];
             for (let i = 0; i < tournamentSize; i++) {
-                const randomIndex = Math.floor(Math.random() * this.population.length);
+                const randomIndex = Math.floor(Math.random() * Math.max(10, this.population.length * 0.1));
                 selected.push(this.population[randomIndex]);
             }
             return selected.sort((a, b) => b.currentFitness - a.currentFitness)[0];
@@ -72,16 +77,6 @@ class GeneticAlgorithm {
         return newGeneration;
     }
 
-}
-
-function handleFileUpload() {
-    const fileInput = document.getElementById('fileInput');
-    const file = fileInput.files[0];
-
-    NeuralNetwork.loadGenes(file, (neuralNetwork) => {
-        // Use the loaded neural network
-        console.log('Loaded neural network:', neuralNetwork);
-    });
 }
 
 // // Exemple d'utilisation
