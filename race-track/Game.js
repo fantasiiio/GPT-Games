@@ -149,6 +149,8 @@ const eraseTrackBtn = document.getElementById('eraseTrackBtn');
 const buttonContents = document.getElementsByClassName('button-content');
 const divCanvas = document.getElementById('divCanvas');
 const runLbl = document.getElementById('runLbl');
+const saveBestNeuralNetworkBtn = document.getElementById('saveBestNeuralNetworkBtn');
+const loadBestNeuralNetworkBtn = document.getElementById('loadBestNeuralNetworkBtn');
 
 
 canvas.width = divCanvas.clientWidth;
@@ -156,6 +158,18 @@ canvas.height = divCanvas.clientHeight;
 
 //divCanvas.clientWidth
 let currentTool = 'run';
+
+saveBestNeuralNetworkBtn.addEventListener('click', () => {
+    geneticAlgorithm.bestIndividual.saveGenes();
+    alert("saved")
+});
+
+loadBestNeuralNetworkBtn.addEventListener('click', () => {
+    redCars.length = 1;
+    let individual = new NeuralNetwork();
+    individual.loadGenes();
+    restart([individual])
+});
 
 clearTrackBtn.addEventListener('click', () => {
     track.clearTrack();
@@ -207,18 +221,23 @@ addEventListener("resize", (event) => {
 
 var population;
 var geneticAlgorithm;
+
+function restart(newPopulation){
+    for (let i = 0; i < newPopulation.length; i++) {
+        redCars[i].neuralNetwork = geneticAlgorithm.population[i];
+        redCars[i].neuralNetwork.isDead = false;
+        redCars[i].reset();
+        track.placeCarAtStartPos(redCars[i]);
+    } 
+}
+
 document.addEventListener('DOMContentLoaded', function () {
 
     const numRedCars = 50;
     let keyPressed = {};
     geneticAlgorithm = initGeneticAlgorithm(numRedCars);
     geneticAlgorithm.onNewGenerationCreatedFn = (newPopulation) => {
-        for (let i = 0; i < newPopulation.length; i++) {
-            redCars[i].neuralNetwork = geneticAlgorithm.population[i];
-            redCars[i].neuralNetwork.isDead = false;
-            redCars[i].reset();
-            track.placeCarAtStartPos(redCars[i]);
-        }        
+        restart(newPopulation);
     }
 
     // Create red cars
@@ -269,7 +288,7 @@ document.addEventListener('DOMContentLoaded', function () {
         let index = 0;
         for (let redCar of redCars) {
             redCar.applyNeuralNetwork();
-            redCar.update(trackGeometry);
+            redCar.update(trackGeometry, track.path);
             let completionPct = track.calculateCompletionPercentage(redCar)
             redCar.neuralNetwork.currentFitness = completionPct;           
             if(redCar.neuralNetwork == geneticAlgorithm.bestIndividual) 

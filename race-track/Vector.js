@@ -56,6 +56,10 @@ class Vector {
     angle() {
         return Math.atan2(this.y, this.x);
     }
+
+    perpendicular() {
+        return new Vector(-this.y, this.x);
+    }
 }
 
 Vector.intersection = function (p1, p2, p3, p4) {

@@ -26,8 +26,17 @@ class GeneticAlgorithm {
             }
 
             const checkPopulation = () => {
-                this.bestIndividual = this.population.reduce((max, curren) => !curren.isDead && max.currentFitness > curren.currentFitness ? max : curren);
-
+                // find best population based on it's currentFitness that is not dead
+                this.bestIndividual = null;
+                for (let i = 0; i < this.population.length; i++) {
+                    const neuralNetwork = this.population[i];
+                    if (!neuralNetwork.isDead) {
+                        if(neuralNetwork.currentFitness > ((this.bestIndividual || {}).currentFitness || 0)) {
+                            this.bestIndividual = neuralNetwork;
+                        }
+                    }
+                }
+                            
                 if (this.allIndividualsDead()) {
                     this.population.sort((a, b) => b.currentFitness - a.currentFitness);
                     console.log(`Génération ${generation}: Meilleure fitness = ${this.population[0].currentFitness}`);

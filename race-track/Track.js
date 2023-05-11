@@ -17,12 +17,6 @@ class Track {
             .fill(null)
             .map(() => new Array(this.gridHeight).fill(false));
 
-        this.startPoint = {
-            x: 0,
-            y: 0,
-            dir: "",
-            revert: true
-        };
 
         this.zoomLevel = 0.5;
         this.maxSquareSize = 300;
@@ -307,6 +301,7 @@ class Track {
                 ctx.scale(this.zoomLevel, this.zoomLevel);
                 this.drawGrid();
                 this.drawTrack();
+                this.drawCheckerFinishLine(ctx);
                 let trackGeometry = this.getTrackGeometry();
                 this.drawTrackGeometry(trackGeometry, ctx);
                 let carIndex = 0;
@@ -525,13 +520,13 @@ class Track {
                 const neighbor = validNeighbors[0];
 
                 if (neighbor.x === x + 1) {
-                    return 'right';
+                    return 'horizontal';
                 } else if (neighbor.x === x - 1) {
-                    return 'left';
+                    return 'horizontal';
                 } else if (neighbor.y === y + 1) {
-                    return 'down';
+                    return 'vertical';
                 } else if (neighbor.y === y - 1) {
-                    return 'up';
+                    return 'vertical';
                 }
             } else if (validNeighbors.length === 2) {
                 const neighbor1 = validNeighbors[0];
@@ -790,6 +785,8 @@ class Track {
     }
 
     calculateCompletionPercentage(car) {
+        if(car.neuralNetwork.isCompleted)
+            return 1;
         const path = this.getTrackPath();
         let carPosition = new Vector(car.x, car.y);
         let distanceCovered = 0;
@@ -810,11 +807,7 @@ class Track {
 
         // Calculate distance from car to next checkpoint
         const checkpointPos = new Vector(path[checkpointIndex].pos.x * this.squareSize + this.squareSize / 2, path[checkpointIndex].pos.y * this.squareSize + this.squareSize / 2);
-        const nextCheckpointIndex = (checkpointIndex + 1) % path.length;
-        const nextCheckpointPos = new Vector(path[nextCheckpointIndex].pos.x * this.squareSize + this.squareSize / 2, path[nextCheckpointIndex].pos.y * this.squareSize + this.squareSize / 2);
         const distanceToCheckpoint = checkpointPos.subtract(carPosition).length();
-        const distanceToNextCheckpoint = distanceToCheckpoint + nextCheckpointPos.subtract(checkpointPos).length();
-
 
         distanceCovered += totalDistance - checkpointDistance + (this.squareSize - distanceToCheckpoint) - this.squareSize;
 
@@ -822,7 +815,57 @@ class Track {
         let completionPercentage = distanceCovered / totalDistance;
         completionPercentage = Math.min(Math.max(completionPercentage, 0), 1);
 
+        let completed = false;
+        const lastCheckpointPos = this.path[this.path.length - 1].pos;
+        if (car.lastGridPosition.equals(lastCheckpointPos)) {
+            // Check if the car passed the last checkpoint           
+            if (checkpointIndex == 0) {
+                completed = true;
+            }
+        }
+    
+        car.lastCheckpointIndex = checkpointIndex;
+        if(completed)
+            car.win();
+
         return completionPercentage;
+    }
+
+
+    drawCheckerFinishLine(ctx, vertical) {
+        ctx.save();
+        let width = this.squareSize;
+        let height = 150;
+        let numSquaresX = 10;
+        let numSquaresY = 3;
+        const squareSize = width / numSquaresX;
+
+        let x = startPoint.x * this.squareSize + this.squareSize / 2 + squareSize * 3;
+        let y = startPoint.y * this.squareSize;
+        let direction = this.getTrackDirectionSimple(startPoint);
+        let isVertical = direction == 'horizontal'
+        ctx.translate(x, y);
+        if (isVertical)
+            ctx.rotate(Math.PI / 2);
+
+
+        
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = "white";
+
+        let isWhite = true;
+        for (let i = 0; i < numSquaresX; i++) {
+            for (let j = 0; j < numSquaresY; j++) {
+                if (isWhite) {
+                    ctx.fillRect(i * squareSize, j * squareSize, squareSize, squareSize);
+                }
+                isWhite = !isWhite;
+            }
+
+        }
+
+        ctx.restore();
     }
 
 

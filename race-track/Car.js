@@ -17,8 +17,11 @@ class Car extends Rectangle {
         this.neuralNetwork = neuralNetwork;
         this.Steering = new Steering(20);
         this.timeOnSameGridSquare = 0;
-        this.lastGridPosition = {x: 0, y: 0};
         this.gridSize = gridSize;
+        this.lastGridPosition = {
+            x: 0,
+            y: 0
+        };
     }
 
 
@@ -121,11 +124,11 @@ class Car extends Rectangle {
         return false;
     }
 
-    update(trackGeometry) {
+    update(trackGeometry, trackPath) {
         this.velocity += this.acceleration;
         this.velocity *= 0.99; // Friction
 
-            
+
         const oldX = this.x;
         const oldY = this.y;
 
@@ -146,7 +149,7 @@ class Car extends Rectangle {
             this.angle += angleDelta * 180 / Math.PI;
         }
 
-        //     // Undo the movement if there is a collision
+        // check if Die
         let intersect = this.calculateIntersectionWithTrack(trackGeometry);
         if (intersect.objectType) {
             this.die(oldX, oldY);
@@ -154,22 +157,27 @@ class Car extends Rectangle {
 
         const currentGridPosition = new Vector(Math.floor(this.x / this.gridSize), Math.floor(this.y / this.gridSize));
         if (currentGridPosition.equals(this.lastGridPosition)) {
-          this.timeOnSameGridSquare++;
-          if (this.timeOnSameGridSquare >= 60*5) {
-            this.die(oldX, oldY);
-          }
+            this.timeOnSameGridSquare++;
+            if (this.timeOnSameGridSquare >= 60 * 5) {
+                this.die(oldX, oldY);
+            }
         } else {
-          this.timeOnSameGridSquare = 0;
-          this.lastGridPosition = currentGridPosition;
+            this.timeOnSameGridSquare = 0;
+            this.lastGridPosition = currentGridPosition;
         }
 
-        if(this.velocity < 0)
+        if (this.velocity < 0)
             this.die(oldX, oldY);
 
         this.updateLaserSensors();
     }
 
-    die(oldX, oldY){
+    win = function () {
+        this.color = 'green'
+        this.neuralNetwork.isCompleted = true;
+    }
+
+    die(oldX, oldY) {
         this.x = oldX;
         this.y = oldY;
         this.velocity = 0;
@@ -211,4 +219,3 @@ class Car extends Rectangle {
     }
 
 }
-
