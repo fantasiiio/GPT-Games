@@ -9,8 +9,8 @@ class Track {
         this.ctx = this.canvas.getContext("2d");
 
         this.squareSize = 500;
-        this.gridWidth = 30;
-        this.gridHeight = 30;
+        this.gridWidth = 15;
+        this.gridHeight = 15;
         this.gridSize = this.squareSize * this.gridWidth;
 
         this.grid = new Array(this.gridWidth)
@@ -83,10 +83,10 @@ class Track {
                     }
 
                     if (neighborCount == 2) {
-                        const top = this.grid[neighbors[3].x][neighbors[3].y];
-                        const bottom = this.grid[neighbors[2].x][neighbors[2].y];
-                        const left = this.grid[neighbors[1].x][neighbors[1].y];
-                        const right = this.grid[neighbors[0].x][neighbors[0].y];
+                        const top = (this.grid[neighbors[3].x] || [])[neighbors[3].y];
+                        const bottom = (this.grid[neighbors[2].x] || [])[neighbors[2].y];
+                        const left = (this.grid[neighbors[1].x] || [])[neighbors[1].y];
+                        const right = (this.grid[neighbors[0].x] || [])[neighbors[0].y];
 
                         ctx.beginPath();
                         if (right && bottom) {
@@ -160,10 +160,10 @@ class Track {
                     }
 
                     if (neighborCount == 2) {
-                        const top = this.grid[neighbors[3].x][neighbors[3].y];
-                        const bottom = this.grid[neighbors[2].x][neighbors[2].y];
-                        const left = this.grid[neighbors[1].x][neighbors[1].y];
-                        const right = this.grid[neighbors[0].x][neighbors[0].y];
+                        const top = (this.grid[neighbors[3].x] || [])[neighbors[3].y];
+                        const bottom = (this.grid[neighbors[2].x] || [])[neighbors[2].y];
+                        const left = (this.grid[neighbors[1].x] || [])[neighbors[1].y];
+                        const right = (this.grid[neighbors[0].x] || [])[neighbors[0].y];
                         if (top && bottom) { // Vertical
                             geometry.lines.push({
                                 p1: new Vector(x * this.squareSize, y * this.squareSize),
@@ -583,7 +583,7 @@ class Track {
                             x,
                             y
                         });
-                        car.angle = direction === 'right' ? 180 : direction === 'up' ? 90 : direction === 'left' ? 0 : 270;
+                        car.angle = direction === 'left' ? 180 : direction === 'up' ? 90 : direction === 'right' ? 0 : 270;
                         car.color = 'red'
                     }
                 }
@@ -681,10 +681,10 @@ class Track {
             }
 
             if (neighborCount == 2) {
-                const top = this.grid[neighbors[3].x][neighbors[3].y];
-                const bottom = this.grid[neighbors[2].x][neighbors[2].y];
-                const left = this.grid[neighbors[1].x][neighbors[1].y];
-                const right = this.grid[neighbors[0].x][neighbors[0].y];
+                const top = (this.grid[neighbors[3].x] || [])[neighbors[3].y];
+                const bottom = (this.grid[neighbors[2].x] || [])[neighbors[2].y];
+                const left = (this.grid[neighbors[1].x] || [])[neighbors[1].y];
+                const right = (this.grid[neighbors[0].x] || [])[neighbors[0].y];
 
                 ctx.beginPath();
                 ctx.stroke();
@@ -785,7 +785,7 @@ class Track {
     }
 
     calculateCompletionPercentage(car) {
-        if(car.neuralNetwork.isCompleted)
+        if (car.neuralNetwork.isCompleted)
             return 1;
         const path = this.getTrackPath();
         let carPosition = new Vector(car.x, car.y);
@@ -823,9 +823,9 @@ class Track {
                 completed = true;
             }
         }
-    
+
         car.lastCheckpointIndex = checkpointIndex;
-        if(completed)
+        if (completed)
             car.win();
 
         return completionPercentage;
@@ -849,7 +849,7 @@ class Track {
             ctx.rotate(Math.PI / 2);
 
 
-        
+
         ctx.fillStyle = "black";
         ctx.fillRect(0, 0, width, height);
         ctx.fillStyle = "white";
@@ -866,6 +866,186 @@ class Track {
         }
 
         ctx.restore();
+    }
+
+
+
+    generateClosedTrack() {
+        let trackPath = [{pos:{x: Math.floor(this.gridWidth / 2), y: 0}}]; // start in the middle of the grid
+        let triedDirections = [[]]; // array of arrays to track tried directions for each point
+        let newPos;
+        while (true) {
+            let currentPos = trackPath[trackPath.length - 1];
+            let validDirections = ['up', 'down', 'left', 'right'].filter(dir => !triedDirections[trackPath.length - 1].includes(dir));
+    
+            if (validDirections.length === 0) { // if no directions left to try, backtrack
+                // this.path = trackPath;
+                // this.updateGrid();
+                // return;
+                if (trackPath.length === 1) {
+                    // if we're back at the start and there are still no valid directions, track generation has failed
+                    throw new Error("Unable to generate track. Please try with different parameters.");
+                } else {
+                    trackPath.pop(); // remove current position from path
+                    triedDirections.pop(); // remove tried directions for current position
+                    continue;
+                }
+            }
+    
+            // choose a random direction from the remaining valid ones
+            const direction = validDirections[Math.floor(Math.random() * validDirections.length)];
+            triedDirections[trackPath.length - 1].push(direction); // mark direction as tried
+    
+            
+            switch(direction) {
+                case 'up':
+                    newPos = {pos:{x: currentPos.pos.x, y: currentPos.pos.y - 1}};
+                    break;
+                case 'down':
+                    newPos = {pos:{x: currentPos.pos.x, y: currentPos.pos.y + 1}};
+                    break;
+                case 'left':
+                    newPos = {pos:{x: currentPos.pos.x - 1, y: currentPos.pos.y}};
+                    break;
+                case 'right':
+                    newPos = {pos:{x: currentPos.pos.x + 1, y: currentPos.pos.y}};
+                    break;
+            }
+    
+            // if (trackPath.length > 4 && this.isAdjacent(trackPath[0], newPos)) {
+            //     if (this.isValidPos(currentPos, newPos, trackPath))
+            //         break; // we've created a closed loop, so we're done
+            // }
+
+            if (this.isValidPos(currentPos, newPos, trackPath)) {
+                trackPath.push(newPos);
+                triedDirections.push([]);
+            }else{
+                currentPos = currentPos;
+            }
+            if (trackPath.length > 4 && this.isAdjacent(trackPath[0], newPos)) {
+                break; // we've created a closed loop, so we're done
+            }
+
+        }
+    
+        this.path = trackPath;
+        this.updateGrid();
+    }
+    
+    isAdjacent(pos1, pos2) {
+        if (pos1.pos.x === pos2.pos.x) {
+            if (Math.abs(pos1.pos.y - pos2.pos.y) === 1) {
+                return true;
+            }
+        } else if (pos1.pos.y === pos2.pos.y) {
+            if (Math.abs(pos1.pos.x - pos2.pos.x) === 1) {
+                return true;
+            }
+        }
+    
+        return false;
+    }
+    
+
+    isValidPos = (currentPos, newPos, trackPath) => {
+        // Check if position is within the grid
+        if (newPos.pos.x < 0 || newPos.pos.y < 0 || newPos.pos.x >= this.gridWidth || newPos.pos.y >= this.gridHeight) {
+            return false;
+        }
+    
+        // Check if position is already part of the path
+        for (let point of trackPath) {
+            if (point.pos.x === newPos.pos.x && point.pos.y === newPos.pos.y) {
+                return false;
+            }
+        }
+    
+        // Check if position is at least 2 units away from the existing path
+        let index = 0;
+        for (let point of trackPath) {
+            if(index++ < 3 && trackPath.length > 4)
+                continue;
+            if (Math.abs(point.pos.x - newPos.pos.x) < 2 && Math.abs(point.pos.y - newPos.pos.y) < 2) {
+                if(point.pos.x != currentPos.pos.x && point.pos.y != currentPos.pos.y)
+                    return false;
+            }
+        }
+    
+        return true;
+    };
+    
+
+
+
+
+
+    selectStartPoint() {
+        const horizontalSegments = [];
+        const verticalSegments = [];
+
+        // Collect all horizontal and vertical segments in the track
+        for (let i = 0; i < this.path.length - 1; i++) {
+            const current = this.path[i];
+            const next = this.path[i + 1];
+
+            if (current.pos.y === next.pos.y) {
+                horizontalSegments.push({
+                    start: current.pos.x,
+                    end: next.pos.x,
+                    pos: {
+                        y: current.pos.y,
+                        x: current.pos.x,
+                    }
+                });
+            } else if (current.pos.x === next.pos.x) {
+                verticalSegments.push({
+                    start: current.pos.y,
+                    end: next.pos.y,
+                    pos: {
+                        x: current.pos.x,
+                        y: current.pos.y,
+                    }
+                });
+            }
+        }
+
+        // Randomly select a horizontal or vertical segment, and a position along that segment
+        let startPoint;
+        let segment;
+        if (Math.random() < 0.5) {
+            segment = horizontalSegments[Math.floor(Math.random() * horizontalSegments.length)];
+            startPoint = {
+                x: segment.pos.x,
+                y: segment.pos.y,
+                dir: segment.start < segment.end ? "right" : "left",
+                revert: segment.start < segment.end,
+            };
+        } else {
+            segment = verticalSegments[Math.floor(Math.random() * verticalSegments.length)];
+            startPoint = {
+                x: segment.pos.x,
+                y: segment.pos.y,
+                dir: segment.start < segment.end ? "down" : "up",
+                revert: segment.start < segment.end,
+            };
+        }
+
+        return startPoint;
+    }
+
+    updateGrid() {
+        // Reset the grid
+        this.grid = new Array(this.gridWidth)
+            .fill(null)
+            .map(() => new Array(this.gridHeight).fill(false));
+
+        // Set the grid cells based on the path
+        for (let i = 0; i < this.path.length; i++) {
+            const x = this.path[i].pos.x;
+            const y = this.path[i].pos.y;
+            this.grid[x][y] = true;
+        }
     }
 
 

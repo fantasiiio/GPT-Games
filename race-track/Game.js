@@ -7,7 +7,7 @@ let drawing = false;
 let erasing = false;
 
 
-const startPoint = {
+let startPoint = {
     x: 0,
     y: 0,
     dir: ""
@@ -258,8 +258,9 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log("L'algorithme génétique a terminé. Meilleur individu : ", bestIndividual);
     });
 
-    track.loadTrack();
-
+    //track.loadTrack();
+    track.generateClosedTrack();
+    startPoint = track.selectStartPoint();
     function handleKeypress() {
         if (currentTool != "run")
             return;
