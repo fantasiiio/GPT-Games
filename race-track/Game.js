@@ -48,7 +48,7 @@ function initGeneticAlgorithm(populationSize) {
     const hiddenSize = 4;
     const outputSize = 2;
     const mutationRate = 0.1;
-    const maxGenerations = 100;
+    const maxGenerations = 1000;
     const inputs = []; // Vous pouvez ajouter des données d'entrée spécifiques ici
     const expectedOutputs = []; // Vous pouvez ajouter des sorties attendues spécifiques ici
     let population = [];
@@ -160,15 +160,12 @@ canvas.height = divCanvas.clientHeight;
 let currentTool = 'run';
 
 saveBestNeuralNetworkBtn.addEventListener('click', () => {
-    geneticAlgorithm.bestIndividual.saveGenes();
+    geneticAlgorithm.savePopulation()
     alert("saved")
 });
 
 loadBestNeuralNetworkBtn.addEventListener('click', () => {
-    redCars.length = 1;
-    let individual = new NeuralNetwork();
-    individual.loadGenes();
-    restart([individual])
+    geneticAlgorithm.loadPopulation()
 });
 
 clearTrackBtn.addEventListener('click', () => {
@@ -189,10 +186,12 @@ eraseTrackBtn.addEventListener('change', () => {
 
 saveTrackBtn.addEventListener('click', () => {
     track.saveTrack();
+    geneticAlgorithm.savePopulation()
 });
 
 loadTrackBtn.addEventListener('click', () => {
     track.loadTrack();
+    geneticAlgorithm.loadPopulation()
 });
 
 validateTrackBtn.addEventListener('click', () => {
@@ -224,7 +223,7 @@ var geneticAlgorithm;
 
 function restart(newPopulation) {
     for (let i = 0; i < newPopulation.length; i++) {
-        redCars[i].neuralNetwork = geneticAlgorithm.population[i];
+        redCars[i].neuralNetwork = newPopulation[i];
         redCars[i].neuralNetwork.isDead = false;
         redCars[i].reset();
         track.placeCarAtStartPos(redCars[i]);
@@ -233,12 +232,6 @@ function restart(newPopulation) {
 
 document.addEventListener('DOMContentLoaded', function () {
 
-    //track.loadTrack();
-    track.generateClosedTrack();
-    startPoint = track.selectStartPoint();
-    track.path = track.getTrackPath();        
-
-
     const numRedCars = 50;
     let keyPressed = {};
     geneticAlgorithm = initGeneticAlgorithm(numRedCars);
@@ -246,13 +239,31 @@ document.addEventListener('DOMContentLoaded', function () {
         restart(newPopulation);
     }
 
-    // Create red cars
-    for (let i = 0; i < geneticAlgorithm.population.length; i++) {
-        const redCar = new Car(canvas.width / 2, canvas.height / 2, 80, 40, 'red', 180, geneticAlgorithm.population[i], track.squareSize);
-        redCar.reset();
-        track.placeCarAtStartPos(redCar);
-        redCars.push(redCar);
+    if (track.loadTrack()) {
+        // Create red cars
+        for (let i = 0; i < geneticAlgorithm.population.length; i++) {
+            const redCar = new Car(canvas.width / 2, canvas.height / 2, 80, 40, 'red', 180, geneticAlgorithm.population[i], track.squareSize);
+            redCar.reset();
+            track.placeCarAtStartPos(redCar);
+            redCars.push(redCar);
+        }
+        geneticAlgorithm.loadPopulation()
+    } else {
+        track.generateClosedTrack();
+        startPoint = track.selectStartPoint();
+        track.path = track.getTrackPath();
+
+        // Create red cars
+        for (let i = 0; i < geneticAlgorithm.population.length; i++) {
+            const redCar = new Car(canvas.width / 2, canvas.height / 2, 80, 40, 'red', 180, geneticAlgorithm.population[i], track.squareSize);
+            redCar.reset();
+            track.placeCarAtStartPos(redCar);
+            redCars.push(redCar);
+        }
+
     }
+
+    track.buildQuadTree();
 
     population = redCars.map(car => car.neuralNetwork);
 
@@ -284,11 +295,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function gameLoop() {
-        let trackGeometry = track.getTrackGeometry();
+        //let trackGeometry = track.getTrackGeometry();
         handleKeypress();
         let index = 0;
         for (let redCar of redCars) {
             redCar.applyNeuralNetwork();
+            let trackGeometry = track.quadTree.query(redCar);
             redCar.update(trackGeometry, track);
             for (let laserSensor of redCar.laserSensors) {
                 let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
@@ -296,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             let completionPct = track.calculateCompletionPercentage(redCar)
-            redCar.updateCheckpoint();            
+            redCar.updateCheckpoint();
             redCar.neuralNetwork.currentFitness = completionPct;
             if (redCar.neuralNetwork.isCompleted) {
                 const slowTime = track.path.length * 1000 * track.lapToWin; // 1 second per square in the path
@@ -305,7 +317,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
 
-            if (redCar.neuralNetwork == geneticAlgorithm.bestIndividual){
+            if (redCar.neuralNetwork == geneticAlgorithm.bestIndividual) {
                 drawText(ctx, "completion: " + (completionPct * 100).toFixed(1), 10, 30)
                 // track.pan.x = canvas.width / 2 - redCar.x;
                 // track.pan.y = canvas.height / 2 - redCar.y;

@@ -10,8 +10,8 @@ class Track {
         this.ctx = this.canvas.getContext("2d");
 
         this.squareSize = 500;
-        this.gridWidth = 20;
-        this.gridHeight = 20;
+        this.gridWidth = 64;
+        this.gridHeight = 64;
         this.gridSize = this.squareSize * this.gridWidth;
 
         this.grid = new Array(this.gridWidth)
@@ -19,14 +19,19 @@ class Track {
             .map(() => new Array(this.gridHeight).fill(false));
 
 
-        this.zoomLevel = 0.1;
+        this.zoomLevel = 0.05;
         this.maxSquareSize = 300;
-
+        this.quadTree = new QuadTree(new Rectangle(0, 0, this.gridSize, this.gridSize, 0, false), 7);
         //this.drawGrid();
     }
 
+    buildQuadTree() {
+        let trackGeometry = this.getTrackGeometry();
+        this.quadTree.intertTrackGeometry(trackGeometry);
+    }
+
     drawGrid() {
-        ctx.strokeStyle = 'darkGreen';
+        ctx.strokeStyle = 'white';
         for (let i = 0; i <= this.gridWidth; i++) {
             ctx.beginPath();
             ctx.moveTo(i * this.squareSize, 0);
@@ -116,6 +121,13 @@ class Track {
                     ctx.fill();
                     ctx.stroke();
                 }
+                // if(x == Math.floor(this.gridWidth / 2) && y == Math.floor(this.gridHeight / 2)) {
+                //     ctx.fillStyle = "black";
+                //     ctx.strokeStyle = 'black';
+                //     ctx.rect(x * this.squareSize, y * this.squareSize, this.squareSize, this.squareSize);
+                //     ctx.fill();
+                //     ctx.stroke();
+                // }
             }
         }
         this.drawDashedLines();
@@ -284,7 +296,14 @@ class Track {
         event.preventDefault();
         const scaleFactor = 1.1;
         const zoomFactor = event.deltaY < 0 ? scaleFactor : 1 / scaleFactor;
+
+        const rect = canvas.getBoundingClientRect();
+        let squareX = Math.floor(((event.clientX - rect.left - this.pan.x) / this.zoomLevel) / this.squareSize);
+        let squareY = Math.floor(((event.clientY - rect.top - this.pan.y) / this.zoomLevel) / this.squareSize);
+
         this.zoomLevel *= zoomFactor;
+        this.pan.x = canvas.width / 2 - squareX * 500 * this.zoomLevel; //;
+        this.pan.y = canvas.height / 2 - squareY * 500 * this.zoomLevel; // - Math.floor(((event.clientY - rect.top - this.pan.y) / this.zoomLevel) / this.squareSize) * 500 * this.zoomLevel;
 
         this.redraw();
     }
@@ -307,6 +326,7 @@ class Track {
                 this.drawTrackGeometry(trackGeometry, ctx);
                 let carIndex = 0;
                 for (let redCar of redCars) {
+                    //this.quadTree.draw(redCar, this.ctx);
                     redCar.draw(ctx);
                     carIndex++;
                 }
@@ -316,34 +336,6 @@ class Track {
             }, 1000 / 60);
         }
     }
-
-    redrawNormal() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.save();
-        ctx.translate(this.pan.x, this.pan.y);
-        ctx.scale(this.zoomLevel, this.zoomLevel);
-        this.drawGrid();
-        this.drawTrack();
-        let geometry = this.getTrackGeometry();
-        this.drawTrackGeometry(geometry, ctx);
-        let carIndex = 0;
-        for (let redCar of redCars) {
-            if (carIndex == 0)
-                redCar.drawLaserSensors(ctx);
-            redCar.draw(ctx);
-            for (let laserSensor of redCar.laserSensors) {
-                let intersection = laserSensor.calculateTrackIntersection(geometry);
-                laserSensor.intersectionInfo = intersection;
-                if (carIndex == 0)
-                    drawIntersectionPoint(ctx, intersection);
-            }
-            carIndex++;;
-        }
-
-        ctx.restore();
-    }
-
-
 
 
     getTrackPath() {
@@ -711,7 +703,7 @@ class Track {
 
     loadTrack() {
         const savedTrack = localStorage.getItem('track');
-        if (savedTrack) {
+        if (savedTrack && confirm('Charger la piste sauvegardée ?')) {
             const savedData = JSON.parse(savedTrack);
             this.grid = savedData.grid;
             startPoint = savedData.startPoint;
@@ -722,6 +714,7 @@ class Track {
                 this.placeCarAtStartPos(redCar);
             }
             console.log('Piste chargée');
+            return true;
         } else {
             console.log('Aucune piste sauvegardée');
         }
@@ -870,8 +863,8 @@ class Track {
     generateClosedTrack() {
         let trackPath = [{
             pos: {
-                x: Math.floor(this.gridWidth / 2),
-                y: 0
+                x: Math.floor(Math.random() * this.gridWidth),
+                y: Math.floor(Math.random() * this.gridHeight)
             }
         }]; // start in the middle of the grid
         let triedDirections = [
@@ -880,10 +873,10 @@ class Track {
         let newPos;
 
         let iterationCount = 0;
-        const maxIterations = 10000; // Set the maximum iterations.
+        const maxIterations = 500000; // Set the maximum iterations.
+        let tryCount = 0;
 
-
-        while (iterationCount < maxIterations) {
+        while (tryCount < 5) {
             let currentPos = trackPath[trackPath.length - 1];
             let validDirections = ['up', 'down', 'left', 'right'].filter(dir => !triedDirections[trackPath.length - 1].includes(dir));
 
@@ -957,9 +950,49 @@ class Track {
                 currentPos = currentPos;
             }
             if (trackPath.length > 4 && this.isAdjacent(trackPath[0], newPos)) {
-                break; // we've created a closed loop, so we're done
+                this.path = trackPath;
+                this.updateGrid();                
+                let haveStraightTrack = false;
+                for (let i = 0; i < this.path.length; i++) {
+                    let dir = this.getTrackDirectionSimple(this.path[i].pos);
+                    if (dir === "horizontal" || dir === "vertical") {
+                        haveStraightTrack = true;
+                        break;
+                    }
+                }
+                if (!haveStraightTrack) {
+                    console.log("no straight track");
+                    iterationCount = 0;
+                    tryCount++;
+                    trackPath = [{
+                        pos: {
+                            x: Math.floor(this.gridWidth / 2),
+                            y: 0
+                        }
+                    }];
+                    triedDirections = [
+                        []
+                    ];
+                } else {
+                    break; // we've created a closed loop, so we're done
+                }
             }
             iterationCount++;
+
+            if (iterationCount == maxIterations) {
+                iterationCount = 0;
+                tryCount++;
+                trackPath = [{
+                    pos: {
+                        x: Math.floor(this.gridWidth / 2),
+                        y: 0
+                    }
+                }];
+                triedDirections = [
+                    []
+                ]; // shorten the track path more and more
+            }
+
         }
 
         // If the loop ends due to maxIterations being reached, log an error message.

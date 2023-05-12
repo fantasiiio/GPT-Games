@@ -185,7 +185,8 @@ class Car extends Rectangle {
         this.completionTime = new Date().getTime();
         // Calculate the time taken to complete the track
         this.timeTakenToCompleteTrack = this.completionTime - this.startTime;
-        this.color = 'green'
+        if(!geneticAlgorithm.bestSolutionFound)        
+            this.color = 'green'
         this.neuralNetwork.isCompleted = true;
     }
 
@@ -213,6 +214,7 @@ class Car extends Rectangle {
         this.speed = 0;
         this.color = 'red'
         this.lastCheckpointIndex = -1;
+        this.lapCount = 0;
     }
 
     updateLaserSensors() {

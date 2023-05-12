@@ -32,26 +32,30 @@ class GeneticAlgorithm {
                     const neuralNetwork = this.population[i];
                     neuralNetwork.isBest = false;
                     if (!neuralNetwork.isDead) {
-                        if(neuralNetwork.currentFitness > ((this.bestIndividual || {}).currentFitness || 0)) {
+                        if (neuralNetwork.currentFitness > ((this.bestIndividual || {}).currentFitness || 0)) {
                             this.bestIndividual = neuralNetwork;
                         }
                     }
-                }                   
-                if(this.bestIndividual)
+                }
+                if (this.bestIndividual)
                     this.bestIndividual.isBest = true;
-                
-                if (this.allIndividualsDead()) {
-                    this.population.sort((a, b) => b.currentFitness - a.currentFitness);
-                    console.log(`Génération ${generation}: Meilleure fitness = ${this.population[0].currentFitness}`);
+                if (!this.restart && !this.bestSolutionFound) {
+                    if (this.allIndividualsDead()) {
+                        this.population.sort((a, b) => b.currentFitness - a.currentFitness);
+                        console.log(`Génération ${generation}: Meilleure fitness = ${this.population[0].currentFitness}`);
 
-                    this.population = this.createNewGeneration();
-                    this.onNewGenerationCreatedFn(this.population);
-                    runGeneration(generation + 1);
+                        this.population = this.createNewGeneration();
+                        this.onNewGenerationCreatedFn(this.population);
+                        runGeneration(generation + 1);
+                    } else {
+                        requestAnimationFrame(checkPopulation);
+                    }
                 } else {
+                    this.restart = false;
                     requestAnimationFrame(checkPopulation);
                 }
-            };
 
+            };
             requestAnimationFrame(checkPopulation);
         };
 
@@ -87,6 +91,27 @@ class GeneticAlgorithm {
             newGeneration.push(childNetwork);
         }
         return newGeneration;
+    }
+
+    savePopulation() {
+        localStorage.setItem('bestSolutionFound', confirm('Est-ce que l\'évolution est terminée?'));
+        const json = JSON.stringify(this.population);
+        localStorage.setItem('population', json);
+    }
+
+    loadPopulation() {
+        // kill all current individuals
+        this.restart = true;
+
+        const json = localStorage.getItem('population');
+        if (json && confirm('Charger la population?')) {
+            this.bestSolutionFound = localStorage.getItem('bestSolutionFound') === 'true';
+            const population = JSON.parse(json);
+            for (let i = 0; i < population.length; i++) {
+                Object.assign(this.population[i], population[i]);
+            }
+            this.onNewGenerationCreatedFn(this.population);
+        }
     }
 
 }
