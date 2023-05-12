@@ -18,10 +18,11 @@ class Car extends Rectangle {
         this.Steering = new Steering(20);
         this.timeOnSameGridSquare = 0;
         this.gridSize = gridSize;
-        this.lastGridPosition = {
-            x: 0,
-            y: 0
-        };
+        this.lastCheckpointIndex = 0;
+        this.timeTakenToCompleteTrack = 0;
+        this.completionTime = 0;
+        this.startTime = 0;
+        this.lapCount = 0;
     }
 
 
@@ -124,13 +125,13 @@ class Car extends Rectangle {
         return false;
     }
 
-    update(trackGeometry, trackPath) {
+    update(trackGeometry, track) {
         this.velocity += this.acceleration;
         this.velocity *= 0.99; // Friction
 
 
-        const oldX = this.x;
-        const oldY = this.y;
+        this.oldX = this.x;
+        this.oldY = this.y;
 
         this.x += this.velocity * Math.cos(this.angle * Math.PI / 180);
         this.y += this.velocity * Math.sin(this.angle * Math.PI / 180);
@@ -138,8 +139,8 @@ class Car extends Rectangle {
         // Calculate wheel angle based on velocity and steering angle
         this.wheelAngle = this.Steering.angle * Math.PI / 180;
 
-        const dx = this.x - oldX;
-        const dy = this.y - oldY;
+        const dx = this.x - this.oldX;
+        const dy = this.y - this.oldY;
 
         // Calculate new angle based on steering angle and velocity
         if (Math.abs(this.Steering.angle) > 0 && Math.abs(this.velocity) > 0) {
@@ -152,34 +153,40 @@ class Car extends Rectangle {
         // check if Die
         let intersect = this.calculateIntersectionWithTrack(trackGeometry);
         if (intersect.objectType) {
-            this.die(oldX, oldY);
+            this.die();
         }
 
-        const currentGridPosition = new Vector(Math.floor(this.x / this.gridSize), Math.floor(this.y / this.gridSize));
-        if (currentGridPosition.equals(this.lastGridPosition)) {
-            this.timeOnSameGridSquare++;
-            if (this.timeOnSameGridSquare >= 60 * 5) {
-                this.die(oldX, oldY);
-            }
-        } else {
-            this.timeOnSameGridSquare = 0;
-            this.lastGridPosition = currentGridPosition;
-        }
+        this.checkpointIndex = track.findNearestCheckpoint(new Vector(this.x, this.y), track.path);
 
         if (this.velocity < 0)
-            this.die(oldX, oldY);
+            this.die();
 
         this.updateLaserSensors();
     }
 
+    updateCheckpoint() {
+        if (this.checkpointIndex == this.lastCheckpointIndex) {
+            this.timeOnSameGridSquare++;
+            if (this.timeOnSameGridSquare >= 60 * 5) {
+                this.die();
+            }
+        } else {
+            this.timeOnSameGridSquare = 0;
+            this.lastCheckpointIndex = this.checkpointIndex;
+        }
+    }
+
     win = function () {
+        this.completionTime = new Date().getTime();
+        // Calculate the time taken to complete the track
+        this.timeTakenToCompleteTrack = this.completionTime - this.startTime;
         this.color = 'green'
         this.neuralNetwork.isCompleted = true;
     }
 
-    die(oldX, oldY) {
-        this.x = oldX;
-        this.y = oldY;
+    die() {
+        this.x = this.oldX;
+        this.y = this.oldY;
         this.velocity = 0;
         this.acceleration = 0;
         this.Steering.angle = 0;
@@ -189,6 +196,7 @@ class Car extends Rectangle {
 
 
     reset(x, y, angle = 0) {
+        this.startTime = new Date().getTime();
         this.timeOnSameGridSquare = 0;
         this.x = x;
         this.y = y;

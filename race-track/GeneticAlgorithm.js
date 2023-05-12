@@ -14,7 +14,7 @@ class GeneticAlgorithm {
     }
 
     allIndividualsDead() {
-        return this.population.every(neuralNetwork => neuralNetwork.isDead);
+        return this.population.every(neuralNetwork => neuralNetwork.isDead || neuralNetwork.isCompleted);
     }
 
     run(callback) {

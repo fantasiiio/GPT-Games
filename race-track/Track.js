@@ -1,5 +1,6 @@
 class Track {
     constructor(canvas) {
+        this.lapToWin = 2;
         this.pan = {
             x: 0,
             y: 0
@@ -9,8 +10,8 @@ class Track {
         this.ctx = this.canvas.getContext("2d");
 
         this.squareSize = 500;
-        this.gridWidth = 15;
-        this.gridHeight = 15;
+        this.gridWidth = 5;
+        this.gridHeight = 5;
         this.gridSize = this.squareSize * this.gridWidth;
 
         this.grid = new Array(this.gridWidth)
@@ -306,21 +307,26 @@ class Track {
                 this.drawTrackGeometry(trackGeometry, ctx);
                 let carIndex = 0;
                 for (let redCar of redCars) {
-                    if (!redCar.neuralNetwork.isDead && redCar.neuralNetwork == geneticAlgorithm.bestIndividual)
-                        redCar.drawLaserSensors(ctx);
+                    if (!redCar.neuralNetwork.isDead && redCar.neuralNetwork == geneticAlgorithm.bestIndividual) {
+                        redCar.color = 'yellow';
+                    } else if(redCar.neuralNetwork.isDead) {
+                        redCar.color = 'gray';
+                    } else if(redCar.neuralNetwork.isCompleted) {
+                        redCar.color = 'green';
+                    } else {
+                        redCar.color = 'red';
+                    }
+
+                    
+                        //redCar.drawLaserSensors(ctx);
+                        // for (let laserSensor of redCar.laserSensors) {
+                        //     let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
+                        //     laserSensor.intersectionInfo = intersection;
+                        //     drawIntersectionPoint(ctx, intersection);
+                        // }
+                    //}
+                    
                     redCar.draw(ctx);
-                    for (let laserSensor of redCar.laserSensors) {
-                        let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
-                        laserSensor.intersectionInfo = intersection;
-                        if (carIndex == 0)
-                            drawIntersectionPoint(ctx, intersection);
-                    }
-                    // Check for collisions walls
-                    let intersect = redCar.calculateIntersectionWithTrack(trackGeometry);
-                    if (intersect.objectType) {
-                        intersect.objectType = "other"
-                        drawIntersectionPoint(ctx, intersect)
-                    }
                     carIndex++;
                 }
 
@@ -583,7 +589,7 @@ class Track {
                             x,
                             y
                         });
-                        car.angle = direction === 'left' ? 180 : direction === 'up' ? 90 : direction === 'right' ? 0 : 270;
+                        car.angle = direction === 'left' ? 180 : direction === 'down' ? 90 : direction === 'right' ? 0 : 270;
                         car.color = 'red'
                     }
                 }
@@ -727,9 +733,9 @@ class Track {
         if (savedTrack) {
             const savedData = JSON.parse(savedTrack);
             this.grid = savedData.grid;
-            startPoint.x = savedData.startPoint.x;
-            startPoint.y = savedData.startPoint.y;
+            startPoint = savedData.startPoint;
             track.path = track.getTrackPath();
+            startPoint.trackPathIndex = track.getPathIndex(startPoint.x, startPoint.y);
             this.redraw();
             for (let redCar of redCars) {
                 this.placeCarAtStartPos(redCar);
@@ -790,7 +796,7 @@ class Track {
         const path = this.getTrackPath();
         let carPosition = new Vector(car.x, car.y);
         let distanceCovered = 0;
-        let checkpointIndex = this.findNearestCheckpoint(carPosition, path);
+
         let checkpointDistance = 0;
         let totalDistance = 0;
 
@@ -800,13 +806,13 @@ class Track {
             const next = new Vector(path[i + 1].pos.x * this.squareSize + this.squareSize / 2, path[i + 1].pos.y * this.squareSize + this.squareSize / 2);
             const distance = next.subtract(current).length();
             totalDistance += distance;
-            if (i >= checkpointIndex) {
+            if (i >= car.checkpointIndex) {
                 checkpointDistance += distance;
             }
         }
 
         // Calculate distance from car to next checkpoint
-        const checkpointPos = new Vector(path[checkpointIndex].pos.x * this.squareSize + this.squareSize / 2, path[checkpointIndex].pos.y * this.squareSize + this.squareSize / 2);
+        const checkpointPos = new Vector(path[car.checkpointIndex].pos.x * this.squareSize + this.squareSize / 2, path[car.checkpointIndex].pos.y * this.squareSize + this.squareSize / 2);
         const distanceToCheckpoint = checkpointPos.subtract(carPosition).length();
 
         distanceCovered += totalDistance - checkpointDistance + (this.squareSize - distanceToCheckpoint) - this.squareSize;
@@ -816,23 +822,28 @@ class Track {
         completionPercentage = Math.min(Math.max(completionPercentage, 0), 1);
 
         let completed = false;
-        const lastCheckpointPos = this.path[this.path.length - 1].pos;
-        if (car.lastGridPosition.equals(lastCheckpointPos)) {
+        let lastCheckpointIndex = startPoint.trackPathIndex - 1;
+        if (lastCheckpointIndex < 0)
+            lastCheckpointIndex = this.path.length - 1;
+
+        if (car.lastCheckpointIndex == lastCheckpointIndex) {
             // Check if the car passed the last checkpoint           
-            if (checkpointIndex == 0) {
+            if (car.checkpointIndex != car.lastCheckpointIndex) {
                 completed = true;
             }
         }
 
-        car.lastCheckpointIndex = checkpointIndex;
-        if (completed)
-            car.win();
+        if (completed) {
+            car.lapCount++;
+            if (car.lapCount == this.lapToWin)
+                car.win();
+        }
 
         return completionPercentage;
     }
 
 
-    drawCheckerFinishLine(ctx, vertical) {
+    drawCheckerFinishLine(ctx) {
         ctx.save();
         let width = this.squareSize;
         let height = 150;
@@ -840,14 +851,19 @@ class Track {
         let numSquaresY = 3;
         const squareSize = width / numSquaresX;
 
-        let x = startPoint.x * this.squareSize + this.squareSize / 2 + squareSize * 3;
+        let x = startPoint.x * this.squareSize;
         let y = startPoint.y * this.squareSize;
         let direction = this.getTrackDirectionSimple(startPoint);
         let isVertical = direction == 'horizontal'
+        if (isVertical) {
+            x += this.squareSize / 2 + squareSize * 3
+        } else {
+            y += this.squareSize / 2 - squareSize * 3
+        }
         ctx.translate(x, y);
+
         if (isVertical)
             ctx.rotate(Math.PI / 2);
-
 
 
         ctx.fillStyle = "black";
@@ -871,13 +887,25 @@ class Track {
 
 
     generateClosedTrack() {
-        let trackPath = [{pos:{x: Math.floor(this.gridWidth / 2), y: 0}}]; // start in the middle of the grid
-        let triedDirections = [[]]; // array of arrays to track tried directions for each point
+        let trackPath = [{
+            pos: {
+                x: Math.floor(this.gridWidth / 2),
+                y: 0
+            }
+        }]; // start in the middle of the grid
+        let triedDirections = [
+            []
+        ]; // array of arrays to track tried directions for each point
         let newPos;
-        while (true) {
+
+        let iterationCount = 0;
+        const maxIterations = 1000; // Set the maximum iterations.
+
+
+        while (iterationCount < maxIterations) {
             let currentPos = trackPath[trackPath.length - 1];
             let validDirections = ['up', 'down', 'left', 'right'].filter(dir => !triedDirections[trackPath.length - 1].includes(dir));
-    
+
             if (validDirections.length === 0) { // if no directions left to try, backtrack
                 // this.path = trackPath;
                 // this.updateGrid();
@@ -891,27 +919,51 @@ class Track {
                     continue;
                 }
             }
-    
+
             // choose a random direction from the remaining valid ones
             const direction = validDirections[Math.floor(Math.random() * validDirections.length)];
             triedDirections[trackPath.length - 1].push(direction); // mark direction as tried
-    
-            
-            switch(direction) {
+
+
+            switch (direction) {
                 case 'up':
-                    newPos = {pos:{x: currentPos.pos.x, y: currentPos.pos.y - 1}};
+                    newPos = {
+                        dir: 'down',
+                        pos: {
+                            x: currentPos.pos.x,
+                            y: currentPos.pos.y - 1
+                        }
+                    };
                     break;
                 case 'down':
-                    newPos = {pos:{x: currentPos.pos.x, y: currentPos.pos.y + 1}};
+                    newPos = {
+                        dir: 'up',
+                        pos: {
+                            x: currentPos.pos.x,
+                            y: currentPos.pos.y + 1
+                        }
+                    };
                     break;
                 case 'left':
-                    newPos = {pos:{x: currentPos.pos.x - 1, y: currentPos.pos.y}};
+                    newPos = {
+                        dir: 'right',
+                        pos: {
+                            x: currentPos.pos.x - 1,
+                            y: currentPos.pos.y
+                        }
+                    };
                     break;
                 case 'right':
-                    newPos = {pos:{x: currentPos.pos.x + 1, y: currentPos.pos.y}};
+                    newPos = {
+                        dir: 'left',
+                        pos: {
+                            x: currentPos.pos.x + 1,
+                            y: currentPos.pos.y
+                        }
+                    };
                     break;
             }
-    
+
             // if (trackPath.length > 4 && this.isAdjacent(trackPath[0], newPos)) {
             //     if (this.isValidPos(currentPos, newPos, trackPath))
             //         break; // we've created a closed loop, so we're done
@@ -920,19 +972,25 @@ class Track {
             if (this.isValidPos(currentPos, newPos, trackPath)) {
                 trackPath.push(newPos);
                 triedDirections.push([]);
-            }else{
+            } else {
                 currentPos = currentPos;
             }
             if (trackPath.length > 4 && this.isAdjacent(trackPath[0], newPos)) {
                 break; // we've created a closed loop, so we're done
             }
-
+            iterationCount++;
         }
-    
+
+        // If the loop ends due to maxIterations being reached, log an error message.
+        if (iterationCount === maxIterations) {
+            console.error('Unable to generate track after maximum iterations.');
+        }
+
+
         this.path = trackPath;
         this.updateGrid();
     }
-    
+
     isAdjacent(pos1, pos2) {
         if (pos1.pos.x === pos2.pos.x) {
             if (Math.abs(pos1.pos.y - pos2.pos.y) === 1) {
@@ -943,96 +1001,69 @@ class Track {
                 return true;
             }
         }
-    
+
         return false;
     }
-    
+
 
     isValidPos = (currentPos, newPos, trackPath) => {
         // Check if position is within the grid
         if (newPos.pos.x < 0 || newPos.pos.y < 0 || newPos.pos.x >= this.gridWidth || newPos.pos.y >= this.gridHeight) {
             return false;
         }
-    
+
         // Check if position is already part of the path
         for (let point of trackPath) {
             if (point.pos.x === newPos.pos.x && point.pos.y === newPos.pos.y) {
                 return false;
             }
         }
-    
+
         // Check if position is at least 2 units away from the existing path
         let index = 0;
         for (let point of trackPath) {
-            if(index++ < 3 && trackPath.length > 4)
+            if (index++ < 3 && trackPath.length > 4)
                 continue;
             if (Math.abs(point.pos.x - newPos.pos.x) < 2 && Math.abs(point.pos.y - newPos.pos.y) < 2) {
-                if(point.pos.x != currentPos.pos.x && point.pos.y != currentPos.pos.y)
+                if (point.pos.x != currentPos.pos.x && point.pos.y != currentPos.pos.y)
                     return false;
             }
         }
-    
+
         return true;
     };
-    
-
-
-
 
 
     selectStartPoint() {
-        const horizontalSegments = [];
-        const verticalSegments = [];
-
-        // Collect all horizontal and vertical segments in the track
-        for (let i = 0; i < this.path.length - 1; i++) {
-            const current = this.path[i];
-            const next = this.path[i + 1];
-
-            if (current.pos.y === next.pos.y) {
-                horizontalSegments.push({
-                    start: current.pos.x,
-                    end: next.pos.x,
-                    pos: {
-                        y: current.pos.y,
-                        x: current.pos.x,
-                    }
-                });
-            } else if (current.pos.x === next.pos.x) {
-                verticalSegments.push({
-                    start: current.pos.y,
-                    end: next.pos.y,
-                    pos: {
-                        x: current.pos.x,
-                        y: current.pos.y,
-                    }
-                });
+        const trackPathIndex = Math.floor(Math.random() * this.path.length);
+        const selectedPoint = this.path[trackPathIndex];
+        let haveStraightTrack = false;
+        for (let i = 0; i < this.path.length; i++) {
+            let dir = this.getTrackDirectionSimple(this.path[i].pos);
+            if (dir === "horizontal" || dir === "vertical") {
+                haveStraightTrack = true;
+                break;
             }
         }
+        if (!haveStraightTrack) {
+            throw new Error("Unable to find horizontal or vertical track. Please try again");
+        }
+        const direction = this.getTrackDirectionSimple(selectedPoint.pos);
 
-        // Randomly select a horizontal or vertical segment, and a position along that segment
-        let startPoint;
-        let segment;
-        if (Math.random() < 0.5) {
-            segment = horizontalSegments[Math.floor(Math.random() * horizontalSegments.length)];
-            startPoint = {
-                x: segment.pos.x,
-                y: segment.pos.y,
-                dir: segment.start < segment.end ? "right" : "left",
-                revert: segment.start < segment.end,
+        if (direction === "horizontal" || direction === "vertical") {
+            return {
+                x: selectedPoint.pos.x,
+                y: selectedPoint.pos.y,
+                dir: direction,
+                revert: true,
+                trackPathIndex
             };
         } else {
-            segment = verticalSegments[Math.floor(Math.random() * verticalSegments.length)];
-            startPoint = {
-                x: segment.pos.x,
-                y: segment.pos.y,
-                dir: segment.start < segment.end ? "down" : "up",
-                revert: segment.start < segment.end,
-            };
+            // If the selected point is not on a horizontal or vertical track, recursively try again
+            return this.selectStartPoint();
         }
-
-        return startPoint;
     }
+
 
     updateGrid() {
         // Reset the grid
@@ -1048,5 +1079,14 @@ class Track {
         }
     }
 
+
+    getPathIndex(x, y) {
+        for (let i = 0; i < this.path.length; i++) {
+            if (this.path[i].pos.x === x && this.path[i].pos.y === y) {
+                return i;
+            }
+        }
+        return -1;
+    }
 
 }

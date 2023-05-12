@@ -23,7 +23,7 @@ function drawText(ctx, text, x, y) {
     ctx.font = '40px Arial';
     ctx.fillStyle = 'white';
     ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';    
+    ctx.textBaseline = 'middle';
     ctx.fillText(text, x, y);
 }
 
@@ -222,16 +222,22 @@ addEventListener("resize", (event) => {
 var population;
 var geneticAlgorithm;
 
-function restart(newPopulation){
+function restart(newPopulation) {
     for (let i = 0; i < newPopulation.length; i++) {
         redCars[i].neuralNetwork = geneticAlgorithm.population[i];
         redCars[i].neuralNetwork.isDead = false;
         redCars[i].reset();
         track.placeCarAtStartPos(redCars[i]);
-    } 
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+
+    //track.loadTrack();
+    track.generateClosedTrack();
+    startPoint = track.selectStartPoint();
+    track.path = track.getTrackPath();        
+
 
     const numRedCars = 50;
     let keyPressed = {};
@@ -243,11 +249,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // Create red cars
     for (let i = 0; i < geneticAlgorithm.population.length; i++) {
         const redCar = new Car(canvas.width / 2, canvas.height / 2, 80, 40, 'red', 180, geneticAlgorithm.population[i], track.squareSize);
-        track.placeCarAtStartPos({
-            x: 0,
-            y: 0
-        });
-
+        redCar.reset();
+        track.placeCarAtStartPos(redCar);
         redCars.push(redCar);
     }
 
@@ -258,9 +261,6 @@ document.addEventListener('DOMContentLoaded', function () {
         console.log("L'algorithme génétique a terminé. Meilleur individu : ", bestIndividual);
     });
 
-    //track.loadTrack();
-    track.generateClosedTrack();
-    startPoint = track.selectStartPoint();
     function handleKeypress() {
         if (currentTool != "run")
             return;
@@ -289,11 +289,22 @@ document.addEventListener('DOMContentLoaded', function () {
         let index = 0;
         for (let redCar of redCars) {
             redCar.applyNeuralNetwork();
-            redCar.update(trackGeometry, track.path);
+            redCar.update(trackGeometry, track);
             let completionPct = track.calculateCompletionPercentage(redCar)
-            redCar.neuralNetwork.currentFitness = completionPct;           
-            if(redCar.neuralNetwork == geneticAlgorithm.bestIndividual) 
-                drawText(ctx, "completion: " + (completionPct*100).toFixed(1), 10, 30)
+            redCar.updateCheckpoint();            
+            redCar.neuralNetwork.currentFitness = completionPct;
+            if (redCar.neuralNetwork.isCompleted) {
+                const slowTime = track.path.length * 1000 * track.lapToWin; // 1 second per square in the path
+                let timeBonus = slowTime - redCar.timeTakenToCompleteTrack;
+                redCar.neuralNetwork.currentFitness = timeBonus;
+            }
+
+
+            if (redCar.neuralNetwork == geneticAlgorithm.bestIndividual){
+                drawText(ctx, "completion: " + (completionPct * 100).toFixed(1), 10, 30)
+                // track.pan.x = canvas.width / 2 - redCar.x;
+                // track.pan.y = canvas.height / 2 - redCar.y;
+            }
             index++;
         }
 
