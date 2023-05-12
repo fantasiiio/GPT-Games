@@ -10,8 +10,8 @@ class Track {
         this.ctx = this.canvas.getContext("2d");
 
         this.squareSize = 500;
-        this.gridWidth = 5;
-        this.gridHeight = 5;
+        this.gridWidth = 20;
+        this.gridHeight = 20;
         this.gridSize = this.squareSize * this.gridWidth;
 
         this.grid = new Array(this.gridWidth)
@@ -19,7 +19,7 @@ class Track {
             .map(() => new Array(this.gridHeight).fill(false));
 
 
-        this.zoomLevel = 0.5;
+        this.zoomLevel = 0.1;
         this.maxSquareSize = 300;
 
         //this.drawGrid();
@@ -307,25 +307,6 @@ class Track {
                 this.drawTrackGeometry(trackGeometry, ctx);
                 let carIndex = 0;
                 for (let redCar of redCars) {
-                    if (!redCar.neuralNetwork.isDead && redCar.neuralNetwork == geneticAlgorithm.bestIndividual) {
-                        redCar.color = 'yellow';
-                    } else if(redCar.neuralNetwork.isDead) {
-                        redCar.color = 'gray';
-                    } else if(redCar.neuralNetwork.isCompleted) {
-                        redCar.color = 'green';
-                    } else {
-                        redCar.color = 'red';
-                    }
-
-                    
-                        //redCar.drawLaserSensors(ctx);
-                        // for (let laserSensor of redCar.laserSensors) {
-                        //     let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
-                        //     laserSensor.intersectionInfo = intersection;
-                        //     drawIntersectionPoint(ctx, intersection);
-                        // }
-                    //}
-                    
                     redCar.draw(ctx);
                     carIndex++;
                 }
@@ -777,7 +758,7 @@ class Track {
 
         let index = 0;
         for (let checkpoint of checkpoints) {
-            let distance = vehiclePosition.distanceTo(new Vector(checkpoint.pos.x, checkpoint.pos.y).multiply(this.squareSize));
+            let distance = vehiclePosition.distanceTo(new Vector(checkpoint.pos.x, checkpoint.pos.y).multiply(this.squareSize).add(new Vector(this.squareSize / 2, this.squareSize / 2)));
 
             if (distance < nearestDistance) {
                 nearestCheckpoint = checkpoint;
@@ -835,7 +816,7 @@ class Track {
 
         if (completed) {
             car.lapCount++;
-            if (car.lapCount == this.lapToWin)
+            if (car.lapCount >= this.lapToWin)
                 car.win();
         }
 
@@ -899,7 +880,7 @@ class Track {
         let newPos;
 
         let iterationCount = 0;
-        const maxIterations = 1000; // Set the maximum iterations.
+        const maxIterations = 10000; // Set the maximum iterations.
 
 
         while (iterationCount < maxIterations) {

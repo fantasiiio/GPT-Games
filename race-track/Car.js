@@ -18,7 +18,7 @@ class Car extends Rectangle {
         this.Steering = new Steering(20);
         this.timeOnSameGridSquare = 0;
         this.gridSize = gridSize;
-        this.lastCheckpointIndex = 0;
+        this.lastCheckpointIndex = -1;
         this.timeTakenToCompleteTrack = 0;
         this.completionTime = 0;
         this.startTime = 0;
@@ -33,8 +33,13 @@ class Car extends Rectangle {
         ctx.rotate(this.angle * Math.PI / 180);
 
         // Draw the car body
+        ctx.lineWidth = 2;
         ctx.fillStyle = this.color;
+        ctx.strokeStyle = 'white';
         ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+        if(this.neuralNetwork.isBest)
+            ctx.strokeRect(-this.width / 2, -this.height / 2, this.width, this.height);
+        ctx.lightWidth = 1;
 
         // Draw tires
         ctx.fillStyle = 'black';
@@ -207,6 +212,7 @@ class Car extends Rectangle {
         this.wheelAngle = 0;
         this.speed = 0;
         this.color = 'red'
+        this.lastCheckpointIndex = -1;
     }
 
     updateLaserSensors() {

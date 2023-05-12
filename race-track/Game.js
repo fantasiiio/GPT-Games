@@ -290,6 +290,11 @@ document.addEventListener('DOMContentLoaded', function () {
         for (let redCar of redCars) {
             redCar.applyNeuralNetwork();
             redCar.update(trackGeometry, track);
+            for (let laserSensor of redCar.laserSensors) {
+                let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
+                laserSensor.intersectionInfo = intersection;
+            }
+
             let completionPct = track.calculateCompletionPercentage(redCar)
             redCar.updateCheckpoint();            
             redCar.neuralNetwork.currentFitness = completionPct;

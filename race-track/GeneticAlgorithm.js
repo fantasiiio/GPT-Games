@@ -30,13 +30,16 @@ class GeneticAlgorithm {
                 this.bestIndividual = null;
                 for (let i = 0; i < this.population.length; i++) {
                     const neuralNetwork = this.population[i];
+                    neuralNetwork.isBest = false;
                     if (!neuralNetwork.isDead) {
                         if(neuralNetwork.currentFitness > ((this.bestIndividual || {}).currentFitness || 0)) {
                             this.bestIndividual = neuralNetwork;
                         }
                     }
-                }
-                            
+                }                   
+                if(this.bestIndividual)
+                    this.bestIndividual.isBest = true;
+                
                 if (this.allIndividualsDead()) {
                     this.population.sort((a, b) => b.currentFitness - a.currentFitness);
                     console.log(`Génération ${generation}: Meilleure fitness = ${this.population[0].currentFitness}`);
