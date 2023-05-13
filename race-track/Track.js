@@ -10,8 +10,8 @@ class Track {
         this.ctx = this.canvas.getContext("2d");
 
         this.squareSize = 500;
-        this.gridWidth = 64;
-        this.gridHeight = 64;
+        this.gridWidth = 8;
+        this.gridHeight = 8;
         this.gridSize = this.squareSize * this.gridWidth;
 
         this.grid = new Array(this.gridWidth)
@@ -21,7 +21,7 @@ class Track {
 
         this.zoomLevel = 0.05;
         this.maxSquareSize = 300;
-        this.quadTree = new QuadTree(new Rectangle(0, 0, this.gridSize, this.gridSize, 0, false), 7);
+        this.quadTree = new QuadTree(new Rectangle(0, 0, this.gridSize, this.gridSize, 0, false), 0);
         //this.drawGrid();
     }
 
@@ -326,7 +326,17 @@ class Track {
                 this.drawTrackGeometry(trackGeometry, ctx);
                 let carIndex = 0;
                 for (let redCar of redCars) {
-                    //this.quadTree.draw(redCar, this.ctx);
+                    // if (redCar.neuralNetwork.isBest) {
+                    //     redCar.drawLaserSensors(ctx);
+                    //     for (let laserSensor of redCar.laserSensors) {
+                    //         let trackGeometry = track.quadTree.queryFromLine({
+                    //             p1: laserSensor.origin,
+                    //             p2: laserSensor.endPoint
+                    //         });
+                    //         let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
+                    //         drawIntersectionPoint(ctx, intersection);
+                    //     }
+                    // }                   
                     redCar.draw(ctx);
                     carIndex++;
                 }
@@ -951,7 +961,7 @@ class Track {
             }
             if (trackPath.length > 4 && this.isAdjacent(trackPath[0], newPos)) {
                 this.path = trackPath;
-                this.updateGrid();                
+                this.updateGrid();
                 let haveStraightTrack = false;
                 for (let i = 0; i < this.path.length; i++) {
                     let dir = this.getTrackDirectionSimple(this.path[i].pos);

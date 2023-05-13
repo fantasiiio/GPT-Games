@@ -84,6 +84,9 @@ class GeneticAlgorithm {
 
     createNewGeneration() {
         const newGeneration = [];
+        if(this.population.length < 3)
+            return this.population;
+            
         for (let i = 0; i < this.population.length; i++) {
             const parents = this.selectParents();
             const childNetwork = parents[0].crossover(parents[1]);

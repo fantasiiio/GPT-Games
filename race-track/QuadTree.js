@@ -86,7 +86,7 @@ class QuadTree {
 
     }
 
-    query(rectangle, found = {
+    queryFromRectangle(rectangle, found = {
         lines: [],
         arcs: []
     }) {
@@ -98,13 +98,70 @@ class QuadTree {
         found.arcs = [...found.arcs, ...this.trackGeometry.arcs];
 
         if (this.divided) {
-            this.northwest.query(rectangle, found);
-            this.northeast.query(rectangle, found);
-            this.southwest.query(rectangle, found);
-            this.southeast.query(rectangle, found);
+            this.northwest.queryFromRectangle(rectangle, found);
+            this.northeast.queryFromRectangle(rectangle, found);
+            this.southwest.queryFromRectangle(rectangle, found);
+            this.southeast.queryFromRectangle(rectangle, found);
         }
 
         return found;
+    }
+
+    queryFromLine(line, found = {
+        lines: [],
+        arcs: []
+    }) {
+        if (!this.bounds.isLinePartWithinRectangle(line)) {
+            return found;
+        }
+
+        found.lines = [...found.lines, ...this.trackGeometry.lines];
+        found.arcs = [...found.arcs, ...this.trackGeometry.arcs];
+
+        if (this.divided) {
+            this.northwest.queryFromLine(line, found);
+            this.northeast.queryFromLine(line, found);
+            this.southwest.queryFromLine(line, found);
+            this.southeast.queryFromLine(line, found);
+        }
+
+        return found;
+    }
+
+    drawFromRectangle(rectangle, ctx) {
+        if (!this.bounds.isRectanglePartWithinRectangle(rectangle)) {
+            return;
+        }
+        // Recursively draw child nodes
+        if (this.divided) {
+            this.northwest.drawFromRectangle(rectangle, ctx);
+            this.northeast.drawFromRectangle(rectangle, ctx);
+            this.southwest.drawFromRectangle(rectangle, ctx);
+            this.southeast.drawFromRectangle(rectangle, ctx);
+        } else {
+            // Draw the current node bounds
+            ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.bounds.x, this.bounds.y, this.bounds.width, this.bounds.height);
+        }
+    }
+
+    drawFromLine(line, ctx) {
+        if (!this.bounds.isLinePartWithinRectangle(line)) {
+            return;
+        }
+        // Recursively draw child nodes
+        if (this.divided) {
+            this.northwest.drawFromLine(line, ctx);
+            this.northeast.drawFromLine(line, ctx);
+            this.southwest.drawFromLine(line, ctx);
+            this.southeast.drawFromLine(line, ctx);
+        } else {
+            // Draw the current node bounds
+            ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.bounds.x, this.bounds.y, this.bounds.width, this.bounds.height);
+        }
     }
 
 }

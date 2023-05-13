@@ -300,9 +300,10 @@ document.addEventListener('DOMContentLoaded', function () {
         let index = 0;
         for (let redCar of redCars) {
             redCar.applyNeuralNetwork();
-            let trackGeometry = track.quadTree.query(redCar);
+            let trackGeometry = track.quadTree.queryFromRectangle(redCar);
             redCar.update(trackGeometry, track);
             for (let laserSensor of redCar.laserSensors) {
+                let trackGeometry = track.quadTree.queryFromLine({p1:laserSensor.origin, p2:laserSensor.endPoint});
                 let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
                 laserSensor.intersectionInfo = intersection;
             }
