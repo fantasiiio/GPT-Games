@@ -115,11 +115,11 @@
             for (let pointIndex = 0; pointIndex < numPoints; pointIndex++) {
                 let angle;
                 if (arcStartAngle > arcEndAngle)
-                    angle = arcEndAngle + angleStep * pointIndex;
+                    angle = arcEndAngle - angleStep * pointIndex;
                 else
-                    angle = arcStartAngle - angleStep * pointIndex;
-                const x = arcCenter.x + arcRadius * Math.cos(angle * Math.PI / 180);
-                const y = arcCenter.y + arcRadius * Math.sin(angle * Math.PI / 180);
+                    angle = arcStartAngle + angleStep * pointIndex;
+                const x = arcCenter.x + arcRadius * Math.cos(angle);
+                const y = arcCenter.y + arcRadius * Math.sin(angle);
                 points.push({
                     x,
                     y

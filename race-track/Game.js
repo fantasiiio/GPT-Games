@@ -92,8 +92,10 @@ canvas.addEventListener('mousedown', (event) => {
         event.preventDefault();
     }
 
-    if (currentTool == "run")
+    if (currentTool == "run"){
+        track.getSquareInfo(event);
         return;
+    }
 
     if (event.button != 0) {
         return;
@@ -295,15 +297,15 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function gameLoop() {
-        //let trackGeometry = track.getTrackGeometry();
+        let trackGeometry = track.getTrackGeometry();
         handleKeypress();
         let index = 0;
         for (let redCar of redCars) {
             redCar.applyNeuralNetwork();
-            let trackGeometry = track.quadTree.queryFromRectangle(redCar);
+            //let trackGeometry = track.quadTree.queryFromRectangle(redCar);
             redCar.update(trackGeometry, track);
             for (let laserSensor of redCar.laserSensors) {
-                let trackGeometry = track.quadTree.queryFromLine({p1:laserSensor.origin, p2:laserSensor.endPoint});
+                //let trackGeometry = track.quadTree.queryFromLine({p1:laserSensor.origin, p2:laserSensor.endPoint});
                 let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
                 laserSensor.intersectionInfo = intersection;
             }

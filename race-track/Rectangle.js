@@ -149,9 +149,9 @@ class Rectangle {
 
         return (
             point.x >= topLeft.x &&
-            point.x <= bottomRight.x &&
+            point.x < bottomRight.x &&
             point.y >= topLeft.y &&
-            point.y <= bottomRight.y
+            point.y < bottomRight.y
         );
     }
 
@@ -192,12 +192,12 @@ class Rectangle {
             [rectCorners[3], rectCorners[0]]
         ];
 
-        for (const [edgeStart, edgeEnd] of rectEdges) {
+        // for (const [edgeStart, edgeEnd] of rectEdges) {
 
-            if (IntersectionUtil.lineArcIntersection(edgeStart, edgeEnd, arc.center, arc.radius, arc.startAngle, arc.endAngle)) {
-                return true;
-            }
-        }
+        //     if (IntersectionUtil.lineArcIntersection(edgeStart, edgeEnd, arc.center, arc.radius, arc.startAngle, arc.endAngle)) {
+        //         return true;
+        //     }
+        // }
 
         // Check if any part of the arc is inside the rectangle
         const arcPoints = IntersectionUtil.getArcPoints(arc.center, arc.radius, arc.startAngle, arc.endAngle);

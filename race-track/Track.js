@@ -10,8 +10,8 @@ class Track {
         this.ctx = this.canvas.getContext("2d");
 
         this.squareSize = 500;
-        this.gridWidth = 8;
-        this.gridHeight = 8;
+        this.gridWidth = 64;
+        this.gridHeight = 64
         this.gridSize = this.squareSize * this.gridWidth;
 
         this.grid = new Array(this.gridWidth)
@@ -19,7 +19,7 @@ class Track {
             .map(() => new Array(this.gridHeight).fill(false));
 
 
-        this.zoomLevel = 0.05;
+        this.zoomLevel = 0.1;
         this.maxSquareSize = 300;
         this.quadTree = new QuadTree(new Rectangle(0, 0, this.gridSize, this.gridSize, 0, false), 0);
         //this.drawGrid();
@@ -326,18 +326,21 @@ class Track {
                 this.drawTrackGeometry(trackGeometry, ctx);
                 let carIndex = 0;
                 for (let redCar of redCars) {
-                    // if (redCar.neuralNetwork.isBest) {
-                    //     redCar.drawLaserSensors(ctx);
-                    //     for (let laserSensor of redCar.laserSensors) {
-                    //         let trackGeometry = track.quadTree.queryFromLine({
-                    //             p1: laserSensor.origin,
-                    //             p2: laserSensor.endPoint
-                    //         });
-                    //         let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
-                    //         drawIntersectionPoint(ctx, intersection);
-                    //     }
-                    // }                   
+                    if (!redCar.neuralNetwork.isDead && redCar.neuralNetwork == geneticAlgorithm.bestIndividual)
+                        redCar.drawLaserSensors(ctx);
                     redCar.draw(ctx);
+                    for (let laserSensor of redCar.laserSensors) {
+                        let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
+                        laserSensor.intersectionInfo = intersection;
+                        if (carIndex == 0)
+                            drawIntersectionPoint(ctx, intersection);
+                    }
+                    // Check for collisions walls
+                    let intersect = redCar.calculateIntersectionWithTrack(trackGeometry);
+                    if (intersect.objectType) {
+                        intersect.objectType = "other"
+                        drawIntersectionPoint(ctx, intersect)
+                    }
                     carIndex++;
                 }
 
@@ -1113,4 +1116,12 @@ class Track {
         return -1;
     }
 
+    getSquareInfo = function(event){
+        const rect = canvas.getBoundingClientRect();
+        let mousePos = {
+            x: Math.floor(((event.clientX - rect.left - this.pan.x) / this.zoomLevel)),
+            y: Math.floor(((event.clientY - rect.top - this.pan.y) / this.zoomLevel)),
+        };        
+        let found = this.quadTree.queryFromPoint(mousePos);
+    }
 }

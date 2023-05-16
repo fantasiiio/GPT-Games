@@ -27,7 +27,7 @@ class QuadTree {
             return;
         }
 
-        if (this.level === this.maxLevel) {
+        if (this.level === this.maxLevel || this.bounds.width <= 500) {
             this.trackGeometry.lines.push(line);
             return;
         }
@@ -47,9 +47,12 @@ class QuadTree {
             return;
         }
 
-        if (this.level === this.maxLevel) {
+        if (this.level === this.maxLevel || this.bounds.width <= 500) {
             this.trackGeometry.arcs.push(arc);
             return;
+        } else {
+            this.bounds.isArcPartWithinRectangle(arc);          
+            this.level = this.level;
         }
 
         if (!this.divided) {
@@ -128,6 +131,27 @@ class QuadTree {
         return found;
     }
 
+    queryFromPoint(point, found = {
+        lines: [],
+        arcs: []
+    }) {
+        if (!this.bounds.contains(point)) {
+            return found;
+        }
+
+        found.lines = [...found.lines, ...this.trackGeometry.lines];
+        found.arcs = [...found.arcs, ...this.trackGeometry.arcs];
+
+        if (this.divided) {
+            this.northwest.queryFromPoint(point, found);
+            this.northeast.queryFromPoint(point, found);
+            this.southwest.queryFromPoint(point, found);
+            this.southeast.queryFromPoint(point, found);
+        }
+
+        return found;
+    }    
+
     drawFromRectangle(rectangle, ctx) {
         if (!this.bounds.isRectanglePartWithinRectangle(rectangle)) {
             return;
@@ -158,9 +182,9 @@ class QuadTree {
             this.southeast.drawFromLine(line, ctx);
         } else {
             // Draw the current node bounds
-            ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
             ctx.lineWidth = 2;
-            ctx.strokeRect(this.bounds.x, this.bounds.y, this.bounds.width, this.bounds.height);
+            ctx.fillRect(this.bounds.x, this.bounds.y, this.bounds.width, this.bounds.height);
         }
     }
 
