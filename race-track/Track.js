@@ -21,13 +21,23 @@ class Track {
 
         this.zoomLevel = 0.1;
         this.maxSquareSize = 300;
-        this.quadTree = new QuadTree(new Rectangle(0, 0, this.gridSize, this.gridSize, 0, false), 0);
+        this.quadTree = new QuadTree(new Rectangle(0, 0, this.gridSize, this.gridSize, 0, false), 9);
+
+        this.lastFrameTime = performance.now();
+        this.now = performance.now();
+        this.elapsed = this.now - this.lastFrameTime;
+        this.fps = 1000 / this.elapsed;
+        this.lastFrameTime = this.now;
+        this.mousePos = {
+            x: 0,
+            y: 0
+        };
         //this.drawGrid();
     }
 
     buildQuadTree() {
-        let trackGeometry = this.getTrackGeometry();
-        this.quadTree.intertTrackGeometry(trackGeometry);
+        this.trackGeometry = this.getTrackGeometry();
+        this.quadTree.intertTrackGeometry(this.trackGeometry);
     }
 
     drawGrid() {
@@ -239,10 +249,10 @@ class Track {
 
 
 
-    drawTrackGeometry(geometry, ctx) {
-        ctx.strokeStyle = 'black';
+    drawTrackGeometry(geometry, ctx, color = 'black') {
+        ctx.strokeStyle = color;
         ctx.lineWidth = 10;
-        ctx.fillStyle = 'black';
+        ctx.fillStyle = color;
 
         ctx.beginPath();
         for (let i = 0; i < geometry.lines.length; i++) {
@@ -268,6 +278,8 @@ class Track {
             ctx.stroke();
         }
     }
+
+
 
     clearSquare(x, y) {
         this.grid[x][y] = false;
@@ -308,12 +320,23 @@ class Track {
         this.redraw();
     }
 
+    drawFPS() {
+        this.ctx.fillStyle = 'black';
+        this.ctx.font = '40px Arial';
+        this.ctx.fillText(`FPS: ${this.fps.toFixed(2)}`, 10, 100);
+    }
+
     redraw() {
         if (!this.redraw.debounced) {
             this.redraw.debounced = true;
             setTimeout(() => {
                 this.redraw.debounced = false;
                 // The code that needs to be debounced goes here:
+
+                this.now = performance.now();
+                this.elapsed = this.now - this.lastFrameTime;
+                this.fps = 1000 / this.elapsed;
+                this.lastFrameTime = this.now;
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.save();
@@ -322,31 +345,59 @@ class Track {
                 this.drawGrid();
                 this.drawTrack();
                 this.drawCheckerFinishLine(ctx);
-                let trackGeometry = this.getTrackGeometry();
-                this.drawTrackGeometry(trackGeometry, ctx);
-                let carIndex = 0;
+                let bestPct = 0;
                 for (let redCar of redCars) {
-                    if (!redCar.neuralNetwork.isDead && redCar.neuralNetwork == geneticAlgorithm.bestIndividual)
-                        redCar.drawLaserSensors(ctx);
-                    redCar.draw(ctx);
+                    redCar.applyNeuralNetwork();
+                    let trackGeometry = track.quadTree.queryFromRectangle(redCar);
+                    redCar.update(trackGeometry, track);
+                    let completionPct = track.calculateCompletionPercentage(redCar)
+                    redCar.updateCheckpoint();
+                    redCar.neuralNetwork.currentFitness = completionPct;
+
+                    if (redCar.neuralNetwork.isBest) {
+                        bestPct = completionPct;
+                        //this.drawTrackGeometry(trackGeometry, ctx);
+                        //redCar.drawLaserSensors(ctx);
+                        // for (let laserSensor of redCar.laserSensors) {
+                        //     let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
+                        //     laserSensor.intersectionInfo = intersection;
+                        //     if (carIndex == 0)
+                        //         drawIntersectionPoint(ctx, intersection);
+                        // }
+                        // // Check for collisions walls
+                        // let intersect = redCar.calculateIntersectionWithTrack(trackGeometry);
+                        // if (intersect.objectType) {
+                        //     intersect.objectType = "other"
+                        //     drawIntersectionPoint(ctx, intersect)
+                        // }
+                    }
                     for (let laserSensor of redCar.laserSensors) {
+                        let trackGeometry = track.quadTree.queryFromLine({
+                            p1: laserSensor.origin,
+                            p2: laserSensor.endPoint
+                        });
                         let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
                         laserSensor.intersectionInfo = intersection;
-                        if (carIndex == 0)
-                            drawIntersectionPoint(ctx, intersection);
                     }
-                    // Check for collisions walls
-                    let intersect = redCar.calculateIntersectionWithTrack(trackGeometry);
-                    if (intersect.objectType) {
-                        intersect.objectType = "other"
-                        drawIntersectionPoint(ctx, intersect)
+
+                    if (redCar.neuralNetwork.isCompleted) {
+                        const slowTime = track.path.length * 1000 * track.lapToWin; // 1 second per square in the path
+                        let timeBonus = slowTime - redCar.timeTakenToCompleteTrack;
+                        redCar.neuralNetwork.currentFitness = timeBonus;
                     }
-                    carIndex++;
+
+                    redCar.draw(ctx);
+                    //carIndex++;
                 }
 
-                ctx.restore();
+                this.drawTrackGeometry(this.trackGeometry, ctx);
+                let geometry = track.quadTree.queryFromPoint(this.mousePos)
+                this.drawTrackGeometry(geometry, ctx, 'white');
 
-            }, 1000 / 60);
+                ctx.restore();
+                drawText(ctx, "completion: " + (bestPct * 100).toFixed(1), 10, 30)
+                this.drawFPS()
+            }, 1);
         }
     }
 
@@ -707,10 +758,11 @@ class Track {
 
     saveTrack() {
         const data = {
+            gridWidth: this.gridWidth,
+            gridHeight: this.gridHeight,
             grid: this.grid,
             startPoint,
         };
-
         localStorage.setItem('track', JSON.stringify(data));
     }
 
@@ -720,6 +772,10 @@ class Track {
             const savedData = JSON.parse(savedTrack);
             this.grid = savedData.grid;
             startPoint = savedData.startPoint;
+            this.gridWidth = savedData.gridWidth || 8;
+            this.gridHeight = savedData.gridHeight || 8;
+            this.gridSize = this.squareSize * this.gridWidth;
+
             track.path = track.getTrackPath();
             startPoint.trackPathIndex = track.getPathIndex(startPoint.x, startPoint.y);
             this.redraw();
@@ -733,11 +789,19 @@ class Track {
         }
     }
 
-    getMousePosition(event) {
+    getMouseSquarePos(event) {
         const rect = canvas.getBoundingClientRect();
         return {
             x: Math.floor(((event.clientX - rect.left - this.pan.x) / this.zoomLevel) / this.squareSize),
             y: Math.floor(((event.clientY - rect.top - this.pan.y) / this.zoomLevel) / this.squareSize),
+        };
+    }
+
+    getMousePos(event) {
+        const rect = canvas.getBoundingClientRect();
+        this.mousePos = {
+            x: Math.floor(((event.clientX - rect.left - this.pan.x) / this.zoomLevel)),
+            y: Math.floor(((event.clientY - rect.top - this.pan.y) / this.zoomLevel)),
         };
     }
 
@@ -780,7 +844,7 @@ class Track {
     calculateCompletionPercentage(car) {
         if (car.neuralNetwork.isCompleted)
             return 1;
-        const path = this.getTrackPath();
+        const path = this.path;
         let carPosition = new Vector(car.x, car.y);
         let distanceCovered = 0;
 
@@ -1116,12 +1180,12 @@ class Track {
         return -1;
     }
 
-    getSquareInfo = function(event){
+    getSquareInfo = function (event) {
         const rect = canvas.getBoundingClientRect();
         let mousePos = {
             x: Math.floor(((event.clientX - rect.left - this.pan.x) / this.zoomLevel)),
             y: Math.floor(((event.clientY - rect.top - this.pan.y) / this.zoomLevel)),
-        };        
+        };
         let found = this.quadTree.queryFromPoint(mousePos);
     }
 }

@@ -38,10 +38,6 @@ function restartGame() {
 }
 let redCars = [];
 
-// const canvas = document.getElementById('parking');
-// const ctx = canvas.getContext('2d');
-// const parkingLot = new ParkingLot(100, 60, 100, 6, 10);
-
 function initGeneticAlgorithm(populationSize) {
     //const populationSize = 50;
     const inputSize = 8;
@@ -74,7 +70,7 @@ function updateTrack(event) {
     if (!mouseDown)
         return;
 
-    const pos = track.getMousePosition(event);
+    const pos = track.getMouseSquarePos(event);
 
     if (currentTool === 'draw') {
         track.setTrack(pos.x, pos.y);
@@ -93,14 +89,14 @@ canvas.addEventListener('mousedown', (event) => {
     }
 
     if (currentTool == "run"){
-        track.getSquareInfo(event);
+        track.getMousePos(event);
         return;
     }
 
     if (event.button != 0) {
         return;
     }
-    const pos = track.getMousePosition(event);
+    const pos = track.getMouseSquarePos(event);
 
     if (drawTrackBtn.checked) {
         drawing = true;
@@ -297,40 +293,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function gameLoop() {
-        let trackGeometry = track.getTrackGeometry();
         handleKeypress();
-        let index = 0;
-        for (let redCar of redCars) {
-            redCar.applyNeuralNetwork();
-            //let trackGeometry = track.quadTree.queryFromRectangle(redCar);
-            redCar.update(trackGeometry, track);
-            for (let laserSensor of redCar.laserSensors) {
-                //let trackGeometry = track.quadTree.queryFromLine({p1:laserSensor.origin, p2:laserSensor.endPoint});
-                let intersection = laserSensor.calculateTrackIntersection(trackGeometry);
-                laserSensor.intersectionInfo = intersection;
-            }
-
-            let completionPct = track.calculateCompletionPercentage(redCar)
-            redCar.updateCheckpoint();
-            redCar.neuralNetwork.currentFitness = completionPct;
-            if (redCar.neuralNetwork.isCompleted) {
-                const slowTime = track.path.length * 1000 * track.lapToWin; // 1 second per square in the path
-                let timeBonus = slowTime - redCar.timeTakenToCompleteTrack;
-                redCar.neuralNetwork.currentFitness = timeBonus;
-            }
-
-
-            if (redCar.neuralNetwork == geneticAlgorithm.bestIndividual) {
-                drawText(ctx, "completion: " + (completionPct * 100).toFixed(1), 10, 30)
-                // track.pan.x = canvas.width / 2 - redCar.x;
-                // track.pan.y = canvas.height / 2 - redCar.y;
-            }
-            index++;
-        }
-
         // Redessiner tout
         track.redraw();
-
 
         requestAnimationFrame(gameLoop);
     }

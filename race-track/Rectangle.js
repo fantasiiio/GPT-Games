@@ -149,9 +149,9 @@ class Rectangle {
 
         return (
             point.x >= topLeft.x &&
-            point.x < bottomRight.x &&
+            point.x <= bottomRight.x &&
             point.y >= topLeft.y &&
-            point.y < bottomRight.y
+            point.y <= bottomRight.y
         );
     }
 
@@ -212,7 +212,6 @@ class Rectangle {
 
     isRectanglePartWithinRectangle(rectangle) {
         const corners = rectangle.corners();
-      
         // Check if any of the rectangle's corners is inside the rectangle
         for (let i = 0; i < corners.length; i++) {
           if (this.contains(corners[i])) {

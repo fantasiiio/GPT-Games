@@ -51,7 +51,7 @@ class QuadTree {
             this.trackGeometry.arcs.push(arc);
             return;
         } else {
-            this.bounds.isArcPartWithinRectangle(arc);          
+            this.bounds.isArcPartWithinRectangle(arc);
             this.level = this.level;
         }
 
@@ -91,20 +91,22 @@ class QuadTree {
 
     queryFromRectangle(rectangle, found = {
         lines: [],
-        arcs: []
+        arcs: [],
+        count: 0
     }) {
         if (!this.bounds.isRectanglePartWithinRectangle(rectangle)) {
             return found;
         }
-
-        found.lines = [...found.lines, ...this.trackGeometry.lines];
-        found.arcs = [...found.arcs, ...this.trackGeometry.arcs];
 
         if (this.divided) {
             this.northwest.queryFromRectangle(rectangle, found);
             this.northeast.queryFromRectangle(rectangle, found);
             this.southwest.queryFromRectangle(rectangle, found);
             this.southeast.queryFromRectangle(rectangle, found);
+        } else {
+            found.lines = [...found.lines, ...this.trackGeometry.lines];
+            found.arcs = [...found.arcs, ...this.trackGeometry.arcs];
+            found.count++;
         }
 
         return found;
@@ -118,14 +120,14 @@ class QuadTree {
             return found;
         }
 
-        found.lines = [...found.lines, ...this.trackGeometry.lines];
-        found.arcs = [...found.arcs, ...this.trackGeometry.arcs];
-
         if (this.divided) {
             this.northwest.queryFromLine(line, found);
             this.northeast.queryFromLine(line, found);
             this.southwest.queryFromLine(line, found);
             this.southeast.queryFromLine(line, found);
+        } else {
+            found.lines = [...found.lines, ...this.trackGeometry.lines];
+            found.arcs = [...found.arcs, ...this.trackGeometry.arcs];            
         }
 
         return found;
@@ -150,7 +152,7 @@ class QuadTree {
         }
 
         return found;
-    }    
+    }
 
     drawFromRectangle(rectangle, ctx) {
         if (!this.bounds.isRectanglePartWithinRectangle(rectangle)) {
