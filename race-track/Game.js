@@ -38,33 +38,6 @@ function restartGame() {
 }
 let redCars = [];
 
-function initGeneticAlgorithm(populationSize) {
-    //const populationSize = 50;
-    const inputSize = 8;
-    const hiddenSize = 4;
-    const outputSize = 2;
-    const mutationRate = 0.1;
-    const maxGenerations = 1000;
-    const inputs = []; // Vous pouvez ajouter des données d'entrée spécifiques ici
-    const expectedOutputs = []; // Vous pouvez ajouter des sorties attendues spécifiques ici
-    let population = [];
-    for (let i = 0; i < populationSize; i++) {
-        const neuralNetwork = new NeuralNetwork(8, 4, 2);
-        population.push(neuralNetwork);
-    }
-    const ga = new GeneticAlgorithm(
-        population,
-        inputSize,
-        hiddenSize,
-        outputSize,
-        mutationRate,
-        maxGenerations,
-        inputs,
-        expectedOutputs
-    );
-
-    return ga;
-}
 
 function updateTrack(event) {
     if (!mouseDown)

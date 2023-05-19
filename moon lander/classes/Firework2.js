@@ -65,4 +65,3 @@ class Firework2 {
         return this.particles.length === 0;
     }
 }
-

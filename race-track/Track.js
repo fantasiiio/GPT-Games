@@ -953,7 +953,8 @@ class Track {
         const maxIterations = 500000; // Set the maximum iterations.
         let tryCount = 0;
 
-        while (tryCount < 5) {
+        let minTrackLength = 500;
+        while (tryCount < 100) {
             let currentPos = trackPath[trackPath.length - 1];
             let validDirections = ['up', 'down', 'left', 'right'].filter(dir => !triedDirections[trackPath.length - 1].includes(dir));
 
@@ -1037,8 +1038,16 @@ class Track {
                         break;
                     }
                 }
-                if (!haveStraightTrack) {
+                let retry = false;
+                if (!haveStraightTrack){
                     console.log("no straight track");
+                    retry = true;
+                }
+                if (this.path.length < minTrackLength){
+                    console.log("minTrackLength not reached");
+                    retry = true;
+                }
+                if(retry){
                     iterationCount = 0;
                     tryCount++;
                     trackPath = [{

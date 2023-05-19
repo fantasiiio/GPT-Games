@@ -29,7 +29,7 @@ class Explosion {
                 height,
                 rotation: 0,
                 rotationSpeed,
-                color:'darkgray'
+                color: 'darkgray'
             });
         }
     }
@@ -40,10 +40,10 @@ class Explosion {
             this.ctx.strokeStyle = 'black';
             this.ctx.save();
             this.ctx.translate(piece.x, piece.y);
-            this.ctx.rotate((piece.rotation * Math.PI) / 180);
+            this.ctx.rotate((piece.rotation * Math.PI));
             this.ctx.rect(-piece.width / 2, -piece.height / 2, piece.width, piece.height);
             this.ctx.fill();
-            this.ctx.stroke();                    
+            this.ctx.stroke();
             this.ctx.restore();
 
             piece.x += piece.vx;
@@ -66,4 +66,3 @@ class Explosion {
         return this.pieces.length === 0;
     }
 }
-
