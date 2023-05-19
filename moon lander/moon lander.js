@@ -37,10 +37,11 @@ const maxRotationAccel = 0.05;
 const FuelConsumption_thrust = 0.25;
 const FuelConsumption_rotate = 0.05;
 let score = 0;
+let zoomLevel = 0.5;
 
 let platform = {
     x: Math.random() * (canvas.width - 200) + 100,
-    y: canvas.height - 50,
+    y: canvas.height/zoomLevel - 50,
     width: 200,
     height: 10
 };
@@ -158,18 +159,61 @@ function initGeneticAlgorithm(populationSize) {
 }
 let landers = [];
 let targets = [];
-let targetCount = 5;
+let targetCount = 10;
+
+
+function generateTargets(minDistance = 200, maxDistance = 1000) {
+    targets.length = 0;
+
+    // Add first target
+    targets.push(new Vector(200 + Math.random() * (canvas.width/zoomLevel - 200), 200 + Math.random() * (canvas.height/zoomLevel / 3 * 2 - 200)));
+
+    for (let i = 1; i < targetCount; i++) {
+        let newTarget = null;
+
+        // Try up to 100 times to find a valid position for a new target.
+        // If it can't find a valid position after 100 tries, it breaks out of the loop to prevent freezing your application.
+        for (let tries = 0; tries < 100; tries++) {
+            let theta = Math.random() * 2 * Math.PI; // Random angle
+            let distance = minDistance + Math.random() * (maxDistance - minDistance); // Random distance within min and max
+
+            // Calculate new position based on a random existing target
+            let randomExistingTarget = targets[Math.floor(Math.random() * targets.length)];
+            let newX = randomExistingTarget.x + distance * Math.cos(theta);
+            let newY = randomExistingTarget.y + distance * Math.sin(theta);
+
+            let isTooCloseToExistingTarget = targets.some(target => {
+                let dx = target.x - newX;
+                let dy = target.y - newY;
+                return Math.sqrt(dx * dx + dy * dy) < minDistance; // Check distance to each existing target
+            });
+
+            if (!isTooCloseToExistingTarget && newX >= 200 && newX <= (canvas.width/zoomLevel - 200) && newY >= 200 && newY <= (canvas.height/zoomLevel / 3 * 2 - 200)) {
+                newTarget = new Vector(newX, newY);
+                break; // If a valid position is found, break out of the loop
+            }
+        }
+
+        // If a valid position was found, add new target
+        if (newTarget !== null) {
+            targets.push(newTarget);
+        }
+    }
+
+    targetCount = targets.length;
+}
+
+let populationCreated = false;
 
 function restart(newPopulation) {
-    targets.length = 0;
-    for (let i = 0; i < targetCount; i++) {
-        targets.push(new Vector(100 + Math.random() * (canvas.width - 100), 100 + Math.random() * (canvas.height / 3 * 2  - 100)));
-    }    
+    populationCreated = false;    
+    generateTargets();
     for (let i = 0; i < newPopulation.length; i++) {
         landers[i].neuralNetwork = newPopulation[i];
         landers[i].neuralNetwork.isDead = false;
         landers[i].resetLander();
     }
+    populationCreated = true;    
 }
 
 const populationCount = 100;
@@ -215,8 +259,6 @@ canvas.addEventListener('mousedown', (event) => {
 
 geneticAlgorithm.loadPopulation()
 
-let zoomLevel = 0.5;
-
 
 function drawText(text, x, y) {
     ctx.font = '40px Arial';
@@ -239,7 +281,7 @@ function drawTarget(position, size, index) {
     // ctx.lineWidth = 2;
     // ctx.stroke();
 
-    drawText(index+1, position.x, position.y); // Draw target index
+    drawText(index + 1, position.x, position.y); // Draw target index
 
     // Draw circle
     ctx.beginPath();
@@ -255,6 +297,9 @@ function gameLoop() {
         setTimeout(() => {
             gameLoop.debounced = false;
 
+            if(!populationCreated)
+                requestAnimationFrame(gameLoop);
+
             if (keysPressed["s"])
                 geneticAlgorithm.savePopulation();
             if (keysPressed["Enter"])
@@ -267,9 +312,9 @@ function gameLoop() {
             drawGasTanks(); // Draw the gas tanks on the mountain
             for (let lander of landers) {
                 if (!lander.neuralNetwork.isDead) {
-                    if(!lander.target || lander.checkTargetReached(lander.target)){
+                    if (!lander.target || lander.checkTargetReached(lander.target)) {
                         lander.changeTarget(targets[lander.targetIndex++]);
-                        if(lander.targetIndex > targets.length)
+                        if (lander.targetIndex > targets.length)
                             lander.die();
                     }
                     lander.calculateFitness(lander.target)
@@ -286,7 +331,7 @@ function gameLoop() {
 
             for (let i = 0; i < targetCount; i++) {
                 drawTarget(targets[i], 50, i);
-            }            
+            }
             drawFuelBar();
             drawScore();
             ctx.restore();
@@ -294,7 +339,7 @@ function gameLoop() {
         }, 1);
     }
 
-    for(let key in keysPressed) {
+    for (let key in keysPressed) {
         delete keysPressed[key];
     }
 }
