@@ -1,10 +1,9 @@
 class Asteroid {
-    constructor(center, minRadius, maxRadius, numVertices) {
-        const radius = Math.random() * (maxRadius - minRadius) + minRadius;
+    constructor(center, radius) {
         this.vertices = [];
-        this.radius = minRadius;
+        this.radius = radius;
         this.numSubdivisions = 2;
-        this.polygon = this.generateRandomAsteroidPolygon(numVertices, minRadius)
+        this.polygon = this.generateRandomAsteroidPolygon()
         let rectangle = this.polygon.createRectangleFromPolygon()
         this.rigidBody = new RigidBody(center.x, center.y, rectangle.width, rectangle.height, 1);
 

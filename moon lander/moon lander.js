@@ -160,64 +160,76 @@ function initGeneticAlgorithm(populationSize) {
 let landers = [];
 let targets = [];
 let asteroids = [];
-let asteroidsCount = 10;
+let asteroidsCount = 0;
 let targetCount = 1;
 
-function generateTargets() {
-    targets.length = 0;
+
+function generateObjectPositions(positionsCount, minDistance = 500, maxDistance = 5000) {
+    let positions = [];
+
+    if(positionsCount == 0)
+        return;
+    // Add first positions
     let center = new Vector(200 + Math.random() * (canvas.width / zoomLevel - 200), 200 + Math.random() * (canvas.height / zoomLevel / 3 * 2 - 200))
-    targets.push(center);
-}
+    positions.push(new Vector(center.x, center.y));
 
-function generateAsteroids(minDistance = 500, maxDistance = 5000) {
-    asteroids.length = 0;
-    const minRadius = 100;
-    const maxRadius = 100;
-    // Add first asteroid
-    let center = new Vector(200 + Math.random() * (canvas.width / zoomLevel - 200), 200 + Math.random() * (canvas.height / zoomLevel / 3 * 2 - 200))
-    asteroids.push(new Asteroid(center, minRadius, maxRadius, 5 + Math.random()*5));
+    for (let i = 0; i < positionsCount; i++) {
+        let newPositions = null;
 
-    for (let i = 0; i < asteroidsCount; i++) {
-        let newAsteroid = null;
-
-        // Try up to 100 times to find a valid position for a new asteroid.
+        // Try up to 100 times to find a valid position for a new positions.
         // If it can't find a valid position after 100 tries, it breaks out of the loop to prevent freezing your application.
         for (let tries = 0; tries < 100; tries++) {
             let theta = Math.random() * 2 * Math.PI; // Random angle
             let distance = minDistance + Math.random() * (maxDistance - minDistance); // Random distance within min and max
 
-            // Calculate new position based on a random existing asteroid
-            let randomExistingAsteroid = asteroids[Math.floor(Math.random() * asteroids.length)];
-            let newX = randomExistingAsteroid.rigidBody.position.x + distance * Math.cos(theta);
-            let newY = randomExistingAsteroid.rigidBody.position.y + distance * Math.sin(theta);
+            // Calculate new position based on a random existing positions
+            let randomExistingPositions = positions[Math.floor(Math.random() * positions.length)];
+            let newX = randomExistingPositions.x + distance * Math.cos(theta);
+            let newY = randomExistingPositions.y + distance * Math.sin(theta);
 
-            let isTooCloseToExistingAsteroid = asteroids.some(asteroid => {
-                let dx = asteroid.rigidBody.position.x - newX;
-                let dy = asteroid.rigidBody.position.y - newY;
-                return Math.sqrt(dx * dx + dy * dy) < minDistance; // Check distance to each existing asteroid
+            let isTooCloseToExistingPositions = positions.some(positions => {
+                let dx = positions.x - newX;
+                let dy = positions.y - newY;
+                return Math.sqrt(dx * dx + dy * dy) < minDistance; // Check distance to each existing positions
             });
 
-            if (!isTooCloseToExistingAsteroid && newX >= 200 && newX <= (canvas.width / zoomLevel - 200) && newY >= 200 && newY <= (canvas.height / zoomLevel / 3 * 2 - 200)) {
+            if (!isTooCloseToExistingPositions && newX >= 200 && newX <= (canvas.width / zoomLevel - 200) && newY >= 200 && newY <= (canvas.height / zoomLevel / 3 * 2 - 200)) {
                 let center = new Vector(200 + Math.random() * (canvas.width / zoomLevel - 200), 200 + Math.random() * (canvas.height / zoomLevel / 3 * 2 - 200))
-                newAsteroid = new Asteroid(center, minRadius, maxRadius, 5 + Math.random()*5);
+                newPositions = new Vector(center.x, center.y);
                 break; // If a valid position is found, break out of the loop
             }
         }
 
-        // If a valid position was found, add new asteroid
-        if (newAsteroid !== null) {
-            asteroids.push(newAsteroid);
+        // If a valid position was found, add new positions
+        if (newPositions !== null) {
+            positions.push(newPositions);
         }
     }
 
-    asteroidsCount = asteroids.length;
+    return positions;
+}
+
+
+function generateAsteroids(){
+    if(asteroidsCount == 0)
+        return;
+    let positions = generateObjectPositions(asteroidsCount);
+    for(let position of positions){
+        let asteroid = new Asteroid(position, 100);
+        asteroids.push(asteroid);
+    }
+}
+
+function generateTargets(){
+    let positions = generateObjectPositions(targetCount);
+    targets = positions;
 }
 
 let populationCreated = false;
 
 function restart(newPopulation) {
     populationCreated = false;
-    generateTargets();
+    //generateTargets();
     generateAsteroids();
     for (let i = 0; i < newPopulation.length; i++) {
         landers[i].neuralNetwork = newPopulation[i];
@@ -252,8 +264,9 @@ canvas.addEventListener('mousemove', (event) => {
 
 function changeAllTarget(mousePosition) {
     for (let lander of landers) {
-        lander.target = new Vector(mousePosition.x, mousePosition.y);
+        lander.target = null;
     }
+    targets[0] = {x:mousePosition.x/zoomLevel, y:mousePosition.y/zoomLevel};
 }
 
 function killAll() {
@@ -262,9 +275,9 @@ function killAll() {
     }
 }
 canvas.addEventListener('mousedown', (event) => {
-    mousePosition.x = event.clientX / zoomLevel;
-    mousePosition.y = event.clientY / zoomLevel;
-    //changeAllTarget(mousePosition);
+    mousePosition.x = event.clientX;
+    mousePosition.y = event.clientY;
+    changeAllTarget(mousePosition);
 });
 
 
@@ -283,16 +296,16 @@ function drawTarget(position, size, index) {
     const crossLength = size / 2;
 
     // Draw cross lines
-    ctx.beginPath();
-    ctx.moveTo(position.x - crossLength, position.y);
-    ctx.lineTo(position.x + crossLength, position.y);
-    ctx.moveTo(position.x, position.y - crossLength);
-    ctx.lineTo(position.x, position.y + crossLength);
-    ctx.strokeStyle = 'white';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    // ctx.beginPath();
+    // ctx.moveTo(position.x - crossLength, position.y);
+    // ctx.lineTo(position.x + crossLength, position.y);
+    // ctx.moveTo(position.x, position.y - crossLength);
+    // ctx.lineTo(position.x, position.y + crossLength);
+    // ctx.strokeStyle = 'white';
+    // ctx.lineWidth = 2;
+    // ctx.stroke();
 
-    //drawText(index + 1, position.x, position.y); // Draw target index
+    drawText(index + 1, position.x, position.y); // Draw target index
 
     // Draw circle
     ctx.beginPath();
@@ -301,7 +314,8 @@ function drawTarget(position, size, index) {
     ctx.lineWidth = 2;
     ctx.stroke();
 }
-
+generateTargets();
+generateAsteroids();
 function gameLoop() {
     if (!gameLoop.debounced) {
         gameLoop.debounced = true;
@@ -311,7 +325,7 @@ function gameLoop() {
             if (!populationCreated)
                 requestAnimationFrame(gameLoop);
 
-            if (keysPressed["s"])
+            if (keysPressed["keyS"])
                 geneticAlgorithm.savePopulation();
             if (keysPressed["Enter"])
                 killAll();
@@ -331,8 +345,8 @@ function gameLoop() {
                 if (!lander.neuralNetwork.isDead) {
                     if (!lander.target || lander.checkTargetReached(lander.target)) {
                         lander.changeTarget(targets[lander.targetIndex]);
-                        if (lander.targetIndex < targets.length-1)
-                            lander.targetIndex++;
+                        // if (lander.targetIndex < targets.length-1)
+                        //     lander.targetIndex++;
                     }
                     lander.calculateFitness(lander.target)
                     lander.applyNeuralNetwork(lander.target); // Update the neural network input 

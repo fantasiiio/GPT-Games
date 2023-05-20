@@ -14,7 +14,7 @@ class Lander {
         this.frameCount = 0;
         this.target = null;
         this.targetIndex = 0;
-        this.rigidBody = new RigidBody(x, y, 50, 50);
+        this.rigidBody = new RigidBody(x / zoomLevel, y / zoomLevel, 50, 50);
         this.polygons = this.getLanderPolygons();
         let area = 0;
         for(let polygon of this.polygons){
@@ -40,11 +40,12 @@ class Lander {
     }
 
     resetLander() {
-        this.rigidBody.position.x = canvas.width / 2;
+        this.rigidBody.position.x = canvas.width / 2 / zoomLevel;
         this.rigidBody.position.y = 50;
         this.rigidBody.angle = 0;
-        this.velocityX = 0;
-        this.velocityY = 0;
+        this.rigidBody.velocity.x = 0;
+        this.rigidBody.velocity.y = 0;
+        this.rigidBody.angularVelocity = 0;
         this.thrust = 0;
         this.fuel = this.maxFuel;
         this.successfulLanding = false;
@@ -114,7 +115,7 @@ class Lander {
 
         // Draw this thruster
         if (this.thrust > 0) {
-            const thrusterHeight = 15;
+            const thrusterHeight = 30;
             const adjustedThrusterHeight = thrusterHeight * (this.thrust / maxThrustPower);
             ctx.beginPath();
             ctx.moveTo(-5, 15);
@@ -195,15 +196,15 @@ class Lander {
         const distanceVector = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
         let targetReached = distanceVector.length() < 100;
         if (targetReached && !this.targetReached) {
-            if (this.startTime == 0)
-                this.startTime = performance.now();
+            if (this.startTimeReached == 0)
+                this.startTimeReached = performance.now();
 
-            this.timeToReachTarget = performance.now() - this.startTime;
+            this.timeToReachTarget = performance.now() - this.startTimeReached;
             if (this.timeToReachTarget > 3000) {
                 this.targetReached = true;
             }
         } else if (!targetReached) {
-            this.startTime = 0;
+            this.startTimeReached = 0;
         }
 
         return this.targetReached;
@@ -218,7 +219,7 @@ class Lander {
 
         const distanceFitness = (1000 - distanceVector.length()) / 1000;
 
-        const rotationPenaltyFactor = Math.abs(this.angularVelocity) / maxAngularVelocity; // Apply penalty based on rotation speed
+        const rotationPenaltyFactor = Math.abs(this.rigidBody.angularVelocity) / maxAngularVelocity; // Apply penalty based on rotation speed
 
         this.neuralNetwork.currentFitness += distanceFitness - (rotationPenaltyFactor) * 0.8;
     }
@@ -228,7 +229,7 @@ class Lander {
             return;
 
 
-        const spaceshipState = [this.rigidBody.position.x / canvas.width, (canvas.height - this.rigidBody.position.y) / canvas.height, this.rigidBody.angle % (Math.PI * 2), this.velocityX, this.velocityY];
+        const spaceshipState = [this.rigidBody.position.x / canvas.width, (canvas.height - this.rigidBody.position.y) / canvas.height, this.rigidBody.angle % (Math.PI * 2), this.rigidBody.velocity.x,  this.rigidBody.velocity.y];
 
 
         const distanceVector = new Vector((target.x - this.rigidBody.position.x) / canvas.width, (target.y - this.rigidBody.position.y) / canvas.height);
@@ -244,10 +245,13 @@ class Lander {
         let now = performance.now();
         if (!this.startTime)
             this.startTime = now;
+
+            
+        this.startTimeReached = 0;
         let deltaTime = now - this.startTime;
-        // if (deltaTime > 30000) {
-        //     this.die();
-        // }
+        if (deltaTime > 30000) {
+            this.die();
+        }
     }
 
     // getNearestMountainDistance(terrain) {
