@@ -5,7 +5,7 @@ const ctx = canvas.getContext('2d');
 
 const mountainResolution = 0.005;
 const mountainHeightFactor = 0.4;
-const maxYOffset = 1;
+const maxYOffset = 1.5;
 let fireworksV1 = [];
 let fireworks = [];
 let explosion = null;
@@ -32,7 +32,7 @@ let gasTanks = [];
 const gravity = 0.01;
 const maxThrustPower = 0.05;
 const landingSpeed = 1;
-const maxRotationSpeed = 0.1;
+const maxAngularVelocity = 0.1;
 const maxRotationAccel = 0.05;
 const FuelConsumption_thrust = 0.25;
 const FuelConsumption_rotate = 0.05;
@@ -41,7 +41,7 @@ let zoomLevel = 0.5;
 
 let platform = {
     x: Math.random() * (canvas.width - 200) + 100,
-    y: canvas.height/zoomLevel - 50,
+    y: canvas.height / zoomLevel - 50,
     width: 200,
     height: 10
 };
@@ -159,61 +159,72 @@ function initGeneticAlgorithm(populationSize) {
 }
 let landers = [];
 let targets = [];
-let targetCount = 10;
+let asteroids = [];
+let asteroidsCount = 10;
+let targetCount = 1;
 
-
-function generateTargets(minDistance = 200, maxDistance = 1000) {
+function generateTargets() {
     targets.length = 0;
+    let center = new Vector(200 + Math.random() * (canvas.width / zoomLevel - 200), 200 + Math.random() * (canvas.height / zoomLevel / 3 * 2 - 200))
+    targets.push(center);
+}
 
-    // Add first target
-    targets.push(new Vector(200 + Math.random() * (canvas.width/zoomLevel - 200), 200 + Math.random() * (canvas.height/zoomLevel / 3 * 2 - 200)));
+function generateAsteroids(minDistance = 500, maxDistance = 5000) {
+    asteroids.length = 0;
+    const minRadius = 100;
+    const maxRadius = 100;
+    // Add first asteroid
+    let center = new Vector(200 + Math.random() * (canvas.width / zoomLevel - 200), 200 + Math.random() * (canvas.height / zoomLevel / 3 * 2 - 200))
+    asteroids.push(new Asteroid(center, minRadius, maxRadius, 5 + Math.random()*5));
 
-    for (let i = 1; i < targetCount; i++) {
-        let newTarget = null;
+    for (let i = 0; i < asteroidsCount; i++) {
+        let newAsteroid = null;
 
-        // Try up to 100 times to find a valid position for a new target.
+        // Try up to 100 times to find a valid position for a new asteroid.
         // If it can't find a valid position after 100 tries, it breaks out of the loop to prevent freezing your application.
         for (let tries = 0; tries < 100; tries++) {
             let theta = Math.random() * 2 * Math.PI; // Random angle
             let distance = minDistance + Math.random() * (maxDistance - minDistance); // Random distance within min and max
 
-            // Calculate new position based on a random existing target
-            let randomExistingTarget = targets[Math.floor(Math.random() * targets.length)];
-            let newX = randomExistingTarget.x + distance * Math.cos(theta);
-            let newY = randomExistingTarget.y + distance * Math.sin(theta);
+            // Calculate new position based on a random existing asteroid
+            let randomExistingAsteroid = asteroids[Math.floor(Math.random() * asteroids.length)];
+            let newX = randomExistingAsteroid.rigidBody.position.x + distance * Math.cos(theta);
+            let newY = randomExistingAsteroid.rigidBody.position.y + distance * Math.sin(theta);
 
-            let isTooCloseToExistingTarget = targets.some(target => {
-                let dx = target.x - newX;
-                let dy = target.y - newY;
-                return Math.sqrt(dx * dx + dy * dy) < minDistance; // Check distance to each existing target
+            let isTooCloseToExistingAsteroid = asteroids.some(asteroid => {
+                let dx = asteroid.rigidBody.position.x - newX;
+                let dy = asteroid.rigidBody.position.y - newY;
+                return Math.sqrt(dx * dx + dy * dy) < minDistance; // Check distance to each existing asteroid
             });
 
-            if (!isTooCloseToExistingTarget && newX >= 200 && newX <= (canvas.width/zoomLevel - 200) && newY >= 200 && newY <= (canvas.height/zoomLevel / 3 * 2 - 200)) {
-                newTarget = new Vector(newX, newY);
+            if (!isTooCloseToExistingAsteroid && newX >= 200 && newX <= (canvas.width / zoomLevel - 200) && newY >= 200 && newY <= (canvas.height / zoomLevel / 3 * 2 - 200)) {
+                let center = new Vector(200 + Math.random() * (canvas.width / zoomLevel - 200), 200 + Math.random() * (canvas.height / zoomLevel / 3 * 2 - 200))
+                newAsteroid = new Asteroid(center, minRadius, maxRadius, 5 + Math.random()*5);
                 break; // If a valid position is found, break out of the loop
             }
         }
 
-        // If a valid position was found, add new target
-        if (newTarget !== null) {
-            targets.push(newTarget);
+        // If a valid position was found, add new asteroid
+        if (newAsteroid !== null) {
+            asteroids.push(newAsteroid);
         }
     }
 
-    targetCount = targets.length;
+    asteroidsCount = asteroids.length;
 }
 
 let populationCreated = false;
 
 function restart(newPopulation) {
-    populationCreated = false;    
+    populationCreated = false;
     generateTargets();
+    generateAsteroids();
     for (let i = 0; i < newPopulation.length; i++) {
         landers[i].neuralNetwork = newPopulation[i];
         landers[i].neuralNetwork.isDead = false;
         landers[i].resetLander();
     }
-    populationCreated = true;    
+    populationCreated = true;
 }
 
 const populationCount = 100;
@@ -272,16 +283,16 @@ function drawTarget(position, size, index) {
     const crossLength = size / 2;
 
     // Draw cross lines
-    // ctx.beginPath();
-    // ctx.moveTo(position.x - crossLength, position.y);
-    // ctx.lineTo(position.x + crossLength, position.y);
-    // ctx.moveTo(position.x, position.y - crossLength);
-    // ctx.lineTo(position.x, position.y + crossLength);
-    // ctx.strokeStyle = 'white';
-    // ctx.lineWidth = 2;
-    // ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(position.x - crossLength, position.y);
+    ctx.lineTo(position.x + crossLength, position.y);
+    ctx.moveTo(position.x, position.y - crossLength);
+    ctx.lineTo(position.x, position.y + crossLength);
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-    drawText(index + 1, position.x, position.y); // Draw target index
+    //drawText(index + 1, position.x, position.y); // Draw target index
 
     // Draw circle
     ctx.beginPath();
@@ -297,7 +308,7 @@ function gameLoop() {
         setTimeout(() => {
             gameLoop.debounced = false;
 
-            if(!populationCreated)
+            if (!populationCreated)
                 requestAnimationFrame(gameLoop);
 
             if (keysPressed["s"])
@@ -310,28 +321,38 @@ function gameLoop() {
             ctx.scale(zoomLevel, zoomLevel);
             terrain.draw(ctx);
             drawGasTanks(); // Draw the gas tanks on the mountain
+            for (let i = 0; i < asteroidsCount; i++) {
+                asteroids[i].rigidBody.update();
+                asteroids[i].getPolygon();
+                asteroids[i].draw();
+            }
+
             for (let lander of landers) {
                 if (!lander.neuralNetwork.isDead) {
                     if (!lander.target || lander.checkTargetReached(lander.target)) {
-                        lander.changeTarget(targets[lander.targetIndex++]);
-                        if (lander.targetIndex > targets.length)
-                            lander.die();
+                        lander.changeTarget(targets[lander.targetIndex]);
+                        if (lander.targetIndex < targets.length-1)
+                            lander.targetIndex++;
                     }
                     lander.calculateFitness(lander.target)
                     lander.applyNeuralNetwork(lander.target); // Update the neural network input 
-                }
-                if (!lander.landed) {
-                    lander.updateLander();
-                    lander.refuelLander(terrain); // Check if the lander is refueling
-                    lander.checkLanding();
-                }
-                lander.drawLander();
 
+                    if (!lander.landed) {
+                        lander.updateLander();
+                        lander.refuelLander(terrain); // Check if the lander is refueling
+                        lander.checkLanding();
+                    }
+                    lander.drawLander();
+                    for (let i = 0; i < asteroidsCount; i++) {
+                        lander.handleAsteroidCollision(asteroids[i]);
+                    }
+                }
             }
 
             for (let i = 0; i < targetCount; i++) {
                 drawTarget(targets[i], 50, i);
             }
+
             drawFuelBar();
             drawScore();
             ctx.restore();

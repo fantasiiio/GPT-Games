@@ -14,7 +14,7 @@ class Explosion {
             const speed = Math.random() * 3 + 1;
             const vx = Math.cos(angle) * speed;
             const vy = Math.sin(angle) * speed;
-            const rotationSpeed = Math.random() * 2 - 1;
+            const angularVelocity = Math.random() * 2 - 1;
 
             const width = Math.random() * 10 + 5;
             const height = Math.random() * 10 + 5;
@@ -28,7 +28,7 @@ class Explosion {
                 width,
                 height,
                 rotation: 0,
-                rotationSpeed,
+                angularVelocity,
                 color: 'darkgray'
             });
         }
@@ -52,7 +52,7 @@ class Explosion {
             piece.vy += this.gravity;
             piece.life -= 0.015;
 
-            piece.rotation += piece.rotationSpeed;
+            piece.rotation += piece.angularVelocity;
 
             if (piece.life <= 0) {
                 piece.life = 0;

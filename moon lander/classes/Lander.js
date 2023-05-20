@@ -1,16 +1,9 @@
 class Lander {
     constructor(x, y, neuralNetwork = null) {
-        this.x = x;
-        this.y = y;
-        this.angle = 0;
-        this.velocityX = 0;
-        this.velocityY = 0;
         this.thrust = 0;
-        this.rotationSpeed = 0;
         this.maxFuel = 1000;
         this.fuel = this.maxFuel;
         this.neuralNetwork = neuralNetwork;
-        this.rotationAccel = 0;
         this.successfulLanding = false;
         this.targetReached = false;
         this.timeToReachTarget = 0;
@@ -21,39 +14,39 @@ class Lander {
         this.frameCount = 0;
         this.target = null;
         this.targetIndex = 0;
+        this.rigidBody = new RigidBody(x, y, 50, 50);
+        this.polygons = this.getLanderPolygons();
+        let area = 0;
+        for(let polygon of this.polygons){
+            area += polygon.area();
+        }
+        this.rigidBody.mass = area / 1000;    
+        this.rigidBody.calculateMomentOfInertia();
     }
 
+
+
     isCollidingWithMountains(terrain) {
-        const x = this.x;
-        const y = this.y + 25;
+        const x = this.rigidBody.position.x;
+        const y = this.rigidBody.position.y + 25;
         return y >= terrain.getY(x);
     }
 
     updateLander() {
         this.fuel -= FuelConsumption_thrust * this.thrust;
-        this.rotationSpeed += this.rotationAccel;
-        if (this.rotationSpeed > maxRotationSpeed) {
-            this.rotationSpeed = maxRotationSpeed;
-        } else if (this.rotationSpeed < -maxRotationSpeed) {
-            this.rotationSpeed = -maxRotationSpeed;
-        }
-        this.angle += this.rotationSpeed;
-        this.velocityX += this.thrust * Math.sin(this.angle);
-        this.velocityY += gravity - (this.thrust * Math.cos(this.angle));
-        this.x += this.velocityX;
-        this.y += this.velocityY;
+        let force = new Vector(this.thrust * Math.sin(this.rigidBody.angle), gravity - (this.thrust * Math.cos(this.rigidBody.angle)));
+        this.rigidBody.applyForce(force);
+        this.rigidBody.update(force);
     }
 
     resetLander() {
-        this.x = canvas.width / 2;
-        this.y = 50;
-        this.angle = 0;
+        this.rigidBody.position.x = canvas.width / 2;
+        this.rigidBody.position.y = 50;
+        this.rigidBody.angle = 0;
         this.velocityX = 0;
         this.velocityY = 0;
         this.thrust = 0;
-        this.rotationSpeed = 0;
         this.fuel = this.maxFuel;
-        this.rotationAccel = 0;
         this.successfulLanding = false;
         this.targetReached = false;
         this.timeToReachTarget = 0;
@@ -76,10 +69,10 @@ class Lander {
 
     drawLander() {
         ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.angle);
+        ctx.translate(this.rigidBody.position.x, this.rigidBody.position.y);
+        ctx.rotate(this.rigidBody.angle);
 
-        // Draw spaceship body
+        // Draw this body
         ctx.beginPath();
         ctx.moveTo(-15, 15);
         ctx.quadraticCurveTo(-15, -15, 0, -30);
@@ -91,14 +84,14 @@ class Lander {
         ctx.stroke();
 
 
-        // Draw spaceship windows
+        // Draw this windows
         ctx.beginPath();
         ctx.arc(0, -5, 6, 0, 2 * Math.PI);
         ctx.fillStyle = 'black';
         ctx.fill();
         ctx.stroke();
 
-        // Draw spaceship wings
+        // Draw this wings
         ctx.beginPath();
         ctx.moveTo(-15, 15);
         ctx.quadraticCurveTo(-25, 10, -25, 30);
@@ -119,7 +112,7 @@ class Lander {
         ctx.strokeStyle = 'gray';
         ctx.stroke();
 
-        // Draw spaceship thruster
+        // Draw this thruster
         if (this.thrust > 0) {
             const thrusterHeight = 15;
             const adjustedThrusterHeight = thrusterHeight * (this.thrust / maxThrustPower);
@@ -138,30 +131,29 @@ class Lander {
 
     isLanderOutOfScreen() {
         return (
-            isNaN(this.x) || // Check if lander is not a number
-            isNaN(this.y) || // Check if lander is not a number
-            this.x < 0 || // Check if lander is left of the screen
-            this.x > canvas.width / zoomLevel || // Check if lander is right of the screen
-            this.y < 0 || // Check if lander is above the screen
-            this.y > canvas.height / zoomLevel // Check if lander is below the screen
+            isNaN(this.rigidBody.position.x) || // Check if lander is not a number
+            isNaN(this.rigidBody.position.y) || // Check if lander is not a number
+            this.rigidBody.position.x < 0 || // Check if lander is left of the screen
+            this.rigidBody.position.x > canvas.width / zoomLevel || // Check if lander is right of the screen
+            this.rigidBody.position.y < 0 || // Check if lander is above the screen
+            this.rigidBody.position.y > canvas.height / zoomLevel // Check if lander is below the screen
         );
     }
     die() {
         this.landed = true;
         this.velocityX = 0;
         this.velocityY = 0;
-        this.rotationSpeed = 0;
         this.neuralNetwork.isDead = true;
     }
 
     checkLanding() {
-        const x = this.x;
-        const y = this.y;
+        const x = this.rigidBody.position.x;
+        const y = this.rigidBody.position.y;
         if (this.isLanderOutOfScreen()) {
             this.die();
         } else {
             if (this.isCollidingWithMountains(terrain)) {
-                let checkAngle = (this.angle + Math.PI / 2) % (2 * Math.PI);
+                let checkAngle = (this.rigidBody.angle + Math.PI / 2) % (2 * Math.PI);
                 const platformRange = y >= platform.y && x >= platform.x && x <= platform.x + platform.width;
                 if (platformRange && this.velocityY < landingSpeed && Math.abs(Math.PI / 2 - checkAngle) < 10) {
                     this.successfulLanding = true;
@@ -176,8 +168,8 @@ class Lander {
     refuelLander(terrain) {
         for (let i = 0; i < gasTanks.length; i++) {
             const gasTank = gasTanks[i];
-            const dx = this.x - gasTank.x;
-            const dy = this.y - gasTank.y;
+            const dx = this.rigidBody.position.x - gasTank.x;
+            const dy = this.rigidBody.position.y - gasTank.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < gasTankRadius + 25) {
@@ -200,7 +192,7 @@ class Lander {
 
     checkTargetReached(target) {
 
-        const distanceVector = new Vector(target.x - this.x, target.y - this.y);
+        const distanceVector = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
         let targetReached = distanceVector.length() < 100;
         if (targetReached && !this.targetReached) {
             if (this.startTime == 0)
@@ -222,11 +214,11 @@ class Lander {
             return;
         this.frameCount++;
 
-        const distanceVector = new Vector(target.x - this.x, target.y - this.y);
+        const distanceVector = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
 
         const distanceFitness = (1000 - distanceVector.length()) / 1000;
 
-        const rotationPenaltyFactor = Math.abs(this.rotationSpeed) / maxRotationSpeed; // Apply penalty based on rotation speed
+        const rotationPenaltyFactor = Math.abs(this.angularVelocity) / maxAngularVelocity; // Apply penalty based on rotation speed
 
         this.neuralNetwork.currentFitness += distanceFitness - (rotationPenaltyFactor) * 0.8;
     }
@@ -236,16 +228,16 @@ class Lander {
             return;
 
 
-        const spaceshipState = [this.x / canvas.width, (canvas.height - this.y) / canvas.height, this.angle % (Math.PI * 2), this.velocityX, this.velocityY];
+        const spaceshipState = [this.rigidBody.position.x / canvas.width, (canvas.height - this.rigidBody.position.y) / canvas.height, this.rigidBody.angle % (Math.PI * 2), this.velocityX, this.velocityY];
 
 
-        const distanceVector = new Vector((target.x - this.x) / canvas.width, (target.y - this.y) / canvas.height);
+        const distanceVector = new Vector((target.x - this.rigidBody.position.x) / canvas.width, (target.y - this.rigidBody.position.y) / canvas.height);
         const targetAngle = distanceVector.angle();
 
         const inputs = [...spaceshipState, distanceVector.length(), targetAngle.cos_angle, targetAngle.sin_angle];
 
         const [thrust, rotationAccel] = this.neuralNetwork.apply(inputs);
-        this.rotationAccel = (rotationAccel - 0.5) * 2 * maxRotationAccel;
+        this.rigidBody.applyTorque((rotationAccel - 0.5) * 2 * maxRotationAccel);
         this.thrust = thrust * maxThrustPower;
 
 
@@ -262,7 +254,7 @@ class Lander {
     //     const distanceArray = [];
     //     for (let x = 0; x < terrain.width; x++) {
     //         const y = terrain.getY(x);
-    //         const distance = Math.sqrt((this.x - x) ** 2 + (this.y - y) ** 2);
+    //         const distance = Math.sqrt((this.rigidBody.position.x - x) ** 2 + (this.rigidBody.position.y - y) ** 2);
     //         distanceArray.push(distance);
     //     }
     //     const nearestDistance = Math.min(...distanceArray);
@@ -278,14 +270,14 @@ class Lander {
         while (left <= right) {
             const mid = Math.floor((left + right) / 2);
 
-            const distance = Math.abs(mid - this.x);
+            const distance = Math.abs(mid - this.rigidBody.position.x);
 
             if (distance < nearestDistance) {
                 nearestIndex = mid;
                 nearestDistance = distance;
             }
 
-            if (mid < this.x) {
+            if (mid < this.rigidBody.position.x) {
                 left = mid + 1;
             } else {
                 right = mid - 1;
@@ -300,21 +292,21 @@ class Lander {
 
 
     getTerrainSlope(terrain) {
-        const x = Math.round(this.x);
+        const x = Math.round(this.rigidBody.position.x);
         const slope = terrain.getTerrainSlope(x);
         return slope;
     }
 
     getPlatformDistance(platform) {
-        const dx = platform.x - this.x;
-        const dy = platform.y - this.y;
+        const dx = platform.x - this.rigidBody.position.x;
+        const dy = platform.y - this.rigidBody.position.y;
         const distance = Math.sqrt(dx ** 2 + dy ** 2);
         return distance;
     }
 
     getPlatformAngle(platform) {
-        const dx = platform.x - this.x;
-        const dy = platform.y - this.y;
+        const dx = platform.x - this.rigidBody.position.x;
+        const dy = platform.y - this.rigidBody.position.y;
         const angle = Math.atan2(dy, dx);
         return angle;
     }
@@ -323,5 +315,117 @@ class Lander {
         const descentSpeed = this.velocityY;
         return descentSpeed;
     }
+
+    getLanderPolygons() {
+        let polygons = [];
+
+        const center = {
+            x: this.rigidBody.position.x,
+            y: this.rigidBody.position.y
+        };
+        const angle = this.rigidBody.angle;
+
+        const bodyVertices = [{
+                x: this.rigidBody.position.x - 15,
+                y: this.rigidBody.position.y + 15
+            },
+            {
+                x: this.rigidBody.position.x,
+                y: this.rigidBody.position.y - 30
+            },
+            {
+                x: this.rigidBody.position.x + 15,
+                y: this.rigidBody.position.y + 15
+            }
+        ];
+        const rotatedBodyVertices = bodyVertices.map(vertex => this.rotatePoint(vertex, center, angle));
+        polygons.push(new Polygon(rotatedBodyVertices));
+
+        const leftWingVertices = [{
+                x: this.rigidBody.position.x - 15,
+                y: this.rigidBody.position.y + 15
+            },
+            {
+                x: this.rigidBody.position.x - 25,
+                y: this.rigidBody.position.y + 10
+            },
+            {
+                x: this.rigidBody.position.x - 25,
+                y: this.rigidBody.position.y + 30
+            },
+            {
+                x: this.rigidBody.position.x - 15,
+                y: this.rigidBody.position.y + 30
+            }
+        ];
+        const rotatedLeftWingVertices = leftWingVertices.map(vertex => this.rotatePoint(vertex, center, angle));
+        polygons.push(new Polygon(rotatedLeftWingVertices));
+
+        const rightWingVertices = [{
+                x: this.rigidBody.position.x + 15,
+                y: this.rigidBody.position.y + 15
+            },
+            {
+                x: this.rigidBody.position.x + 25,
+                y: this.rigidBody.position.y + 10
+            },
+            {
+                x: this.rigidBody.position.x + 25,
+                y: this.rigidBody.position.y + 30
+            },
+            {
+                x: this.rigidBody.position.x + 15,
+                y: this.rigidBody.position.y + 30
+            }
+        ];
+        const rotatedRightWingVertices = rightWingVertices.map(vertex => this.rotatePoint(vertex, center, angle));
+        polygons.push(new Polygon(rotatedRightWingVertices));
+
+        return polygons;
+    }
+
+    rotatePoint(point, center, angle) {
+        const rotatedX = center.x + (point.x - center.x) * Math.cos(angle) - (point.y - center.y) * Math.sin(angle);
+        const rotatedY = center.y + (point.x - center.x) * Math.sin(angle) + (point.y - center.y) * Math.cos(angle);
+        return {
+            x: rotatedX,
+            y: rotatedY
+        };
+    }
+
+    handleAsteroidCollision(asteroid) {
+        // Get the polygons of the lander and asteroid
+        const landerPolygons = this.getLanderPolygons();
+
+        // Check for intersection between each pair of polygons
+        for (const landerPolygon of landerPolygons) {
+            const nearestPoint = landerPolygon.getNearestIntersection(asteroid.polygon);
+
+            if (nearestPoint) {
+                this.rigidBody.resolveCollision(asteroid.rigidBody);
+            }
+        }
+    }
+
+    // For navigation
+    getNearestAsteroidPoint(asteroid) {
+        let nearestPoint = null;
+        let minDistance = Infinity;
+
+
+        for (let i = 0; i < asteroid.vertices.length; i++) {
+            const asteroidPoint = asteroid.vertices[i];
+            let position = new Vector(this.rigidBody.position.x, this.rigidBody.position.y);
+            const distance = position.distanceTo(asteroidPoint);
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestPoint = asteroidPoint;
+            }
+        }
+
+        return nearestPoint;
+    }
+    
 
 }

@@ -57,10 +57,6 @@ class Vector {
         var r = Math.sqrt(this.x * this.x + this.y * this.y);
         return {cos_angle: this.x / r, sin_angle: this.y / r};
     }
-
-    perpendicular() {
-        return new Vector(-this.y, this.x);
-    }
 }
 
 Vector.intersection = function (p1, p2, p3, p4) {
