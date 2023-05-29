@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>2D Cavern Generator</title>
+    <style>
+        #cavernCanvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="cavernCanvas" width="800" height="600"></canvas>
+    <script>
+        var canvas = document.getElementById('cavernCanvas');
+        var ctx = canvas.getContext('2d');
+
+        var width = 100;
+        var height = 75;
+        var size = 8; // Size of each cell
+        var initialFill = 0.45; // Initial chance a cell is filled
+        var numberOfSteps = 5; // Number of steps in cellular automaton
+        var fillNeighbourLimit = 4; // Number of filled neighbours to cause a fill
+
+        var map = [];
+
+        function initializeMap() {
+            map = [];
+            for (let y = 0; y < height; y++) {
+                let row = [];
+                for (let x = 0; x < width; x++) {
+                    row.push(Math.random() < initialFill ? 1 : 0);
+                }
+                map.push(row);
+            }
+        }
+
+        function doSimulationStep() {
+            let newMap = JSON.parse(JSON.stringify(map)); // Copy existing map
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let nbs = countFilledNeighbours(x, y);
+                    if (map[y][x]) {
+                        newMap[y][x] = nbs >= fillNeighbourLimit ? 1 : 0;
+                    } else {
+                        newMap[y][x] = nbs > fillNeighbourLimit ? 1 : 0;
+                    }
+                }
+            }
+            map = newMap;
+        }
+
+        function countFilledNeighbours(x, y) {
+            let count = 0;
+            for (let i = -1; i < 2; i++) {
+                for (let j = -1; j < 2; j++) {
+                    let neighbourX = x + i;
+                    let neighbourY = y + j;
+                    if (i == 0 && j == 0) {
+                        // Do nothing for current cell
+                    } else if (neighbourX < 0 || neighbourY < 0 || neighbourX >= width || neighbourY >= height) {
+                        count += 1;
+                    } else if (map[neighbourY][neighbourX] == 1) {
+                        count += 1;
+                    }
+                }
+            }
+            return count;
+        }
+
+        function drawMap() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    if (map[y][x] == 1) {
+                        ctx.fillRect(x * size, y * size, size, size);
+                    }
+                }
+            }
+        }
+
+        // Initialize and run the simulation
+        initializeMap();
+        for (let i = 0; i < numberOfSteps; i++) {
+            doSimulationStep();
+        }
+        drawMap();
+    </script>
+</body>
+</html>

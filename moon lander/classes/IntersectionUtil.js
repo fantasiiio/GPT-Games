@@ -2,6 +2,9 @@
         constructor() {}
 
         static lineIntersection(p1, p2, lineStart, lineEnd) {
+            if (!(p1 instanceof Vector)) {
+                p1 = new Vector(p1.x, p1.y);
+            }
             let x1 = p1.x;
             let y1 = p1.y;
             let x2 = p2.x;
@@ -30,6 +33,10 @@
             }
 
             return null;
+        }
+
+        static lineCircleIntersection(p1, p2, center, radius) {
+            return IntersectionUtil.lineArcIntersection(p1, p2, center, radius, 0, 2 * Math.PI);
         }
 
 

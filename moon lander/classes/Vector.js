@@ -16,6 +16,10 @@ class Vector {
         return this.x * other.x + this.y * other.y;
     }
 
+    cross(vector) {
+        return this.x * vector.y - this.y * vector.x;
+    }
+
     length() {
         return Math.sqrt(this.dot(this));
     }
@@ -32,6 +36,10 @@ class Vector {
 
     multiply(scalar) {
         return new Vector(this.x * scalar, this.y * scalar);
+    }
+
+    div(scalar) {
+        return new Vector(this.x / scalar, this.y / scalar);
     }
 
     perpendicular() {
@@ -54,8 +62,15 @@ class Vector {
     }
 
     angle() {
+        return Math.atan2(this.x, this.y);
+    }
+
+    angle2() {
         var r = Math.sqrt(this.x * this.x + this.y * this.y);
-        return {cos_angle: this.x / r, sin_angle: this.y / r};
+        return {
+            cos_angle: this.x / r,
+            sin_angle: this.y / r
+        };
     }
 }
 

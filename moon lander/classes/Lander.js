@@ -1,6 +1,12 @@
 class Lander {
     constructor(x, y, neuralNetwork = null) {
+        this.retartPosition = {
+            x,
+            y
+        };
         this.thrust = 0;
+        this.sideThrust = 0;
+        this.angularAcceleration = 0;
         this.maxFuel = 1000;
         this.fuel = this.maxFuel;
         this.neuralNetwork = neuralNetwork;
@@ -14,34 +20,45 @@ class Lander {
         this.frameCount = 0;
         this.target = null;
         this.targetIndex = 0;
-        this.rigidBody = new RigidBody(x / zoomLevel, y / zoomLevel, 50, 50);
+        this.rigidBody = new RigidBody(x, y, 50, 50);
         this.polygons = this.getLanderPolygons();
         let area = 0;
-        for(let polygon of this.polygons){
+        this.fitnessMultiplier = 1;
+        for (let polygon of this.polygons) {
             area += polygon.area();
         }
-        this.rigidBody.mass = area / 1000;    
+        this.rigidBody.mass = area / 1000;
         this.rigidBody.calculateMomentOfInertia();
     }
 
 
 
     isCollidingWithMountains(terrain) {
+        return false;
         const x = this.rigidBody.position.x;
         const y = this.rigidBody.position.y + 25;
         return y >= terrain.getY(x);
     }
 
-    updateLander() {
+    updateLander(asteroids) {
         this.fuel -= FuelConsumption_thrust * this.thrust;
         let force = new Vector(this.thrust * Math.sin(this.rigidBody.angle), gravity - (this.thrust * Math.cos(this.rigidBody.angle)));
+        let sideForce = new Vector(this.sideThrust * Math.sin(this.rigidBody.angle + Math.PI / 2), gravity - (this.sideThrust * Math.cos(this.rigidBody.angle + Math.PI / 2)));
         this.rigidBody.applyForce(force);
-        this.rigidBody.update(force);
+        this.rigidBody.applyForce(sideForce);
+        this.rigidBody.applyTorque(this.angularAcceleration);
+        this.rigidBody.update();
+
+        this.lastSpaceshipStates = this.spaceshipStates;
+        this.spaceshipStates = this.calculateStates(this.target, asteroids);
+        //this.spaceshipStates = [...this.spaceshipStates, this.thrust, this.angularAcceleration]
+        if (!this.lastSpaceshipStates)
+            this.lastSpaceshipStates = this.spaceshipStates;
     }
 
     resetLander() {
-        this.rigidBody.position.x = canvas.width / 2 / zoomLevel;
-        this.rigidBody.position.y = 50;
+        this.rigidBody.position.x = this.retartPosition.x;
+        this.rigidBody.position.y = this.retartPosition.y;
         this.rigidBody.angle = 0;
         this.rigidBody.velocity.x = 0;
         this.rigidBody.velocity.y = 0;
@@ -58,19 +75,34 @@ class Lander {
         this.frameCount = 0;
         this.target = null;
         this.targetIndex = 0;
+        this.neuralNetwork.currentFitness = 0;
+        this.fitnessMultiplier = 1;
+        this.startDistance = 0;
     }
 
     changeTarget(target) {
         this.target = target;
         this.targetReached = false;
         this.timeToReachTarget = 0;
-        this.startTime = 0;
+        this.startTimeReached = 0;
     }
-
 
     drawLander() {
         ctx.save();
         ctx.translate(this.rigidBody.position.x, this.rigidBody.position.y);
+
+        if (this.neuralNetwork.positionNumber) {
+            if (this.neuralNetwork.positionNumber < 10)
+                ctx.fillStyle = 'yellow';
+            else
+                ctx.fillStyle = 'white';
+
+            ctx.font = '40px Arial';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.neuralNetwork.positionNumber + " (" + this.neuralNetwork.currentFitness.toFixed() + ")", 50, 0);
+        }
+
         ctx.rotate(this.rigidBody.angle);
 
         // Draw this body
@@ -113,6 +145,8 @@ class Lander {
         ctx.strokeStyle = 'gray';
         ctx.stroke();
 
+
+
         // Draw this thruster
         if (this.thrust > 0) {
             const thrusterHeight = 30;
@@ -126,19 +160,32 @@ class Lander {
             ctx.fill();
             ctx.strokeStyle = 'red';
             ctx.stroke();
+        } else if (this.thrust < 0) {
+            const thrusterHeight = 30;
+            const adjustedThrusterHeight = thrusterHeight * (this.thrust / maxThrustPower);
+            ctx.beginPath();
+            ctx.moveTo(-5, -25);
+            ctx.lineTo(0, -25 - adjustedThrusterHeight);
+            ctx.lineTo(5, -25);
+            ctx.closePath();
+            ctx.fillStyle = 'red';
+            ctx.fill();
+            ctx.strokeStyle = 'red';
+            ctx.stroke();
         }
         ctx.restore();
     }
 
     isLanderOutOfScreen() {
-        return (
-            isNaN(this.rigidBody.position.x) || // Check if lander is not a number
-            isNaN(this.rigidBody.position.y) || // Check if lander is not a number
-            this.rigidBody.position.x < 0 || // Check if lander is left of the screen
-            this.rigidBody.position.x > canvas.width / zoomLevel || // Check if lander is right of the screen
-            this.rigidBody.position.y < 0 || // Check if lander is above the screen
-            this.rigidBody.position.y > canvas.height / zoomLevel // Check if lander is below the screen
-        );
+        return false;
+        // return (
+        //     isNaN(this.rigidBody.position.x) || // Check if lander is not a number
+        //     isNaN(this.rigidBody.position.y) || // Check if lander is not a number
+        //     this.rigidBody.position.x < 0 || // Check if lander is left of the screen
+        //     this.rigidBody.position.x > canvas.width / zoomLevel || // Check if lander is right of the screen
+        //     this.rigidBody.position.y < 0 || // Check if lander is above the screen
+        //     this.rigidBody.position.y > canvas.height / zoomLevel // Check if lander is below the screen
+        // );
     }
     die() {
         this.landed = true;
@@ -194,13 +241,15 @@ class Lander {
     checkTargetReached(target) {
 
         const distanceVector = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
-        let targetReached = distanceVector.length() < 100;
+        let targetReached = distanceVector.length() < targetRadius;
+        if(targetReached)
+            this.neuralNetwork.currentFitness += 5;
         if (targetReached && !this.targetReached) {
             if (this.startTimeReached == 0)
                 this.startTimeReached = performance.now();
 
             this.timeToReachTarget = performance.now() - this.startTimeReached;
-            if (this.timeToReachTarget > 3000) {
+            if (this.timeToReachTarget > 20) {
                 this.targetReached = true;
             }
         } else if (!targetReached) {
@@ -210,46 +259,265 @@ class Lander {
         return this.targetReached;
     }
 
-    calculateFitness(target) {
+    wrapAroundAngle(angle) {
+        while (angle < -Math.PI) angle += 2 * Math.PI;
+        while (angle > Math.PI) angle -= 2 * Math.PI;
+        return angle;
+    }
+
+    calculatePredictionError(predictionModel) {
+        // Get the model's prediction for the next state
+        let predictedNextState = predictionModel.predict(this.lastSpaceshipStates);
+
+        // Calculate the difference between the predicted and actual next states
+        let predictionError = [];
+        for (let i = 0; i < predictedNextState.length; i++) {
+            predictionError[i] = this.spaceshipStates[i] - predictedNextState[i];
+        }
+
+        // Calculate the mean squared error
+        let mse = 0;
+        for (let error of predictionError) {
+            mse += error * error;
+        }
+        mse /= predictionError.length;
+
+        return mse;
+    }
+
+    // function that check if trajectory line is intersecting with target
+    checkTrajectoryIntersectTarget(target) {
+        const trajectoryLine = {
+            start: this.rigidBody.position,
+            end: this.rigidBody.position.add(this.rigidBody.velocity.normalize().multiply(10000)) // multiply by 10000 to extend the line
+        };
+        const targetCircle = {
+            center: new Vector(target.x, target.y),
+            radius: targetRadius
+        };
+        const intersection = IntersectionUtil.lineCircleIntersection(trajectoryLine.start, trajectoryLine.end, targetCircle.center, targetCircle.radius);
+        return intersection;
+    }
+
+
+    calculateFitness(target, predictionModel) {
         if (!target)
             return;
         this.frameCount++;
 
-        const distanceVector = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
+        // Calculate the vector pointing from the spaceship to the target
+        let distanceVector = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
 
-        const distanceFitness = (1000 - distanceVector.length()) / 1000;
+        // Calculate the angle of the spaceship's body
+        let bodyAngle = this.rigidBody.angle;
+        bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
 
-        const rotationPenaltyFactor = Math.abs(this.rigidBody.angularVelocity) / maxAngularVelocity; // Apply penalty based on rotation speed
+        // Calculate the facing direction of the spaceship
+        const facingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
 
-        this.neuralNetwork.currentFitness += distanceFitness - (rotationPenaltyFactor) * 0.8;
+        // Calculate distance fitness based on the normalized distance to the target
+        let distanceFitness = Math.max(0, 1 - distanceVector.length() / this.startDistance);
+
+        // Normalize the distance vector
+        let distanceVectorNormal = new Vector(distanceVector.x, distanceVector.y).normalize();
+
+        let velocityDotProduct = 0;
+        let velocityScore;
+        let facingDotProduct;
+        let facingReward = 0;
+        let trajectoryBonus = 0;
+        if (this.rigidBody.velocity.length() == 0) {
+            velocityScore = 0;
+        } else {
+            // Check if the spaceship is moving toward the target
+            velocityDotProduct = this.rigidBody.velocity.normalize().dot(distanceVectorNormal);
+            velocityScore = velocityDotProduct;
+
+            if(this.checkTrajectoryIntersectTarget(target))
+                trajectoryBonus = 2;
+
+            // Check if the spaceship is facing the target
+            facingDotProduct = facingDirection.dot(distanceVectorNormal);
+            facingReward = facingDotProduct;
+        }
+
+        // Calculate rotation penalty based on the spaceship's angular velocity
+        const rotationPenaltyFactor = Math.abs(this.rigidBody.angularVelocity) / maxAngularVelocity;
+
+        // Calculate thrust penalty based on the spaceship's thrust
+        const thrustPenaltyFactor = Math.abs(this.thrust) / maxThrustPower;
+
+        // Calculate prediction error (commented out in the provided code)
+
+        // Update the current fitness of the neural network by combining various factors
+        this.neuralNetwork.currentFitness += (distanceFitness + facingReward + velocityScore) - (rotationPenaltyFactor * 2 + thrustPenaltyFactor * 0.2);
     }
 
-    applyNeuralNetwork(target) {
+
+
+    // calculate the rate of change of θ
+    compute_dtheta_dt(x, y, vx, vy) {
+        // compute distance from origin
+        var r = Math.sqrt(x * x + y * y);
+
+        // compute unit tangential vector
+        var unit_tangential_vector = {
+            x: -y / r,
+            y: x / r
+        };
+
+        // compute dθ/dt
+        var dtheta_dt = vx * unit_tangential_vector.x + vy * unit_tangential_vector.y;
+
+        return dtheta_dt;
+    }
+
+    // calculate the rate of change of r
+    compute_dr_dt(x, y, vx, vy) {
+        // compute distance from origin
+        var r = Math.sqrt(x * x + y * y);
+
+        // compute unit radial vector
+        var unit_radial_vector = {
+            x: x / r,
+            y: y / r
+        };
+
+        // compute dr/dt
+        var dr_dt = vx * unit_radial_vector.x + vy * unit_radial_vector.y;
+
+        return dr_dt;
+    }
+
+    // Function to calculate velocity in polar coordinates
+    velocityInPolarCoordinates(r, dr_dt, dtheta_dt) {
+        var v_r = dr_dt; // radial velocity
+        var v_theta = r * dtheta_dt; // tangential velocity
+        return {
+            v_r: v_r,
+            v_theta: v_theta
+        };
+    }
+
+    calculateCosSinAngle(vector1, vector2) {
+        const dotProduct = vector1.dot(vector2);
+        const magnitudeProduct = vector1.length() * vector2.length();
+
+        const cosAngle = dotProduct / magnitudeProduct;
+        const sinAngle = vector1.cross(vector2) / magnitudeProduct;
+
+        return {
+            cos_angle: cosAngle,
+            sin_angle: sinAngle
+        };
+    }
+    // function that cast Cast 5 rays in 180 degree arc in front of the spaceship and returns an array of distances to the nearest asteroids
+    getRayDistances(asteroids, numRays = numRadarRays, rayAngle = Math.PI, rayLength = 1000) {
+        const rayDistances = [];
+
+        for (let i = 0; i < numRays; i++) {
+            // Calculate the angle of the spaceship's body
+            let bodyAngle = this.rigidBody.angle;
+            bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
+            // Calculate the current ray
+            const angle = bodyAngle - rayAngle / 2 + (rayAngle / (numRays - 1)) * i;
+            const rayDirection = new Vector(Math.cos(angle), Math.sin(angle));
+            const ray = {
+                start: this.rigidBody.position,
+                end: this.rigidBody.position.add(rayDirection.multiply(rayLength))
+            };
+            let minDistance = Infinity;
+
+            for (let asteroid of asteroids) {
+                const intersection = asteroid.polygon.getNearestRayIntersection(ray);
+                if (intersection) {
+                    //drawPoint(intersection.point);
+                    const distance = this.rigidBody.position.distanceTo(intersection.point);
+
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                    }
+                }
+            }
+
+            if (minDistance == Infinity) {
+                minDistance = rayLength;
+            }
+
+            rayDistances.push(minDistance / rayLength);
+        }
+
+        return rayDistances;
+    }
+
+    calculateStates(target, asteroids) {
         if (this.neuralNetwork.isDead)
             return;
 
+        // Calculate the vector pointing from the spaceship to the target
+        const deltaTarget = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
 
-        const spaceshipState = [this.rigidBody.position.x / canvas.width, (canvas.height - this.rigidBody.position.y) / canvas.height, this.rigidBody.angle % (Math.PI * 2), this.rigidBody.velocity.x,  this.rigidBody.velocity.y];
+        // Calculate the angle of the spaceship's body
+        let bodyAngle = this.rigidBody.angle;
+        bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
+        const headingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
+
+        // Calculate the cosine and sine of the angle between the spaceship's heading and the target direction
+        const targetAngle = this.calculateCosSinAngle(deltaTarget, headingDirection);
 
 
-        const distanceVector = new Vector((target.x - this.rigidBody.position.x) / canvas.width, (target.y - this.rigidBody.position.y) / canvas.height);
-        const targetAngle = distanceVector.angle();
+        let r;
+        if (this.startDistance)
+            r = deltaTarget.length() / this.startDistance;
+        else
+            r = 1;
 
-        const inputs = [...spaceshipState, distanceVector.length(), targetAngle.cos_angle, targetAngle.sin_angle];
+        // Store the initial target distance for normalization
+        if (!this.startDistance)
+            this.startDistance = deltaTarget.length();
 
-        const [thrust, rotationAccel] = this.neuralNetwork.apply(inputs);
-        this.rigidBody.applyTorque((rotationAccel - 0.5) * 2 * maxRotationAccel);
-        this.thrust = thrust * maxThrustPower;
+        // Calculate the velocity in polar coordinates
+        const dr_dt = this.compute_dr_dt(-deltaTarget.x, -deltaTarget.y, this.rigidBody.velocity.x, this.rigidBody.velocity.y);
+        const dtheta_dt = this.compute_dtheta_dt(-deltaTarget.x, -deltaTarget.y, this.rigidBody.velocity.x, this.rigidBody.velocity.y);
+        const velocity = this.velocityInPolarCoordinates(r, dr_dt, dtheta_dt);
 
+        // Find the nearest asteroid and calculate the angle and distance to it
+        let radar = this.getRayDistances(asteroids, numRadarRays);
+
+        // Gather the spaceship states including position, velocity, target information, and asteroid information
+        const spaceshipStates = [
+            Math.cos(this.rigidBody.angle), // x-component of spaceship's body angle
+            Math.sin(this.rigidBody.angle), // y-component of spaceship's body angle
+            this.rigidBody.angularVelocity / maxAngularVelocity, // normalized angular velocity
+            r, // normalized target distance
+            velocity.v_r, // radial velocity
+            velocity.v_theta, // angular velocity
+            targetAngle.cos_angle, // cosine of angle between heading and target direction
+            targetAngle.sin_angle, // sine of angle between heading and target direction
+            ...radar // normalized distances to nearest asteroids
+        ];
+
+        return spaceshipStates;
+    }
+
+
+
+    applyNeuralNetwork() {
+
+        let inputs = this.spaceshipStates;
+        const [thrust, angularAcceleration] = this.neuralNetwork.predict(inputs);
+
+        // Update thrustDirection based on the new orientation
+        this.angularAcceleration = (angularAcceleration - 0.5) * 2 * maxRotationAccel;
+        this.thrust = (thrust - 0.5) * 2 * maxThrustPower;
 
         let now = performance.now();
         if (!this.startTime)
             this.startTime = now;
 
-            
-        this.startTimeReached = 0;
+
         let deltaTime = now - this.startTime;
-        if (deltaTime > 30000) {
+        if (deltaTime > deathTimer) {
             this.die();
         }
     }
@@ -407,29 +675,31 @@ class Lander {
 
             if (nearestPoint) {
                 this.rigidBody.resolveCollision(asteroid.rigidBody);
+                this.neuralNetwork.currentFitness -= 1000;
             }
         }
     }
 
     // For navigation
-    getNearestAsteroidPoint(asteroid) {
+    getNearestAsteroidPoint(asteroids) {
         let nearestPoint = null;
         let minDistance = Infinity;
 
+        for (let asteroid of asteroids) {
+            for (let i = 0; i < asteroid.polygon.vertices.length; i++) {
+                const asteroidPoint = asteroid.polygon.vertices[i];
+                let position = new Vector(this.rigidBody.position.x, this.rigidBody.position.y);
+                const distance = position.distanceTo(asteroidPoint);
 
-        for (let i = 0; i < asteroid.vertices.length; i++) {
-            const asteroidPoint = asteroid.vertices[i];
-            let position = new Vector(this.rigidBody.position.x, this.rigidBody.position.y);
-            const distance = position.distanceTo(asteroidPoint);
-
-            if (distance < minDistance) {
-                minDistance = distance;
-                nearestPoint = asteroidPoint;
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestPoint = asteroidPoint;
+                }
             }
         }
 
         return nearestPoint;
     }
-    
+
 
 }

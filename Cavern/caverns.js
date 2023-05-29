@@ -1,87 +1,96 @@
-const CANVAS_SIZE = 800;
-const TILE_SIZE = 10;
-const CHANCE_TO_START_ALIVE = 0.4;
-
-let canvas = document.getElementById('canvas');
-let context = canvas.getContext('2d');
-
-// Initialize a 2D array
-let cells = new Array(CANVAS_SIZE / TILE_SIZE);
-for(let i = 0; i < cells.length; i++) {
-    cells[i] = new Array(CANVAS_SIZE / TILE_SIZE);
-}
-
-function initialize() {
-    for(let x = 0; x < cells.length; x++) {
-        for(let y = 0; y < cells[0].length; y++) {
-            cells[x][y] = Math.random() < CHANCE_TO_START_ALIVE ? 1 : 0;
-        }
+class CaveGenerator {
+    constructor(width, height, fillProbability, birthLimit, deathLimit, steps) {
+        this.width = width;
+        this.height = height;
+        this.fillProbability = fillProbability;
+        this.birthLimit = birthLimit;
+        this.deathLimit = deathLimit;
+        this.steps = steps;
     }
-}
 
-function doSimulationStep() {
-    let newCells = JSON.parse(JSON.stringify(cells)); // Copy the array
+    generateMap() {
+        let map = this.createRandomMap();
 
-    for(let x = 0; x < cells.length; x++) {
-        for(let y = 0; y < cells[0].length; y++) {
-            let aliveNeighbours = countAliveNeighbours(x, y);
+        for (let i = 0; i < this.steps; i++) {
+            map = this.doSimulationStep(map);
+        }
 
-            if(cells[x][y]) {
-                if(aliveNeighbours < 2 || aliveNeighbours > 3) {
-                    newCells[x][y] = 0;
+        return map;
+    }
+
+    createRandomMap() {
+        let map = new Array(this.height);
+        for (let y = 0; y < this.height; y++) {
+            map[y] = new Array(this.width);
+            for (let x = 0; x < this.width; x++) {
+                map[y][x] = Math.random() < this.fillProbability ? 1 : 0;
+            }
+        }
+        return map;
+    }
+
+    doSimulationStep(map) {
+        let newMap = new Array(this.height);
+        for (let y = 0; y < map.length; y++) {
+            newMap[y] = new Array(this.width);
+            for (let x = 0; x < map[0].length; x++) {
+                let nbs = this.countAliveNeighbors(map, x, y);
+                if (map[y][x] === 1) {
+                    newMap[y][x] = nbs < this.deathLimit ? 0 : 1;
                 } else {
-                    newCells[x][y] = 1;
-                }
-            } else {
-                if(aliveNeighbours == 3) {
-                    newCells[x][y] = 1;
+                    newMap[y][x] = nbs > this.birthLimit ? 1 : 0;
                 }
             }
         }
+        return newMap;
     }
 
-    cells = newCells;
-}
-
-function countAliveNeighbours(x, y) {
-    let count = 0;
-    for(let i = -1; i < 2; i++) {
-        for(let j = -1; j < 2; j++) {
-            let neighbourX = x + i;
-            let neighbourY = y + j;
-
-            if(i == 0 && j == 0) {
-                // Do nothing for the current cell
-            } else if(neighbourX < 0 || neighbourY < 0 || neighbourX >= cells.length || neighbourY >= cells[0].length) {
-                count++;
-            } else if(cells[neighbourX][neighbourY]) {
-                count++;
+    countAliveNeighbors(map, x, y) {
+        let count = 0;
+        for (let i = -1; i < 2; i++) {
+            for (let j = -1; j < 2; j++) {
+                let neighbourX = x + i;
+                let neighbourY = y + j;
+                if (i === 0 && j === 0) {
+                    // Do nothing for the center cell.
+                } else if (neighbourX < 0 || neighbourY < 0 || neighbourX >= this.width || neighbourY >= this.height) {
+                    // Count out-of-bounds as alive.
+                    count = count + 1;
+                } else if (map[neighbourY][neighbourX] === 1) {
+                    // Count alive cells.
+                    count = count + 1;
+                }
             }
         }
+        return count;
     }
 
-    return count;
+
+    
 }
 
-function drawCells() {
-    context.fillStyle = 'black';
-    context.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    context.fillStyle = 'white';
 
-    for(let x = 0; x < cells.length; x++) {
-        for(let y = 0; y < cells[0].length; y++) {
-            if(cells[x][y]) {
-                context.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-            }
+function drawCave(context, map, cellSize) {
+    // Clear the canvas before drawing.
+    context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+
+    // Set colors for the cave and free space.
+    const colors = {
+        '1': '#000', // Color for the cave walls.
+        '0': '#fff'  // Color for the free space.
+    };
+
+    for (let y = 0; y < map.length; y++) {
+        for (let x = 0; x < map[0].length; x++) {
+            context.fillStyle = colors[map[y][x]];
+            context.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
         }
     }
 }
 
-function update() {
-    doSimulationStep();
-    drawCells();
-    requestAnimationFrame(update);
-}
+const canvas = document.getElementById('cavernCanvas');
+const context = canvas.getContext('2d');
 
-initialize();
-update();
+let generator = new CaveGenerator(800, 600, 0.4, 4, 3, 1);
+let map = generator.generateMap();
+drawCave(context, map, 1);

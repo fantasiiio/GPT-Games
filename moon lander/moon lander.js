@@ -3,9 +3,19 @@ const canvas = document.getElementById('gameCanvas');
 
 const ctx = canvas.getContext('2d');
 
+let enableManualControl = false;
+let landers = [];
+let targets = [];
+let asteroids = [];
+let asteroidsCount = 10;
+let targetCount = 1
+const populationCount = enableManualControl ? 1 : 100;
+let targetRadius = 200;
+let numRadarRays = 5;
+
 const mountainResolution = 0.005;
 const mountainHeightFactor = 0.4;
-const maxYOffset = 1.5;
+const maxYOffset = 3.5;
 let fireworksV1 = [];
 let fireworks = [];
 let explosion = null;
@@ -26,21 +36,51 @@ const refuelSound = new Audio('boost-100537.mp3');
 // Create gas tanks array
 let gasTanks = [];
 
+const saveGenerationBtn = document.getElementById('saveGenerationBtn');
+const skipGenerationBtn = document.getElementById('skipGenerationBtn');
+const stopShipBtn = document.getElementById('stopShipBtn');
+const numberOfTargets = document.getElementById('numberOfTargets');
+const numberOfStarship = document.getElementById('numberOfStarship');
 
+numberOfTargets.value = targetCount;
+numberOfStarship.value = populationCount;
 
+numberOfStarship.addEventListener('change', () => {
+    populationCount = numberOfStarship.value;
+})
 
-const gravity = 0.01;
-const maxThrustPower = 0.05;
+numberOfTargets.addEventListener('change', () => {
+    targetCount = numberOfTargets.value;
+    generateTargets();
+})
+saveGenerationBtn.addEventListener('click', () => {
+    geneticAlgorithm.savePopulation()
+    alert("saved")
+});
+
+skipGenerationBtn.addEventListener('click', () => {
+    killAll();
+});
+
+stopShipBtn.addEventListener('click', () => {
+    landers[0].rigidBody.velocity = new Vector(0, 0);
+    landers[0].rigidBody.angularVelocity = 0;
+});
+
+const deathTimer = Number.MAX_SAFE_INTEGER;
+const gravity = 0.0;
+const maxThrustPower = 0.1;
+const maxSideThrustPower = 0.05;
 const landingSpeed = 1;
 const maxAngularVelocity = 0.1;
-const maxRotationAccel = 0.05;
+const maxRotationAccel = 0.002;
 const FuelConsumption_thrust = 0.25;
 const FuelConsumption_rotate = 0.05;
 let score = 0;
-let zoomLevel = 0.5;
+let zoomLevel = 0.25;
 
 let platform = {
-    x: Math.random() * (canvas.width - 200) + 100,
+    x: (Math.random() * (canvas.width - 200) + 100) / zoomLevel,
     y: canvas.height / zoomLevel - 50,
     width: 200,
     height: 10
@@ -59,6 +99,47 @@ document.addEventListener('keyup', (e) => {
     keys[e.code] = false;
 });
 
+
+function saveSettings() {
+    localStorage.setItem('moonLanderSettings', JSON.stringify({
+        mountainResolution,
+        mountainHeightFactor,
+        maxYOffset,
+        gasTankAmount,
+        targetCount,
+        populationCount,
+        deathTimer,
+        gravity,
+        maxThrustPower,
+        landingSpeed,
+        maxAngularVelocity,
+        maxRotationAccel,
+        FuelConsumption_thrust,
+        FuelConsumption_rotate,
+        zoomLevel
+    }));
+}
+
+function loadSettings() {
+    const settings = JSON.parse(localStorage.getItem('moonLanderSettings'));
+    if (settings) {
+        mountainResolution = settings.mountainResolution;
+        mountainHeightFactor = settings.mountainHeightFactor;
+        maxYOffset = settings.maxYOffset;
+        gasTankAmount = settings.gasTankAmount;
+        targetCount = settings.targetCount;
+        populationCount = settings.populationCount;
+        deathTimer = settings.deathTimer;
+        gravity = settings.gravity;
+        maxThrustPower = settings.maxThrustPower;
+        landingSpeed = settings.landingSpeed;
+        maxAngularVelocity = settings.maxAngularVelocity;
+        maxRotationAccel = settings.maxRotationAccel;
+        FuelConsumption_thrust = settings.FuelConsumption_thrust;
+        FuelConsumption_rotate = settings.FuelConsumption_rotate;
+        zoomLevel = settings.zoomLevel;
+    }
+}
 
 function drawFuelBar() {
     const fuelBarHeight = 20;
@@ -126,14 +207,14 @@ function clearCanvas(canvas, context, color) {
     context.fillStyle = color;
     context.fillRect(0, 0, canvas.width, canvas.height);
 }
-let terrain = new Terrain(canvas.width * 2, canvas.height * 2, mountainResolution, mountainHeightFactor, maxYOffset);
+let terrain = new Terrain(canvas.width / zoomLevel, canvas.height / zoomLevel, mountainResolution, mountainHeightFactor, maxYOffset);
 terrain.generateTerrain();
 
 // Init Genetic Algorithm
 function initGeneticAlgorithm(populationSize) {
     //const populationSize = 50;
-    const inputSize = 8;
-    const hiddenSize = 5;
+    const inputSize = 8 + numRadarRays;
+    const hiddenSize = 6;
     const outputSize = 2;
     const mutationRate = 0.1;
     const maxGenerations = 1000;
@@ -141,7 +222,7 @@ function initGeneticAlgorithm(populationSize) {
     const expectedOutputs = []; // Vous pouvez ajouter des sorties attendues spécifiques ici
     let population = [];
     for (let i = 0; i < populationSize; i++) {
-        const neuralNetwork = new NeuralNetwork(inputSize, hiddenSize, outputSize);
+        const neuralNetwork = new NeuralNetwork2([inputSize, hiddenSize, outputSize]);
         population.push(neuralNetwork);
     }
     const ga = new GeneticAlgorithm(
@@ -157,23 +238,19 @@ function initGeneticAlgorithm(populationSize) {
 
     return ga;
 }
-let landers = [];
-let targets = [];
-let asteroids = [];
-let asteroidsCount = 0;
-let targetCount = 1;
+
 
 
 function generateObjectPositions(positionsCount, minDistance = 500, maxDistance = 5000) {
     let positions = [];
 
-    if(positionsCount == 0)
+    if (positionsCount == 0)
         return;
     // Add first positions
     let center = new Vector(200 + Math.random() * (canvas.width / zoomLevel - 200), 200 + Math.random() * (canvas.height / zoomLevel / 3 * 2 - 200))
     positions.push(new Vector(center.x, center.y));
 
-    for (let i = 0; i < positionsCount; i++) {
+    for (let i = 0; i < positionsCount-1; i++) {
         let newPositions = null;
 
         // Try up to 100 times to find a valid position for a new positions.
@@ -210,19 +287,22 @@ function generateObjectPositions(positionsCount, minDistance = 500, maxDistance 
 }
 
 
-function generateAsteroids(){
-    if(asteroidsCount == 0)
+function generateAsteroids() {
+    if (asteroidsCount == 0)
         return;
+
+    asteroids.length = 0;
     let positions = generateObjectPositions(asteroidsCount);
-    for(let position of positions){
-        let asteroid = new Asteroid(position, 100);
+    for (let position of positions) {
+        let asteroid = new Asteroid(position, Math.random()*400+ 100);
         asteroids.push(asteroid);
     }
 }
 
-function generateTargets(){
+function generateTargets() {
     let positions = generateObjectPositions(targetCount);
     targets = positions;
+    // targets = [{x: canvas.width / 2 / zoomLevel, y: canvas.height / 4 / zoomLevel}];
 }
 
 let populationCreated = false;
@@ -230,7 +310,7 @@ let populationCreated = false;
 function restart(newPopulation) {
     populationCreated = false;
     //generateTargets();
-    generateAsteroids();
+    //generateAsteroids();
     for (let i = 0; i < newPopulation.length; i++) {
         landers[i].neuralNetwork = newPopulation[i];
         landers[i].neuralNetwork.isDead = false;
@@ -239,7 +319,6 @@ function restart(newPopulation) {
     populationCreated = true;
 }
 
-const populationCount = 100;
 let geneticAlgorithm = initGeneticAlgorithm(populationCount);
 geneticAlgorithm.onNewGenerationCreatedFn = (newPopulation) => {
     restart(newPopulation);
@@ -251,22 +330,36 @@ geneticAlgorithm.run(bestIndividual => {
 
 
 for (let i = 0; i < populationCount; i++) {
-    const lander = new Lander(canvas.width / 2, 50, geneticAlgorithm.population[i]);
+    const lander = new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel, geneticAlgorithm.population[i]);
     landers.push(lander);
 }
 
-let mousePosition = new Vector(0, 0);
+
 
 canvas.addEventListener('mousemove', (event) => {
-    mousePosition.x = event.clientX;
-    mousePosition.y = event.clientY;
+    let mousePosition = new Vector(0, 0);
+    mousePosition.x = (event.clientX) / zoomLevel - pan.x - 30;
+    mousePosition.y = (event.clientY) / zoomLevel - pan.y - 30;
+    if (targetFound) {
+        targetFound.x = mousePosition.x;
+        targetFound.y = mousePosition.y;
+    } else if (asteroidFound) {
+        asteroidFound.rigidBody.position.x = mousePosition.x;
+        asteroidFound.rigidBody.position.y = mousePosition.y;
+    } else if (panning) {
+        panEvent(event);
+    }
+
 });
 
 function changeAllTarget(mousePosition) {
     for (let lander of landers) {
         lander.target = null;
     }
-    targets[0] = {x:mousePosition.x/zoomLevel, y:mousePosition.y/zoomLevel};
+    targets[0] = {
+        x: mousePosition.x / zoomLevel,
+        y: mousePosition.y / zoomLevel
+    };
 }
 
 function killAll() {
@@ -274,12 +367,82 @@ function killAll() {
         lander.die()
     }
 }
+
+let targetFound = null;
+let asteroidFound = null;
+let panning = false;
+
 canvas.addEventListener('mousedown', (event) => {
-    mousePosition.x = event.clientX;
-    mousePosition.y = event.clientY;
-    changeAllTarget(mousePosition);
+    let mousePosition = new Vector(0, 0);
+    mousePosition.x = (event.clientX) / zoomLevel - pan.x - 30;
+    mousePosition.y = (event.clientY) / zoomLevel - pan.y - 30;
+    if (event.button == 1) {
+        panning = true;
+    } else if (event.button == 0) {
+        // check if the mouse is in a target circle
+        targetFound = null;
+        for (let i = 0; i < targetCount; i++) {
+            let distance = Math.sqrt(Math.pow(targets[i].x - mousePosition.x, 2) + Math.pow(targets[i].y - mousePosition.y, 2));
+            if (distance < targetRadius) {
+                targetFound = targets[i];
+                return;
+            }
+        }
+
+        asteroidFound = null;
+        for (let i = 0; i < asteroidsCount; i++) {
+            if(asteroids[i].polygon.isPointInside(mousePosition)){
+                asteroidFound = asteroids[i];
+                return;
+            }
+        }
+
+    }
+    //changeAllTarget(mousePosition);
 });
 
+canvas.addEventListener('mouseup', (event) => {
+    targetFound = null;
+    asteroidFound = null;
+    lastCursorX = null;
+    lastCursorY = null;
+    panning = false;
+});
+
+
+let lastCursorX = null;
+let lastCursorY = null;
+let pan = {
+    x: 0,
+    y: 0
+};
+
+function panEvent(event) {
+    event.preventDefault()
+
+    pan.x += event.movementX / zoomLevel;
+    pan.y += event.movementY / zoomLevel;
+}
+
+function zoom(event) {
+    event.preventDefault();
+
+    const scaleFactor = 1.1;
+    const zoomFactor = event.deltaY < 0 ? scaleFactor : 1 / scaleFactor;
+
+    const mousePosBefore = new Vector(event.clientX / zoomLevel - pan.x, event.clientY / zoomLevel - pan.y);
+    zoomLevel *= zoomFactor;
+    const mousePosAfter = new Vector(event.clientX / zoomLevel - pan.x, event.clientY / zoomLevel - pan.y);
+    
+    pan.x = pan.x + mousePosAfter.x - mousePosBefore.x;
+    pan.y = pan.y + mousePosAfter.y - mousePosBefore.y;
+}
+
+// Add an event listener for the wheel event
+canvas.addEventListener('wheel', (event) => {
+    event.preventDefault(); // Prevent the default scrolling behavior
+    zoom(event);
+});
 
 geneticAlgorithm.loadPopulation()
 
@@ -309,13 +472,44 @@ function drawTarget(position, size, index) {
 
     // Draw circle
     ctx.beginPath();
-    ctx.arc(position.x, position.y, size, 0, 2 * Math.PI);
+    ctx.arc(position.x, position.y, size - 50, 0, 2 * Math.PI);
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
     ctx.stroke();
 }
 generateTargets();
 generateAsteroids();
+
+function updateLanderManually(lander) {
+
+    if (keys['ArrowLeft']) {
+        lander.rigidBody.angularVelocity -= maxRotationAccel;
+    }
+    if (keys['ArrowRight']) {
+        lander.rigidBody.angularVelocity += maxRotationAccel;
+    }
+    if (!keys['ArrowLeft'] && !keys['ArrowRight']) {
+        //lander.rigidBody.angularVelocity = 0;
+    }
+    if (keys['ArrowUp']) {
+        lander.thrust = maxThrustPower;
+    } else {
+        lander.thrust = 0;
+    }
+}
+
+//let predictionModel = new NeuralNetwork2([10, 8, 8]);
+function drawPoint(point) {
+    let color;
+    color = 'white';
+
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 10, 0, 2 * Math.PI, false);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.closePath();
+}
+
 function gameLoop() {
     if (!gameLoop.debounced) {
         gameLoop.debounced = true;
@@ -325,14 +519,13 @@ function gameLoop() {
             if (!populationCreated)
                 requestAnimationFrame(gameLoop);
 
-            if (keysPressed["keyS"])
+            if (keysPressed["KeyS"])
                 geneticAlgorithm.savePopulation();
-            if (keysPressed["Enter"])
-                killAll();
             //ctx.clearRect(0, 0, canvas.width, canvas.height);
             clearCanvas(canvas, ctx, '#03002e');
             ctx.save();
             ctx.scale(zoomLevel, zoomLevel);
+            ctx.translate(pan.x, pan.y);
             terrain.draw(ctx);
             drawGasTanks(); // Draw the gas tanks on the mountain
             for (let i = 0; i < asteroidsCount; i++) {
@@ -340,19 +533,34 @@ function gameLoop() {
                 asteroids[i].getPolygon();
                 asteroids[i].draw();
             }
-
+            let index = 0;
+            let inputArrays = [];
+            let targetArrays = [];
             for (let lander of landers) {
                 if (!lander.neuralNetwork.isDead) {
                     if (!lander.target || lander.checkTargetReached(lander.target)) {
-                        lander.changeTarget(targets[lander.targetIndex]);
-                        // if (lander.targetIndex < targets.length-1)
-                        //     lander.targetIndex++;
+                         if (!lander.target || targets.length > 1) {
+                            if(targets.length > 1)
+                                lander.neuralNetwork.currentFitness += 5000;
+                            lander.changeTarget(targets[lander.targetIndex++]);
+                            lander.targetIndex %= targets.length;
+                        }
                     }
-                    lander.calculateFitness(lander.target)
-                    lander.applyNeuralNetwork(lander.target); // Update the neural network input 
+
+                    lander.updateLander(asteroids);
+                    if (index == 0 && enableManualControl) {
+                        updateLanderManually(lander);
+                    } else {
+                        lander.applyNeuralNetwork(lander.target); // Update the neural network input
+                    }
 
                     if (!lander.landed) {
-                        lander.updateLander();
+
+
+                        inputArrays.push(lander.lastSpaceshipStates);
+                        targetArrays.push(lander.spaceshipStates.slice(0, lander.spaceshipStates.length - 2));
+
+                        lander.calculateFitness(lander.target, null)
                         lander.refuelLander(terrain); // Check if the lander is refueling
                         lander.checkLanding();
                     }
@@ -361,10 +569,13 @@ function gameLoop() {
                         lander.handleAsteroidCollision(asteroids[i]);
                     }
                 }
+                index++;
             }
 
+            //predictionModel.trainBatch(inputArrays, targetArrays);
+
             for (let i = 0; i < targetCount; i++) {
-                drawTarget(targets[i], 50, i);
+                drawTarget(targets[i], targetRadius, i);
             }
 
             drawFuelBar();

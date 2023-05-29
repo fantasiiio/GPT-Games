@@ -306,19 +306,20 @@ class Track {
 
     zoom(event) {
         event.preventDefault();
+    
         const scaleFactor = 1.1;
         const zoomFactor = event.deltaY < 0 ? scaleFactor : 1 / scaleFactor;
-
-        const rect = canvas.getBoundingClientRect();
-        let squareX = Math.floor(((event.clientX - rect.left - this.pan.x) / this.zoomLevel) / this.squareSize);
-        let squareY = Math.floor(((event.clientY - rect.top - this.pan.y) / this.zoomLevel) / this.squareSize);
-
+    
+        const mousePosBefore = new Vector(event.clientX / this.zoomLevel - this.pan.x, event.clientY / this.zoomLevel - this.pan.y);
         this.zoomLevel *= zoomFactor;
-        this.pan.x = canvas.width / 2 - squareX * 500 * this.zoomLevel; //;
-        this.pan.y = canvas.height / 2 - squareY * 500 * this.zoomLevel; // - Math.floor(((event.clientY - rect.top - this.pan.y) / this.zoomLevel) / this.squareSize) * 500 * this.zoomLevel;
+        const mousePosAfter = new Vector(event.clientX / this.zoomLevel - this.pan.x, event.clientY / this.zoomLevel - this.pan.y);
+        
+        this.pan.x = this.pan.x - (mousePosBefore.x - mousePosAfter.x);
+        this.pan.y = this.pan.y - (mousePosBefore.y - mousePosAfter.y);
 
-        this.redraw();
+        this.redraw();        
     }
+
 
     drawFPS() {
         this.ctx.fillStyle = 'black';

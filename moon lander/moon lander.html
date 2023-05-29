@@ -10,7 +10,28 @@
 </head>
 
 <body>
-    <canvas id="gameCanvas" width="1200" height="1000"></canvas>
+    <div style="display: flex;">
+        <canvas id="gameCanvas" width="1200" height="1000"></canvas>
+        <div>
+            <div>
+                <button id="saveGenerationBtn">Save Generation</button>
+            </div>
+            <div>
+                <button id="skipGenerationBtn">Skip Generation</button>
+            </div>
+            <div>
+                <button id="stopShipBtn">Stop Ship</button>
+            </div>
+            <div>
+                <div>Number of targets</div>
+                <input id="numberOfTargets" type="number" />
+            </div>
+            <div>
+                <div>Number of starship</div>
+                <input id="numberOfStarship" type="number"/>
+            </div>
+        </div>
+    </div>
     <script src="classes/Explosion.js"></script>
     <script src="classes/Firework2.js"></script>
     <script src="classes/Terrain.js"></script>
@@ -22,7 +43,8 @@
     <script src="classes/IntersectionUtil.js"></script>
     <script src="classes/Asteroid.js"></script>
     <script src="classes/GeneticAlgorithm.js"></script>
-    <script src="classes/NeuralNetwork.js"></script>
+    <script src="classes/Matrix.js"></script>
+    <script src="classes/NeuralNetwork2.js"></script>
     <script src="moon lander.js"></script>
 </body>
 

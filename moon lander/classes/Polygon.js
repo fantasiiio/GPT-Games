@@ -79,8 +79,27 @@ class Polygon {
         return new Polygon(outputList);
     }
 
+    // Returns the nearest intersection points between this and line
+    getNearestRayIntersection(ray) {
+        let nearestPoint = null;
+        let nearestDistance = Infinity;
+        for (let i = 0; i < this.vertices.length; i++) {
+            const p1 = this.vertices[i];
+            const p2 = i === this.vertices.length - 1 ? this.vertices[0] : this.vertices[i + 1];
+            const intersection = IntersectionUtil.lineIntersection(p1, p2, ray.start, ray.end);
+            if (intersection) {
+                let distance = intersection.point.distanceTo(ray.start);
+                if (distance < nearestDistance) {
+                    nearestPoint = intersection;
+                    nearestDistance = distance;
+                }
+            }
 
+        }
+        return nearestPoint;
+    }
 
+    //
     inside(point, cp1, cp2) {
         return (cp2.x - cp1.x) * (point.y - cp1.y) > (cp2.y - cp1.y) * (point.x - cp1.x);
     }
@@ -94,6 +113,7 @@ class Polygon {
         return new Vector((n1 * dp.x - n2 * dc.x) * n3, (n1 * dp.y - n2 * dc.y) * n3);
     }
 
+    // Returns the nearest intersection point between this and poly2
     getNearestIntersection(poly2) {
         let nearestPoint = null;
         let nearestDistance = Infinity;
@@ -128,6 +148,7 @@ class Polygon {
         return nearestPoint;
     }
 
+
     createRectangleFromPolygon() {
         let minX = Number.MAX_VALUE;
         let minY = Number.MAX_VALUE;
@@ -156,4 +177,24 @@ class Polygon {
 
         return rectangle;
     }
+
+    isPointInside(point) {
+        const vertices = this.vertices;
+        let inside = false;
+        for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+          const xi = vertices[i].x;
+          const yi = vertices[i].y;
+          const xj = vertices[j].x;
+          const yj = vertices[j].y;
+    
+          const intersect =
+            yi > point.y !== yj > point.y &&
+            point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
+    
+          if (intersect) inside = !inside;
+        }
+    
+        return inside;
+      }
+    
 }

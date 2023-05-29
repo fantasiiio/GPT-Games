@@ -11,6 +11,7 @@ class GeneticAlgorithm {
         this.expectedOutputs = expectedOutputs;
         this.onNewGenerationCreatedFn = onNewGenerationCreatedFn;
         this.bestIndividual = null;
+        this.generationCount = 0;
     }
 
     allIndividualsDead() {
@@ -20,6 +21,7 @@ class GeneticAlgorithm {
     run(callback) {
 
         const runGeneration = (generation) => {
+            this.generationCount = generation;
             if (generation >= this.maxGenerations) {
                 callback(this.population);
                 return;
@@ -28,25 +30,24 @@ class GeneticAlgorithm {
             const checkPopulation = () => {
                 // find best population based on it's currentFitness that is not dead
                 this.bestIndividual = null;
+                this.population.sort((a, b) => b.currentFitness - a.currentFitness);
+                this.population[0].isBest = true;
+                this.bestIndividual = this.population[0];
+
                 for (let i = 0; i < this.population.length; i++) {
                     const neuralNetwork = this.population[i];
-                    neuralNetwork.isBest = false;
-                    if (!neuralNetwork.isDead) {
-                        if (neuralNetwork.currentFitness > ((this.bestIndividual || {}).currentFitness || 0)) {
-                            this.bestIndividual = neuralNetwork;
-                        }
-                    }
+                    neuralNetwork.positionNumber = i + 1;
+                    if (!neuralNetwork.isDead)
+                        this.bestIndividual = neuralNetwork;
                 }
-                if (this.bestIndividual)
-                    this.bestIndividual.isBest = true;
                 if (!this.restart && !this.bestSolutionFound) {
                     if (this.allIndividualsDead()) {
-                        this.population.sort((a, b) => b.currentFitness - a.currentFitness);
-                        console.log(`G\xE9n\xE9ration ${generation}: Meilleure fitness = ${this.population[0].currentFitness}`);
+                        //this.savePopulation();
+                        console.log(`G\xE9n\xE9ration ${this.generationCount}: Meilleure fitness = ${this.population[0].currentFitness}`);
 
                         this.population = this.createNewGeneration();
                         this.onNewGenerationCreatedFn(this.population);
-                        runGeneration(generation + 1);
+                        runGeneration(this.generationCount + 1);
                     } else {
                         requestAnimationFrame(checkPopulation);
                     }
@@ -66,10 +67,10 @@ class GeneticAlgorithm {
 
     selectParents() {
         let selectOne = () => {
-            const tournamentSize = 3; // Adjust this value to control the selection pressure
+            const tournamentSize = 5; // Adjust this value to control the selection pressure
             const selected = [];
             for (let i = 0; i < tournamentSize; i++) {
-                const randomIndex = Math.floor(Math.random() * Math.max(10, this.population.length * 0.1));
+                const randomIndex = Math.floor(Math.random() * this.population.length-1);
                 selected.push(this.population[randomIndex]);
             }
             return selected.sort((a, b) => b.currentFitness - a.currentFitness)[0];
@@ -84,9 +85,9 @@ class GeneticAlgorithm {
 
     createNewGeneration() {
         const newGeneration = [];
-        if(this.population.length < 3)
+        if (this.population.length < 3)
             return this.population;
-            
+
         for (let i = 0; i < this.population.length; i++) {
             const parents = this.selectParents();
             const childNetwork = parents[0].crossover(parents[1]);
@@ -97,21 +98,38 @@ class GeneticAlgorithm {
     }
 
     savePopulation() {
-        localStorage.setItem('bestSolutionFound', confirm('Est-ce que l\'\xC9volution est termin\xE9e?'));
+        //localStorage.setItem('bestSolutionFound', confirm('Est-ce que l\'\xC9volution est termin\xE9e?'));
         const json = JSON.stringify(this.population);
-        localStorage.setItem('population', json);
+        localStorage.setItem('generation' + this.generationCount, json);
     }
 
     loadPopulation() {
-        // kill all current individuals
-        this.restart = true;
+        let generationJson;
+        let maxGenerationNumber = 0;
+        for (const [key, value] of Object.entries(localStorage)) {
+            if (key.startsWith('generation')) {
+                let generationNumber = parseInt(key.replace('generation', ''));
+                if (generationNumber > maxGenerationNumber) {
+                    maxGenerationNumber = generationNumber;
+                    generationJson = value;
+                }
+            }
+        }
+        if (generationJson && confirm('Charger la population?')) {
+        this.generationCount = maxGenerationNumber;
+            
 
-        const json = localStorage.getItem('population');
-        if (json && confirm('Charger la population?')) {
+            this.restart = true;
             this.bestSolutionFound = localStorage.getItem('bestSolutionFound') === 'true';
-            const population = JSON.parse(json);
-            for (let i = 0; i < population.length; i++) {
+            const population = JSON.parse(generationJson);
+            for (let i = 0; i < Math.min(population.length, this.population.length); i++) {
                 Object.assign(this.population[i], population[i]);
+                
+                this.population[i].weights = this.population[i].weights.map(weightMatrix => Matrix.map(weightMatrix, x => x));
+                this.population[i].biases = this.population[i].biases.map(biasMatrix => Matrix.map(biasMatrix, x => x));
+                // this.population[i].addInputNeuron();
+                // this.population[i].addInputNeuron();
+                // this.population[i].addInputNeuron();
             }
             this.onNewGenerationCreatedFn(this.population);
         }
