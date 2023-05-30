@@ -9,6 +9,43 @@ class Polygon {
         }
     }
 
+    static createRectangle(x, y, width, height) {
+        const points = [{
+                x,
+                y
+            },
+            {
+                x: x + width,
+                y
+            },
+            {
+                x: x + width,
+                y: y + height
+            },
+            {
+                x,
+                y: y + height
+            }
+        ];
+
+        return new Polygon(points);
+    }
+
+    rotate(angle, center) {
+        for (let i = 0; i < this.vertices.length; i++) {
+            this.vertices[i] = this.rotatePoint(this.vertices[i], center, angle);
+        }
+    }
+
+    rotatePoint(point, center, angle) {
+        const rotatedX = center.x + (point.x - center.x) * Math.cos(angle) - (point.y - center.y) * Math.sin(angle);
+        const rotatedY = center.y + (point.x - center.x) * Math.sin(angle) + (point.y - center.y) * Math.cos(angle);
+        return {
+            x: rotatedX,
+            y: rotatedY
+        };
+    }
+
     calculateCenter() {
         let center = new Vector(0, 0);
         for (let i = 0; i < this.vertices.length; i++) {
@@ -41,18 +78,18 @@ class Polygon {
         return Math.abs(area) / 2;
     }
 
-    draw(context) {
+    draw() {
         if (this.vertices.length < 3) {
             return;
         }
-        context.strokeStyle = "blue";
-        context.beginPath();
-        context.moveTo(this.vertices[0].x, this.vertices[0].y);
+        ctx.strokeStyle = "blue";
+        ctx.beginPath();
+        ctx.moveTo(this.vertices[0].x, this.vertices[0].y);
         for (let i = 1; i < this.vertices.length; i++) {
-            context.lineTo(this.vertices[i].x, this.vertices[i].y);
+            ctx.lineTo(this.vertices[i].x, this.vertices[i].y);
         }
-        context.closePath();
-        context.stroke();
+        ctx.closePath();
+        ctx.stroke();
     }
 
     clip(otherPolygon) {
@@ -80,24 +117,30 @@ class Polygon {
     }
 
     // Returns the nearest intersection points between this and line
-    getNearestRayIntersection(ray) {
+    getNearestRayIntersection(ray, includeLastSegment = true) {
         let nearestPoint = null;
         let nearestDistance = Infinity;
-        for (let i = 0; i < this.vertices.length; i++) {
+
+        const lastVertexIndex = includeLastSegment ? this.vertices.length : this.vertices.length - 1;
+
+        for (let i = 0; i < lastVertexIndex; i++) {
             const p1 = this.vertices[i];
             const p2 = i === this.vertices.length - 1 ? this.vertices[0] : this.vertices[i + 1];
             const intersection = IntersectionUtil.lineIntersection(p1, p2, ray.start, ray.end);
+
             if (intersection) {
-                let distance = intersection.point.distanceTo(ray.start);
+                const distance = intersection.point.distanceTo(ray.start);
+
                 if (distance < nearestDistance) {
                     nearestPoint = intersection;
                     nearestDistance = distance;
                 }
             }
-
         }
+
         return nearestPoint;
     }
+
 
     //
     inside(point, cp1, cp2) {
@@ -114,32 +157,36 @@ class Polygon {
     }
 
     // Returns the nearest intersection point between this and poly2
-    getNearestIntersection(poly2) {
+    getNearestIntersection(poly2, includeLastSegment = true) {
         let nearestPoint = null;
         let nearestDistance = Infinity;
 
-        // Iterate through each edge of this
-        for (let i = 0; i < this.vertices.length; i++) {
-            const p1 = this.vertices[i];
-            const p2 = i === this.vertices.length - 1 ? this.vertices[0] : this.vertices[i + 1];
+        const lastVertexIndex = includeLastSegment ? this.vertices.length : this.vertices.length - 1;
 
-            // Iterate through each edge of poly2
-            for (let j = 0; j < poly2.vertices.length; j++) {
-                const p3 = poly2.vertices[j];
-                const p4 = j === poly2.vertices.length - 1 ? poly2.vertices[0] : poly2.vertices[j + 1];
+        for (let i = 0; i < lastVertexIndex; i++) {
+            // Iterate through each edge of this
+            for (let i = 0; i < this.vertices.length; i++) {
+                const p1 = this.vertices[i];
+                const p2 = i === this.vertices.length - 1 ? this.vertices[0] : this.vertices[i + 1];
 
-                // Find the intersection point between the two edges
-                const intersection = IntersectionUtil.lineIntersection(p1, p2, p3, p4);
+                // Iterate through each edge of poly2
+                for (let j = 0; j < poly2.vertices.length; j++) {
+                    const p3 = poly2.vertices[j];
+                    const p4 = j === poly2.vertices.length - 1 ? poly2.vertices[0] : poly2.vertices[j + 1];
 
-                // If there is an intersection
-                if (intersection) {
-                    // Calculate the distance between the intersection point and this
-                    const distance = intersection.point.distanceTo(p1);
+                    // Find the intersection point between the two edges
+                    const intersection = IntersectionUtil.lineIntersection(p1, p2, p3, p4);
 
-                    // Update the nearest point and distance if necessary
-                    if (distance < nearestDistance) {
-                        nearestPoint = intersection;
-                        nearestDistance = distance;
+                    // If there is an intersection
+                    if (intersection) {
+                        // Calculate the distance between the intersection point and this
+                        const distance = intersection.point.distanceTo(p1);
+
+                        // Update the nearest point and distance if necessary
+                        if (distance < nearestDistance) {
+                            nearestPoint = intersection;
+                            nearestDistance = distance;
+                        }
                     }
                 }
             }
@@ -182,19 +229,19 @@ class Polygon {
         const vertices = this.vertices;
         let inside = false;
         for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
-          const xi = vertices[i].x;
-          const yi = vertices[i].y;
-          const xj = vertices[j].x;
-          const yj = vertices[j].y;
-    
-          const intersect =
-            yi > point.y !== yj > point.y &&
-            point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
-    
-          if (intersect) inside = !inside;
+            const xi = vertices[i].x;
+            const yi = vertices[i].y;
+            const xj = vertices[j].x;
+            const yj = vertices[j].y;
+
+            const intersect =
+                yi > point.y !== yj > point.y &&
+                point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
+
+            if (intersect) inside = !inside;
         }
-    
+
         return inside;
-      }
-    
+    }
+
 }

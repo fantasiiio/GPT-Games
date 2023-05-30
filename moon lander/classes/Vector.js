@@ -72,6 +72,13 @@ class Vector {
             sin_angle: this.y / r
         };
     }
+
+    static angleBetweenVectors(vector1, vector2) {
+        const dotProduct = vector1.dot(vector2);
+        const magnitudeProduct = vector1.length() * vector2.length();
+        const angleInRadians = Math.acos(dotProduct / magnitudeProduct);
+        return angleInRadians;
+    }
 }
 
 Vector.intersection = function (p1, p2, p3, p4) {

@@ -30,7 +30,7 @@ class GeneticAlgorithm {
             const checkPopulation = () => {
                 // find best population based on it's currentFitness that is not dead
                 this.bestIndividual = null;
-                this.population.sort((a, b) => b.currentFitness - a.currentFitness);
+                //this.population.sort((a, b) => b.currentFitness - a.currentFitness);
                 this.population[0].isBest = true;
                 this.bestIndividual = this.population[0];
 
@@ -70,7 +70,7 @@ class GeneticAlgorithm {
             const tournamentSize = 5; // Adjust this value to control the selection pressure
             const selected = [];
             for (let i = 0; i < tournamentSize; i++) {
-                const randomIndex = Math.floor(Math.random() * this.population.length-1);
+                const randomIndex = Math.floor(Math.random() * this.population.length - 1);
                 selected.push(this.population[randomIndex]);
             }
             return selected.sort((a, b) => b.currentFitness - a.currentFitness)[0];
@@ -103,7 +103,7 @@ class GeneticAlgorithm {
         localStorage.setItem('generation' + this.generationCount, json);
     }
 
-    loadPopulation() {
+    loadPopulation2() {
         let generationJson;
         let maxGenerationNumber = 0;
         for (const [key, value] of Object.entries(localStorage)) {
@@ -116,15 +116,15 @@ class GeneticAlgorithm {
             }
         }
         if (generationJson && confirm('Charger la population?')) {
-        this.generationCount = maxGenerationNumber;
-            
+            this.generationCount = maxGenerationNumber;
+
 
             this.restart = true;
             this.bestSolutionFound = localStorage.getItem('bestSolutionFound') === 'true';
             const population = JSON.parse(generationJson);
             for (let i = 0; i < Math.min(population.length, this.population.length); i++) {
                 Object.assign(this.population[i], population[i]);
-                
+
                 this.population[i].weights = this.population[i].weights.map(weightMatrix => Matrix.map(weightMatrix, x => x));
                 this.population[i].biases = this.population[i].biases.map(biasMatrix => Matrix.map(biasMatrix, x => x));
                 // this.population[i].addInputNeuron();
