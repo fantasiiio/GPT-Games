@@ -1,9 +1,10 @@
 class Lander {
-    constructor(x, y, neuralNetwork = null) {
+    constructor(x, y, populationIndex) {
         this.retartPosition = {
             x,
             y
         };
+        this.populationIndex = populationIndex;
         this.thrust = 0;
         this.sideThrust = 0;
         this.angularAcceleration = 0;
@@ -36,6 +37,8 @@ class Lander {
 
     setActiveNeuralNetwork(name) {
         this.neuralNetwork = this.neuralNetworks[name];
+        if(geneticAlgorithm)
+            geneticAlgorithm.population[this.populationIndex] = this.neuralNetwork;
         this.currentActionName = name;
     }
 
@@ -65,8 +68,9 @@ class Lander {
     checkChangeAction() {
         if (this.targetIndex == targets.length - 1) {
             let lastTargetDistance = this.getLastTargetDistance();
-            if (lastTargetDistance < 1000)
+            if (lastTargetDistance < 1000){
                 this.setActiveNeuralNetwork("stop");
+            }
         }
     }
 

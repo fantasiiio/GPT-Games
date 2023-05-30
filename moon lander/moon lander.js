@@ -15,10 +15,10 @@ let cycleTargets = false;
 const populationCount = enableManualControl ? 1 : 100;
 let targetRadius = 200;
 let numRadarRays = 5;
-let startingTimeBonus = 30000;
+let startingTimeBonus = 2000;
 let frameCount = 0;
-
-const deathTimer = 5000;
+let geneticAlgorithm = null;
+const deathTimer = 30000;
 const gravity = 0.0;
 const maxThrustPower = 0.1;
 const maxSideThrustPower = 0.05;
@@ -557,8 +557,8 @@ function loadLanders() {
     if (keys.length == 0) return false;
 
     //this.restart = true;
-
-    let landersArray = Array.from({length: JSON.parse(localStorage.getItem(keys[0])).length}, () => new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel));
+    let index = 0;
+    let landersArray = Array.from({length: JSON.parse(localStorage.getItem(keys[0])).length}, () => new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel,index++));
 
     keys.forEach(key => {
         let actionName = key.replace('NeuralNetwork_', '');
@@ -590,22 +590,24 @@ function SetLandersNeuralNetwork(name){
 
 if(!loadLanders()){
     for (let i = 0; i < populationCount; i++) {
-        const lander = new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel, geneticAlgorithm.population[i]);
+        const lander = new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel, i);
         landers.push(lander);
     }    
-} else {
-    SetLandersNeuralNetwork("travel")
-}
+} 
+
+
 changeAllTarget();
 //addNeuralNetworkToLanders("dock")
+SetLandersNeuralNetwork("travel")
 
-let geneticAlgorithm = initGeneticAlgorithm(populationCount);
+geneticAlgorithm = initGeneticAlgorithm(populationCount);
 geneticAlgorithm.onNewGenerationCreatedFn = (newPopulation) => {
     restart(newPopulation);
 }
 geneticAlgorithm.run(bestIndividual => {
     console.log("L'algorithme g\xE9n\xE9tique a terminé. Meilleur individu : ", bestIndividual);
 });
+
 
 
 function gameLoop() {
@@ -637,21 +639,22 @@ function gameLoop() {
             let targetArrays = [];
             for (let lander of landers) {
                 if (!lander.neuralNetwork.isDead) {
-                    // lander.checkChangeAction();
-                    // if (lander.checkTargetReached(lander.target)) {
-                    //      if (targets.length > 1) {
-                    //         if(targets.length > 1)
-                    //              lander.neuralNetwork.currentFitness += 5000;
-                    //         lander.changeTarget(targets[lander.targetIndex++]);
-                    //         if(cycleTargets){
-                    //             lander.targetIndex %= targets.length;
-                    //         } else {
-                    //             if(lander.targetIndex >= targets.length){
-                    //                 lander.targetIndex = targets.length - 1;
-                    //             }
-                    //         }
-                    //     }
-                    // }
+                    lander.checkChangeAction();
+                    if (lander.checkTargetReached(lander.target)) {
+                         if (targets.length > 1) {
+                            // if(targets.length > 1)
+                            //      lander.neuralNetwork.currentFitness += 5000;
+                            lander.targetIndex++;
+                            if(cycleTargets){
+                                lander.targetIndex %= targets.length;
+                            } else {
+                                if(lander.targetIndex >= targets.length){
+                                    lander.targetIndex = targets.length - 1;
+                                }
+                            }
+                            lander.changeTarget(targets[lander.targetIndex]);
+                        }
+                    }
 
 
                     lander.updateLander(asteroids);
