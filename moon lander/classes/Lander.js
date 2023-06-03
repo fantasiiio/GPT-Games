@@ -33,11 +33,13 @@ class Lander {
         //this.neuralNetwork.currentFitness = startingTimeBonus;
         this.neuralNetworks = {}; // Array to store multiple neural networks indexed by name
         this.currentActionName = "";
+        this.harvestCapacity = 10;
+        this.harvestedResources = [];
     }
 
     setActiveNeuralNetwork(name) {
         this.neuralNetwork = this.neuralNetworks[name];
-        if(geneticAlgorithm)
+        if (geneticAlgorithm)
             geneticAlgorithm.population[this.populationIndex] = this.neuralNetwork;
         this.currentActionName = name;
     }
@@ -68,13 +70,15 @@ class Lander {
     checkChangeAction() {
         if (this.targetIndex == targets.length - 1) {
             let lastTargetDistance = this.getLastTargetDistance();
-            if (lastTargetDistance < 1000){
+            if (lastTargetDistance < 1000) {
                 this.setActiveNeuralNetwork("stop");
             }
         }
     }
 
     updateLander(asteroids) {
+        if (this.neuralNetwork.isDead)
+            return;
         // fuel consumption is calculated based on the thrust and angular acceleration
         this.fuelConsumption = 0;
         this.fuelConsumption += FuelConsumption_thrust * (this.thrust / maxThrustPower);
@@ -116,6 +120,12 @@ class Lander {
         this.fitnessMultiplier = 1;
         this.startDistance = 0;
         this.timeBonus = startingTimeBonus;
+        this.harvestCount = 0;
+        this.harvestedResources.length = 0;
+        this.harvesting = false;
+        for (let name in this.neuralNetworks)
+            this.neuralNetworks[name].isDead = false;
+
     }
 
     changeTarget(target) {
@@ -310,30 +320,37 @@ class Lander {
         }
     }
 
-    refuelLander(terrain) {
-        for (let i = 0; i < gasTanks.length; i++) {
-            const gasTank = gasTanks[i];
-            const dx = this.rigidBody.position.x - gasTank.x;
-            const dy = this.rigidBody.position.y - gasTank.y;
+    harvestResource() {
+        let closestResourceIndex = null;
+        let minDistance = 50;
+
+        for (let i = 0; i < resources.length; i++) {
+            const resource = resources[i];
+            const dx = this.rigidBody.position.x - resource.x;
+            const dy = this.rigidBody.position.y - resource.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (distance < gasTankRadius + 25) {
-                this.fuel += gasTankRefuelAmount;
-                if (this.fuel > 100) this.fuel = 100;
-                gasTanks.splice(i, 1);
-                i--;
+            if (distance < resourceRadius + 25) {
+                if (this.harvestedResources.length < this.harvestCapacity && !this.harvestedResources.includes(i)) {
+                    this.harvesting = true;
+                    this.harvestedResources.push(i);
+                }
+            }
 
-                // Add a new gas tank to the mountain
-                const x = Math.random() * (canvas.width - gasTankRadius * 2) + gasTankRadius;
-                const y = terrain.getY(x) - gasTankRadius;
-                gasTanks.push({
-                    x,
-                    y
-                });
-                playRefuelSound();
+            // If this resource is closer than the current closest resource, update closestResourceIndex and minDistance
+            if (distance < minDistance && !this.harvestedResources.includes(i)) {
+                minDistance = distance;
+                closestResourceIndex = i;
+                this.nearestResource = resource;
             }
         }
+
+        // If a resource was found, change the target
+        if (closestResourceIndex !== null) {
+            this.changeTarget(this.nearestResource);
+        }
     }
+
 
     checkTargetReached(target) {
 
@@ -531,7 +548,8 @@ class Lander {
         this.neuralNetwork.currentFitness += distanceFitness + angleAlignmentScore - (rotationPenaltyFactor * 5 + positionAlignmentPenality * 2 + speed * 0.1);
     }
 
-    calculateFitness(target) {
+    calculateFitness_stop() {
+        let target = this.target;
         if (!target)
             return;
         this.frameCount++;
@@ -592,6 +610,66 @@ class Lander {
         this.neuralNetwork.currentFitness += (distanceFitness * 4 + facingReward * 5 + velocityScore + speedScore + thrustScore) - (rotationPenaltyFactor * 5);
     }
 
+    calculateFitness() {
+        let fitness = 0;
+
+        let fitnessInputs = nnConfigs[this.currentActionName].fitness;
+        let inputIndex = 1;
+        for(let input of fitnessInputs){
+            if (!input.checked)
+            {
+                inputIndex++;
+                continue;
+            }
+            let value;
+
+            switch (inputIndex++) {
+                case 1:
+                    let distanceVector = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
+                    value = Math.max(0, 1 - distanceVector.length() / this.startDistance);
+                    break;
+                case 2:
+                    let bodyAngle = this.rigidBody.angle;
+                    bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
+                    const facingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
+                    let distanceVectorNormal = new Vector(distanceVector.x, distanceVector.y).normalize();
+                    value = facingDirection.dot(distanceVectorNormal);
+                    break;
+                case 3:
+                    value = this.rigidBody.velocity.normalize().dot(distanceVectorNormal);
+                    break;
+                case 4:
+                    value = Math.abs(this.rigidBody.angularVelocity) / maxAngularVelocity;
+                    break;
+                case 5:
+                    value = Math.abs(this.thrust) / maxThrustPower;
+                    break;
+                case 6:
+                    if (this.targetReached) {
+                        value = Math.max(1 - this.rigidBody.velocity.length() / 10, 1);
+                    }
+                    break;
+                case 7:
+                    value = 1 - Math.abs(this.thrust) / maxThrustPower;
+                    break;
+                case 8:
+                    value = spaceStation.dockAlignment.dot(facingDirection);
+                    break;
+                case 9:
+                    value = this.distanceFromLineToPoint(spaceStation.dockPosition, spaceStation.dockPosition.add(spaceStation.dockAlignment), this.rigidBody.position) / 1000;
+                    break;
+                case 10:
+                    value = this.rigidBody.velocity.length();
+                    break;
+                default:
+                    break;
+            }
+
+            fitness += value * input.multiplyFactor;
+        };
+
+        this.neuralNetwork.currentFitness += fitness;
+    }
 
 
     // calculate the rate of change of θ
@@ -702,7 +780,7 @@ class Lander {
         return rayDistances;
     }
 
-    calculateStates(target, asteroids) {
+    calculateStates2(target, asteroids) {
         if (this.neuralNetwork.isDead)
             return;
 
@@ -728,7 +806,7 @@ class Lander {
         if (!this.startDistance)
             this.startDistance = deltaTarget.length();
 
-        // Calculate the velocity in polar coordinates
+        // Calculate the velocity in polar coordinates relative to the target
         const dr_dt = this.compute_dr_dt(-deltaTarget.x, -deltaTarget.y, this.rigidBody.velocity.x, this.rigidBody.velocity.y);
         const dtheta_dt = this.compute_dtheta_dt(-deltaTarget.x, -deltaTarget.y, this.rigidBody.velocity.x, this.rigidBody.velocity.y);
         const velocity = this.velocityInPolarCoordinates(r, dr_dt, dtheta_dt);
@@ -746,33 +824,247 @@ class Lander {
             velocity.v_theta, // angular velocity
             targetAngle.cos_angle, // cosine of angle between heading and target direction
             targetAngle.sin_angle, // sine of angle between heading and target direction
-            ...radar // normalized distances to nearest asteroids
+            ...radar, // normalized distances to nearest asteroids
+            projectileAngle.cos_angle, // cosine of angle between heading and projectile direction
+            projectileAngle.sin_angle, // sine of angle between heading and projectile direction
+            projectileDistance, // normalized distance to nearest projectile
+            projectile.v_r, // radial velocity of nearest projectile
+            projectile.v_theta, // angular velocity of nearest projectile
         ];
 
         return spaceshipStates;
     }
 
+    getNearestProjectileInfo(projectiles) {
+        let nearestProjectile = null;
+        let minDistance = Infinity;
+        let projectileDirection = null;
+
+        // Find nearest projectile
+        for (let projectile of projectiles) {
+            let dx = this.rigidBody.position.x - projectile.position.x;
+            let dy = this.rigidBody.position.y - projectile.position.y;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearestProjectile = projectile;
+                projectileDirection = new Vector(dx, dy).normalize();
+            }
+        }
+
+        if (!nearestProjectile) {
+            return null; // No projectiles found
+        }
+
+        // Calculate the angle of the spaceship's body
+        let bodyAngle = this.rigidBody.angle;
+        bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
+        const headingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
+
+        // Calculate the cosine and sine of the angle between the spaceship's heading and the projectile direction
+        const projectileAngle = this.calculateCosSinAngle(projectileDirection, headingDirection);
+
+        // Calculate the relative position and velocity to the nearest projectile
+        const deltaProjectile = new Vector(nearestProjectile.position.x - this.rigidBody.position.x, nearestProjectile.position.y - this.rigidBody.position.y);
+        const deltaVelocity = new Vector(nearestProjectile.velocity.x - this.rigidBody.velocity.x, nearestProjectile.velocity.y - this.rigidBody.velocity.y);
+        const r = deltaProjectile.length();
+        const dr_dt = this.compute_dr_dt(-deltaProjectile.x, -deltaProjectile.y, deltaVelocity.x, deltaVelocity.y);
+        const dtheta_dt = this.compute_dtheta_dt(-deltaProjectile.x, -deltaProjectile.y, deltaVelocity.x, deltaVelocity.y);
+        const velocity = this.velocityInPolarCoordinates(r, dr_dt, dtheta_dt);
+
+        return {
+            cos_angle: projectileAngle.cos_angle,
+            sin_angle: projectileAngle.sin_angle,
+            distance: r,
+            v_r: velocity.v_r,
+            v_theta: velocity.v_theta
+        };
+    }
+
+
+    calculateStates(target, asteroids) {
+        if (this.neuralNetwork.isDead)
+            return;
+
+        const spaceshipStates = [];
+
+        let inputs = nnConfigs[this.currentActionName].inputs;
+        let inputIndex = 1;
+        for (const input of inputs) {
+            if (!input.checked){
+                inputIndex++;
+                continue;
+            }
+            switch (inputIndex++) {
+                case 1:
+                    spaceshipStates.push(
+                        Math.cos(this.rigidBody.angle),
+                        Math.sin(this.rigidBody.angle),
+                        this.rigidBody.angularVelocity / maxAngularVelocity
+                    );
+                    break;
+                case 2:
+                    const bodyAngle = this.wrapAroundAngle(this.rigidBody.angle) + Math.PI / 2 * 3;
+                    const headingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
+
+                    // Calculate the vector pointing from the spaceship to the target
+                    let deltaTarget;
+                    if (target) {
+                        deltaTarget = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
+                    }
+
+                    // Calculate the cosine and sine of the angle between the spaceship's heading and the target direction
+                    let targetAngle;
+                    if (target) {
+                        targetAngle = this.calculateCosSinAngle(deltaTarget, headingDirection);
+                    }
+
+                    // Store the initial target distance for normalization and calculate normalized target distance
+                    let r = 1;
+                    if (this.startDistance && target) {
+                        r = deltaTarget.length() / this.startDistance;
+                    } else if (!this.startDistance && target) {
+                        this.startDistance = deltaTarget.length();
+                    }
+
+                    // Calculate the velocity in polar coordinates relative to the target
+                    let velocity;
+                    if (target) {
+                        const dr_dt = this.compute_dr_dt(-deltaTarget.x, -deltaTarget.y, this.rigidBody.velocity.x, this.rigidBody.velocity.y);
+                        const dtheta_dt = this.compute_dtheta_dt(-deltaTarget.x, -deltaTarget.y, this.rigidBody.velocity.x, this.rigidBody.velocity.y);
+                        velocity = this.velocityInPolarCoordinates(r, dr_dt, dtheta_dt);
+                    }
+
+                    spaceshipStates.push(
+                        r,
+                        velocity.v_r,
+                        velocity.v_theta,
+                        targetAngle.cos_angle,
+                        targetAngle.sin_angle
+                    );
+                    break;
+                case 3:
+                    // Find the nearest asteroid and calculate the angle and distance to it
+                    let radar = this.getRayDistances(asteroids, walls, numRadarRays);
+
+                    spaceshipStates.push(...radar);
+                    break;
+                case 4:
+                    let nearestAsteroidPoint = this.getNearestAsteroidPoint(asteroids);
+                    let distanceToNearestAsteroid = this.rigidBody.position.distanceTo(nearestAsteroidPoint);
+                    let angleToNearestAsteroid = this.calculateCosSinAngle(this.rigidBody.position, nearestAsteroidPoint);
+                    spaceshipStates.push(
+                        distanceToNearestAsteroid,
+                        angleToNearestAsteroid.cos_angle,
+                        angleToNearestAsteroid.sin_angle
+                    );
+                    break;
+                case 5:
+                    const nearestProjectileInfo = this.getNearestProjectileInfo(projectiles);
+
+                    if (nearestProjectileInfo) {
+                        // Gather the spaceship states including position, velocity, target information, asteroid information, and projectile information
+                        spaceshipStates.push(
+                            nearestProjectileInfo.cos_angle,
+                            nearestProjectileInfo.sin_angle,
+                            nearestProjectileInfo.distance,
+                            nearestProjectileInfo.v_r,
+                            nearestProjectileInfo.v_theta
+                        );
+                    } else {
+                        spaceshipStates.push(0, 0, 1, 0, 0);
+                    }
+                    break;
+                case 6:
+                    if (this.nearestResource) {
+                        // Calculate the vector pointing from the spaceship to the nearest resource
+                        const deltaResource = new Vector(this.nearestResource.x - this.rigidBody.position.x, this.nearestResource.y - this.rigidBody.position.y);
+
+                        // Calculate the angle of the spaceship's body
+                        let resourceAngle = this.rigidBody.angle;
+                        resourceAngle = this.wrapAroundAngle(resourceAngle) + Math.PI / 2 * 3;
+                        const resourceDirection = new Vector(Math.cos(resourceAngle), Math.sin(resourceAngle));
+
+                        // Calculate the cosine and sine of the angle between the spaceship's heading and the resource direction
+                        const resourceTargetAngle = this.calculateCosSinAngle(deltaResource, resourceDirection);
+
+                        // Add to spaceshipStates
+                        spaceshipStates.push(
+                            resourceTargetAngle.cos_angle, // cosine of angle between heading and resource direction
+                            resourceTargetAngle.sin_angle, // sine of angle between heading and resource direction
+                            deltaResource.length() / this.startDistance // normalized distance to nearest resource
+                        );
+                    } else {
+                        spaceshipStates.push(0, 0, 1);
+                    }
+                    break;
+                case 7:
+                    spaceshipStates.push(this.fuelLevel);
+                    break;
+                case 8:
+                    spaceshipStates.push(this.healthLevel);
+                    break;
+                case 9:
+                    spaceshipStates.push(this.energyLevel);
+                    break;
+            }
+        }
+
+        return spaceshipStates;
+    }
 
 
     applyNeuralNetwork() {
 
         let inputs = this.spaceshipStates;
-        const [thrust, angularAcceleration, sideThrust] = this.neuralNetwork.predict(inputs);
+        const outputValues = this.neuralNetwork.predict(inputs);
 
-        // Update thrustDirection based on the new orientation
-        this.angularAcceleration = (angularAcceleration - 0.5) * 2 * maxRotationAccel;
-        this.thrust = (thrust - 0.5) * 2 * maxThrustPower;
-        this.sideThrust = (sideThrust - 0.5) * 2 * maxSideThrustPower;
+        let outputs = nnConfigs[this.currentActionName].outputs;
+        let outputIndex = 1;
+        outputs.forEach((output, index) => {
+            if(!output.checked){
+                outputIndex++;
+                return;
+            }
+
+            let value = (outputValues[index] - 0.5) * 2; // transform from range [0, 1] to [-1, 1]
+            switch (outputIndex++) {
+                case 1:
+                    value *= maxThrustPower; // additional transform specific to thrust
+                    this.thrust = value;
+                    break;
+                case 2:
+                    value *= maxRotationAccel; // additional transform specific to angularAcceleration
+                    this.angularAcceleration = value;
+                    break;
+                case 3:
+                    value *= maxSideThrustPower; // additional transform specific to sideThrust
+                    this.sideThrust = value;
+                    break;
+                case 4:
+                    // Assuming value is used to determine if fire is active
+                    this.isFireActive = value > 0; // threshold for activating fire can be adjusted
+                    break;
+                case 5:
+                    // Assuming value is used to determine if shield is active
+                    this.isShieldActive = value > 0; // threshold for activating shield can be adjusted
+                    break;
+                default:
+                    break;
+            }
+        });
+    
         let now = performance.now();
         if (!this.startTime)
             this.startTime = now;
-
-
+    
         let deltaTime = now - this.startTime;
         if (deltaTime > deathTimer) {
             this.die();
         }
     }
+    
 
     // getNearestMountainDistance(terrain) {
     //     const distanceArray = [];

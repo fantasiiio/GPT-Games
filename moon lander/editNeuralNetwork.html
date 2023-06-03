@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Neural Network Configuration</title>
+    <style>
+        .form-group {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <h2>Neural Networks</h2>
+        <div id="networkFields"></div>
+        <button onclick="addNetwork()">Add Network</button>
+        <button onclick="removeNetwork()">Remove Network</button>
+    </div>
+    <button onclick="saveConfiguration()">Save Configuration</button>
+    <button onclick="loadConfiguration()">Load Configuration</button>
+</body>
+
+<script>
+    const fitnesses = [{
+            id: 1,
+            name: "Distance fitness based on the normalized distance to the target",
+            multiplyFactor: 1
+        },
+        {
+            id: 2,
+            name: "Facing reward calculated from the dot product of spaceship's facing direction and normalized distance vector",
+            multiplyFactor: 1
+        },
+        {
+            id: 3,
+            name: "Velocity score calculated from the dot product of spaceship's velocity and normalized distance vector",
+            multiplyFactor: 1
+        },
+        {
+            id: 4,
+            name: "Rotation penalty based on the spaceship's angular velocity",
+            multiplyFactor: 1
+        },
+        {
+            id: 5,
+            name: "Thrust penalty factor based on the spaceship's thrust",
+            multiplyFactor: 0.2
+        },
+        {
+            id: 6,
+            name: "Speed score calculated when target is reached",
+            multiplyFactor: 1
+        },
+        {
+            id: 7,
+            name: "Thrust score calculated as (1 - thrust penalty factor)",
+            multiplyFactor: 1
+        },
+        {
+            id: 8,
+            name: "Angle alignment score calculated from dot product during docking",
+            multiplyFactor: 1
+        },
+        {
+            id: 9,
+            name: "Position alignment with center line penalty during docking",
+            multiplyFactor: 1
+        },
+        {
+            id: 10,
+            name: "Spaceship's speed",
+            multiplyFactor: 0.1
+        },
+    ];
+
+    const inputs = [{
+            id: 1,
+            name: "spaceship's angle + Angular velocity (x3)",
+            inputCount: 3
+        },
+        {
+            id: 2,
+            name: "target info (distance, polar velocity, target angle) (x5)",
+            inputCount: 5
+        },
+        {
+            id: 3,
+            name: "Asteroids Radar Rays ( x5)",
+            inputCount: 5
+        },
+        {
+            id: 4,
+            name: "Asteroids Radar Nearest ( x3)",
+            inputCount: 3
+        },
+        {
+            id: 5,
+            name: "projectile info (distance, polar velocity, angle) (x5)",
+            inputCount: 5
+        },
+        {
+            id: 6,
+            name: "Resource Radar Nearest (x3)",
+            inputCount: 3
+        },
+        {
+            id: 7,
+            name: "Fuel",
+            inputCount: 1
+        },
+        {
+            id: 8,
+            name: "Health",
+            inputCount: 1
+        },
+        {
+            id: 9,
+            name: "Energy Level",
+            inputCount: 1
+        }
+    ];
+
+    const outputs = [{
+            id: 1,
+            name: "angularAcceleration",
+        },
+        {
+            id: 2,
+            name: "thrust",
+        },
+        {
+            id: 3,
+            name: "sideThrust",
+        },
+        {
+            id: 4,
+            name: "Fire",
+        },
+        {
+            id: 5,
+            name: "Activate Shield",
+        }
+    ];
+
+    const hiddenLayers = [{
+            id: 1,
+            name: "Hidden Layer 1",
+            defaultValue: 10
+        }
+        //... add more hidden layers as needed
+    ];
+
+    let hiddenLayerCount = hiddenLayers.length;
+
+
+    function handleAddHiddenLayerClick(event) {
+        const networkId = event.target.dataset.networkId;
+        addHiddenLayer(networkId);
+    }
+
+    function addHiddenLayer(networkId) {
+        const network = networks.find(network => network.id == networkId);
+
+        if (network) {
+            hiddenLayerCount++;
+            const newHiddenLayer = {
+                id: hiddenLayerCount,
+                name: `Hidden Layer ${hiddenLayerCount}`,
+                defaultValue: 10
+            };
+            network.hiddenLayers.push(newHiddenLayer);
+
+            const hiddenLayerFieldsContainer = document.getElementById(`hiddenLayerFields${networkId}`);
+            let targetId = `hiddenLayerFields${networkId}`;
+            const container = document.getElementById(targetId);
+            addSubField(container, newHiddenLayer.id, newHiddenLayer.name, 10, 0, "hiddenLayers");
+        }
+    }
+
+    function handleRemoveHiddenLayerClick(event) {
+        const networkId = event.target.dataset.networkId;
+        removeHiddenLayer(networkId);
+    }
+
+    function removeHiddenLayer(networkId) {
+        if (hiddenLayerCount > 0) {
+            hiddenLayerCount--;
+            hiddenLayers.pop();
+            const hiddenLayerFieldsContainer = document.getElementById(`hiddenLayerFields${networkId}`);
+            let targetId = `hiddenLayerFields${networkId}`;
+            const container = document.getElementById(targetId);
+            container.lastElementChild.remove();
+        }
+    }
+
+    const networks = [];
+
+    let networkCount = networks.length;
+
+    function addNetwork() {
+        networkCount++;
+        const newNetwork = {
+            id: networkCount,
+            name: `Network ${networkCount}`,
+            inputs: structuredClone(inputs),
+            hiddenLayers: structuredClone(hiddenLayers),
+            outputs: structuredClone(outputs),
+            fitness: structuredClone(fitnesses)
+        };
+        networks.push(newNetwork);
+        populateFields(newNetwork, "networkFields");
+    }
+
+    function removeNetwork() {
+        if (networkCount > 0) {
+            networkCount--;
+            networks.pop();
+            const networkContainer = document.getElementById("networkFields");
+            networkContainer.lastElementChild.remove();
+        }
+    }
+
+    function populateFields(network, targetId) {
+        const container = document.getElementById(targetId);
+        const networkId = network.id;
+
+        let formGroup = document.createElement('div');
+        formGroup.className = "form-group";
+
+        let nametitle = document.createElement('H1');
+        nametitle.innerHTML = `Network ${networkId}`;
+
+        let nameLabel = document.createElement('label');
+        nameLabel.htmlFor = `${targetId}${networkId}`;
+        nameLabel.innerHTML = `Name`;
+
+        let nameInput = document.createElement('input');
+        nameInput.type = "text";
+        nameInput.id = `${targetId}${networkId}`;
+        nameInput.name = `${targetId}${networkId}`;
+        nameInput.value = network.name;
+
+        let breakLine = document.createElement('br');
+
+        let defaultNetworkLabel = document.createElement('label');
+        defaultNetworkLabel.htmlFor = `defaultNetwork${networkId}`;
+        defaultNetworkLabel.innerHTML = `Is default network`;
+
+        let defaultNetworkRadio = document.createElement('input');
+        defaultNetworkRadio.type = "radio";
+        defaultNetworkRadio.id = `defaultNetwork${networkId}`;
+        defaultNetworkRadio.name = `defaultNetwork`;
+        defaultNetworkRadio.value = networkId;
+        defaultNetworkRadio.checked = network.isDefault;
+
+        formGroup.appendChild(nametitle);
+        formGroup.appendChild(nameLabel);
+        formGroup.appendChild(nameInput);
+        formGroup.appendChild(breakLine);
+        formGroup.appendChild(defaultNetworkLabel);
+        formGroup.appendChild(defaultNetworkRadio);
+
+        // Inputs
+        const inputsContainer = document.createElement('div');
+        inputsContainer.innerHTML = `<h2>Inputs</h2>`;
+        const inputFieldsContainer = document.createElement('div');
+        inputFieldsContainer.id = `inputFields${networkId}`;
+        inputsContainer.appendChild(inputFieldsContainer);
+        formGroup.appendChild(inputsContainer);
+
+        // Hidden Layers
+        const hiddenLayersContainer = document.createElement('div');
+        hiddenLayersContainer.innerHTML = `<h2>Hidden Layers</h2>`;
+        const hiddenLayerFieldsContainer = document.createElement('div');
+        hiddenLayerFieldsContainer.id = `hiddenLayerFields${networkId}`;
+        hiddenLayersContainer.appendChild(hiddenLayerFieldsContainer);
+
+        const addHiddenLayerButton = document.createElement('button');
+        addHiddenLayerButton.innerHTML = 'Add Hidden Layer';
+        addHiddenLayerButton.dataset.networkId = network.id;
+        addHiddenLayerButton.onclick = handleAddHiddenLayerClick;
+
+        const removeHiddenLayerButton = document.createElement('button');
+        removeHiddenLayerButton.innerHTML = 'Remove Hidden Layer';
+        removeHiddenLayerButton.onclick = handleRemoveHiddenLayerClick;
+        removeHiddenLayerButton.dataset.networkId = network.id;
+
+        hiddenLayersContainer.appendChild(addHiddenLayerButton);
+        hiddenLayersContainer.appendChild(removeHiddenLayerButton);
+        formGroup.appendChild(hiddenLayersContainer);
+
+        // Outputs
+        const outputsContainer = document.createElement('div');
+        outputsContainer.innerHTML = `<h2>Outputs</h2>`;
+        const outputFieldsContainer = document.createElement('div');
+        outputFieldsContainer.id = `outputFields${networkId}`;
+        outputsContainer.appendChild(outputFieldsContainer);
+        formGroup.appendChild(outputsContainer);
+
+        // Fitness
+        const fitnessContainer = document.createElement('div');
+        fitnessContainer.innerHTML = `<h2>Fitness</h2>`;
+        const fitnessFieldsContainer = document.createElement('div');
+        fitnessFieldsContainer.id = `fitnessFields${networkId}`;
+        fitnessContainer.appendChild(fitnessFieldsContainer);
+        formGroup.appendChild(fitnessContainer);
+
+        container.appendChild(formGroup);
+
+        populateSubFields(network, "fitness", `fitnessFields${networkId}`);
+        populateSubFields(network, "inputs", `inputFields${networkId}`);
+        populateSubFields(network, "hiddenLayers", `hiddenLayerFields${networkId}`);
+        populateSubFields(network, "outputs", `outputFields${networkId}`);
+    }
+
+    function populateSubFields(network, propertyName, targetId) {
+        const container = document.getElementById(targetId);
+        const fields = network[propertyName] || [];
+
+        fields.forEach((field, index) => {
+            addSubField(container, field.id, field.name, field.value, field.multiplyFactor, propertyName,
+                targetId);
+        });
+    }
+
+    function addSubField(container, fieldId, fieldName, fieldValue, fieldMultiplyFactor, propertyName, targetId) {
+        let formGroup = document.createElement('div');
+        formGroup.className = "form-group";
+
+        let input = null;
+        if (propertyName != "hiddenLayers") {
+            input = document.createElement('input');
+            input.type = "checkbox";
+            input.id = `${targetId}${fieldId}`;
+            input.name = `${targetId}${fieldId}`;
+            input.checked = fieldValue;
+        }
+
+        let inputNumber = null;
+        if (propertyName == "fitness" || propertyName == "hiddenLayers") {
+            inputNumber = document.createElement('input');
+            inputNumber.type = "number";
+            inputNumber.style = "width: 40px";
+            inputNumber.id = `num${targetId}${fieldId}`;
+            inputNumber.name = `num${targetId}${fieldId}`;
+            if (propertyName == "fitness")
+                inputNumber.value = fieldMultiplyFactor;
+            else
+                inputNumber.value = fieldValue;
+        }
+        let label = document.createElement('label');
+        label.htmlFor = fieldId;
+        label.innerHTML = fieldName;
+
+        if (propertyName != "hiddenLayers")
+            formGroup.appendChild(input);
+        if (propertyName == "fitness" || propertyName == "hiddenLayers")
+            formGroup.appendChild(inputNumber);
+        formGroup.appendChild(label);
+
+        container.appendChild(formGroup);
+    }
+
+
+
+
+
+    function saveConfiguration() {
+        const config = {
+            networks: []
+        };
+
+        networks.forEach((network, index) => {
+            const name = document.getElementById(`networkFields${network.id}`).value;
+            const isDefault = document.getElementById(`defaultNetwork${network.id}`).checked;
+            const fitnessFields = Array.from(document.querySelectorAll(
+                `input[name^=fitnessFields${network.id}]`)).map(
+                input => ({
+                    checked: input.checked,
+                    multiplyFactor: document.getElementById(`num${input.id}`).value
+                }));
+            let inputCount = 0;
+            const inputFields = Array.from(document.querySelectorAll(`#inputFields${network.id} input`)).map(
+                input => ({
+                    checked: input.checked,
+                    inputCount: inputs[inputCount++].inputCount
+                }));
+            const hiddenLayerFields = Array.from(document.querySelectorAll(
+                `#hiddenLayerFields${network.id} input`)).map(input => input.value);
+            const outputFields = Array.from(document.querySelectorAll(`#outputFields${network.id} input`)).map(
+                output => ({
+                    checked: output.checked,
+                }));
+
+            config.networks[index] = {
+                id: network.id,
+                name,
+                isDefault,
+                fitness: fitnessFields,
+                inputs: inputFields,
+                hiddenLayers: hiddenLayerFields,
+                outputs: outputFields
+            };
+        });
+
+        localStorage.setItem('nnConfig', JSON.stringify(config));
+    }
+
+    function loadConfiguration() {
+        const config = JSON.parse(localStorage.getItem('nnConfig'));
+
+        if (config && config.networks) {
+            networks.length = 0;
+            networkCount = 0;
+
+            config.networks.forEach((network) => {
+                networkCount++;
+                let newNetwork = {
+                    id: networkCount,
+                    inputs: structuredClone(inputs),
+                    hiddenLayers: [],
+                    outputs: structuredClone(outputs),
+                    fitness: structuredClone(fitnesses),
+                    name: network.name,
+                    isDefault: network.isDefault
+                };
+
+                network.fitness.forEach((fitness, index) => {
+                    newNetwork.fitness[index].value = network.fitness[index].checked;
+                    newNetwork.fitness[index].multiplyFactor = network.fitness[index].multiplyFactor;
+                });
+
+                for (let i = 0; i < network.inputs.length; i++) {
+                    newNetwork.inputs[i].value = network.inputs[i].checked;
+                }
+                for (let i = 0; i < network.hiddenLayers.length; i++) {
+                    newNetwork.hiddenLayers.push({
+                        value: network.hiddenLayers[i]
+                    });
+                }
+                for (let i = 0; i < network.outputs.length; i++) {
+                    newNetwork.outputs[i].value = network.outputs[i].checked;
+                }
+
+                networks.push(newNetwork);
+            });
+
+            const networkContainer = document.getElementById("networkFields");
+            networkContainer.innerHTML = "";
+
+            networks.forEach((network) => {
+                populateFields(network, "networkFields");
+            });
+        }
+    }
+
+
+    loadConfiguration();
+</script>
+
+</html>

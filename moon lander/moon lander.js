@@ -4,13 +4,13 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 let enableManualControl = false;
-let useSpaceStation = false;
+let useSpaceStation = true;
 let landers = [];
 let targets = [];
 let asteroids = [];
 let walls = [];
 let asteroidsCount = 0;
-let targetCount = 3
+let targetCount = 2;
 let cycleTargets = false;
 const populationCount = enableManualControl ? 1 : 100;
 let targetRadius = 200;
@@ -18,7 +18,7 @@ let numRadarRays = 5;
 let startingTimeBonus = 2000;
 let frameCount = 0;
 let geneticAlgorithm = null;
-const deathTimer = 30000;
+const deathTimer = Number.MAX_VALUE;
 const gravity = 0.0;
 const maxThrustPower = 0.1;
 const maxSideThrustPower = 0.05;
@@ -44,17 +44,16 @@ let fireworkCounter = 0;
 const fireworkInterval = 100;
 //let successfulLanding = false;
 // Add gas tank properties
-const gasTankRadius = 10;
-const gasTankColor = 'rgba(0, 255, 0, 0.5)';
-const gasTankAmount = 5;
-const gasTankRefuelAmount = 25;
+const resourceRadius = 10;
+const resourceAmount = 50;
+const resourceRefuelAmount = 25;
 const audioContext = new(window.AudioContext || window.webkitAudioContext)();
 const thrustSound = new Audio('thrust.mp3');
 //thrustSound.play();
 const refuelSound = new Audio('boost-100537.mp3');
 
 // Create gas tanks array
-let gasTanks = [];
+let resources = [];
 let drawingMode = false;
 let drawing = false;
 
@@ -122,7 +121,7 @@ function saveSettings() {
         mountainResolution,
         mountainHeightFactor,
         maxYOffset,
-        gasTankAmount,
+        resourceAmount,
         targetCount,
         populationCount,
         deathTimer,
@@ -143,7 +142,7 @@ function loadSettings() {
         mountainResolution = settings.mountainResolution;
         mountainHeightFactor = settings.mountainHeightFactor;
         maxYOffset = settings.maxYOffset;
-        gasTankAmount = settings.gasTankAmount;
+        resourceAmount = settings.resourceAmount;
         targetCount = settings.targetCount;
         populationCount = settings.populationCount;
         deathTimer = settings.deathTimer;
@@ -208,14 +207,24 @@ function playRefuelSound() {
 let firework = null;
 
 
-function drawGasTanks() {
+function drawResources(resourceCounts) {
     ctx.save();
-    for (const gasTank of gasTanks) {
+    for (const [index, resource] of resources.entries()) {
         ctx.beginPath();
-        ctx.arc(gasTank.x, gasTank.y, gasTankRadius, 0, 2 * Math.PI);
-        ctx.fillStyle = gasTankColor;
+
+        ctx.arc(resource.x, resource.y, resourceRadius, 0, 2 * Math.PI);
+        ctx.fillStyle = "#03C03C";
         ctx.fill();
         ctx.stroke();
+
+        // If this resource has been harvested, display the count
+        if (resourceCounts[index] !== undefined) {
+            ctx.font = "10px Arial";
+            ctx.fillStyle = "black";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(resourceCounts[index].toString(), resource.x, resource.y);
+        }
     }
     ctx.restore();
 }
@@ -231,14 +240,14 @@ let spaceStation = new SpaceStation(canvas.width / zoomLevel / 2, canvas.height 
 
 function getNeuralNetworksFromLanders() {
     let neuralNetworks = [];
-    for(let lander of landers) {
+    for (let lander of landers) {
         neuralNetworks.push(lander.neuralNetwork);
     }
     return neuralNetworks;
 }
 
-function addNeuralNetworkToLanders(name){
-    for(let lander of landers) {
+function addNeuralNetworkToLanders(name) {
+    for (let lander of landers) {
         lander.addNeuralNetwork(new NeuralNetwork2([inputSize, hiddenSize, outputSize]), name);
     }
 }
@@ -332,7 +341,7 @@ function generateAsteroids() {
 
 function generateTargets() {
     let positions = generateObjectPositions(targetCount);
-    targets = positions;
+    targets = positions || [];
 }
 
 let populationCreated = false;
@@ -342,7 +351,6 @@ function restart(newPopulation) {
     //generateAsteroids();
     for (let i = 0; i < newPopulation.length; i++) {
         landers[i].neuralNetwork = newPopulation[i];
-        landers[i].neuralNetwork.isDead = false;
         landers[i].resetLander();
         //landers[i].rigidBody.angle = Math.PI/2;
         //landers[i].rigidBody.velocity = new Vector(10, 0);
@@ -378,7 +386,12 @@ canvas.addEventListener('mousemove', (event) => {
 
 function changeAllTarget(position) {
     for (let lander of landers) {
-        lander.target = targets[0];
+        if (targets.length > 0)
+            lander.target = targets[0];
+        else if (useSpaceStation)
+            lander.target = spaceStation.dockPosition;
+        else
+            lander.target = new Vector(canvas.width / zoomLevel / 2, canvas.height / zoomLevel - 50);
     }
 }
 
@@ -552,53 +565,194 @@ function drawLines(listOfPoints, color = 'white') {
     }
 }
 
-function loadLanders() {
-    let keys = Object.keys(localStorage).filter(key => key.startsWith('NeuralNetwork_'));
-    if (keys.length == 0) return false;
+function getCheckedItemCount(network) {
+    const checkedItemCount = {
+        fitness: 0,
+        inputs: 0,
+        hiddenLayers: 0,
+        outputs: 0
+    };
 
-    //this.restart = true;
-    let index = 0;
-    let landersArray = Array.from({length: JSON.parse(localStorage.getItem(keys[0])).length}, () => new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel,index++));
-
-    keys.forEach(key => {
-        let actionName = key.replace('NeuralNetwork_', '');
-        let populationData = JSON.parse(localStorage.getItem(key));
-
-        // For each saved individual, load the individual's data into the corresponding Lander
-        populationData.forEach((individualData, i) => {
-            Object.setPrototypeOf(individualData, NeuralNetwork2.prototype);
-
-            // Add the loaded NeuralNetwork to the Lander
-            landersArray[i].addNeuralNetwork(individualData, actionName);
-
-            // Convert weights and biases back to Matrix objects
-            individualData.weights = individualData.weights.map(weightMatrix => Matrix.map(weightMatrix, x => x));
-            individualData.biases = individualData.biases.map(biasMatrix => Matrix.map(biasMatrix, x => x));
-        });
+    network.fitness.forEach((item) => {
+        if (item.checked) {
+            checkedItemCount.fitness++;
+        }
     });
 
-    landers = landersArray; 
+    network.inputs.forEach((item) => {
+        if (item) {
+            checkedItemCount.inputs++;
+        }
+    });
+
+    network.hiddenLayers.forEach((item) => {
+        if (item) {
+            checkedItemCount.hiddenLayers++;
+        }
+    });
+
+    network.outputs.forEach((item) => {
+        if (item) {
+            checkedItemCount.outputs++;
+        }
+    });
+
+    return checkedItemCount;
+}
+
+function checkNodesPerLayer(individualData, config) {
+    const nodesPerLayer = individualData.nodesPerLayer;
+    const inputsCount = config.inputs.reduce((sum, input) => sum + (input.checked ? input.inputCount : 0), 0);
+    const hiddenLayersCount = config.hiddenLayers.length;
+    const outputs = config.outputs;
+    const outputsCount = outputs.filter((output) => output.checked).length;
+
+    if (nodesPerLayer.length !== hiddenLayersCount + 2) {
+        return false; // Number of layers doesn't match
+    }
+
+    if (nodesPerLayer[0] !== inputsCount) {
+        return false; // Number of input neurons doesn't match
+    }
+
+    if (nodesPerLayer[nodesPerLayer.length - 1] !== outputsCount) {
+        return false; // Number of output neurons doesn't match
+    }
+
+    for (let i = 1; i <= hiddenLayersCount; i++) {
+        if (nodesPerLayer[i] != config.hiddenLayers[i - 1]) {
+            return false; // Number of neurons in hidden layers doesn't match
+        }
+    }
+
+    return true; // All checks passed
+}
+
+
+function getMatchingNodesPerLayer(config) {
+    const inputsCount = config.inputs.length;
+    const hiddenLayersCount = config.hiddenLayers.length;
+    const outputsCount = config.outputs.length;
+
+    const nodesPerLayer = [inputsCount];
+    for (let i = 0; i < hiddenLayersCount; i++) {
+        nodesPerLayer.push(config.hiddenLayers[i].defaultValue);
+    }
+    nodesPerLayer.push(outputsCount);
+
+    return nodesPerLayer;
+}
+
+
+let nnConfigs = {};
+
+function loadLanders() {
+    const config = JSON.parse(localStorage.getItem('nnConfig'));
+
+    if (config && config.networks) {
+        nnConfigs.length = 0;
+        let networkCount = 0;
+
+        config.networks.forEach((network) => {
+            // networkCount++;
+            // let nnConfig = {
+            //     id: networkCount,
+            //     inputs: [],
+            //     hiddenLayers: [],
+            //     outputs: [],
+            //     fitness: [],
+            //     name: network.name,
+            //     isDefault: network.isDefault || false
+            // };
+
+            // network.fitness.forEach((fitness, index) => {
+            //     let newValue = {
+            //         value: network.fitness[index].checked,
+            //         multiplyFactor: network.fitness[index].multiplyFactor
+            //     }
+            //     nnConfig.fitness.push(newValue);
+            // });
+
+            // for (let i = 0; i < network.inputs.length; i++) {
+            //     nnConfig.inputs.push({
+            //         value: network.inputs[i].checked,
+            //         inputCount: network.inputs[i].inputCount
+            //     });
+            // }
+            // for (let i = 0; i < network.hiddenLayers.length; i++) {
+            //     nnConfig.hiddenLayers.push({
+            //         value: network.hiddenLayers[i]
+            //     });
+            // }
+            // for (let i = 0; i < network.outputs.length; i++) {
+            //     nnConfig.outputs.push({
+            //         value: network.outputs[i].checked
+            //     });
+            // }
+
+            nnConfigs[network.name] = network;
+
+            let key = Object.keys(localStorage).find(key => key == 'NeuralNetwork_' + network.name);
+            let populationData = JSON.parse(localStorage.getItem(key));
+            if (populationData) {
+                // For each saved individual, load the individual's data into the corresponding Lander
+                populationData.forEach((individualData, i) => {
+                    let lander = landers[i];
+                    if (!lander)
+                        lander = new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel, i);
+
+                    Object.setPrototypeOf(individualData, NeuralNetwork2.prototype);
+
+                    if (!checkNodesPerLayer(individualData, network)) {
+                        console.error('The number of nodes per layer in the saved NeuralNetwork does not match the number of nodes per layer in the config.');
+                        return false;
+                    }
+                    // Add the loaded NeuralNetwork to the Lander
+                    lander.addNeuralNetwork(individualData, network.name);
+                    if (!landers[i])
+                        landers.push(lander);
+
+                    // Convert weights and biases back to Matrix objects
+                    individualData.weights = individualData.weights.map(weightMatrix => Matrix.map(weightMatrix, x => x));
+                    individualData.biases = individualData.biases.map(biasMatrix => Matrix.map(biasMatrix, x => x));
+                });
+            } else {
+                for (let i = 0; i < populationCount; i++) {
+                    let nodesPerLayer = getMatchingNodesPerLayer(network);
+                    let lander = landers[i];
+                    if (!lander)
+                        lander = new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel, i);
+
+                    lander.addNeuralNetwork(new NeuralNetwork2(nodesPerLayer), name);
+                    if (!landers[i])
+                        landers.push(lander);
+                }
+
+            }
+            if(network.isDefault)
+                SetLandersNeuralNetwork(network.name);
+        });
+    }
 
     return true;
 }
 
-function SetLandersNeuralNetwork(name){
+
+function SetLandersNeuralNetwork(name) {
     for (let i = 0; i < populationCount; i++) {
         landers[i].setActiveNeuralNetwork(name);
     }
 }
 
-if(!loadLanders()){
+if (!loadLanders()) {
     for (let i = 0; i < populationCount; i++) {
         const lander = new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel, i);
         landers.push(lander);
-    }    
-} 
+    }
+}
 
 
 changeAllTarget();
-//addNeuralNetworkToLanders("dock")
-SetLandersNeuralNetwork("travel")
 
 geneticAlgorithm = initGeneticAlgorithm(populationCount);
 geneticAlgorithm.onNewGenerationCreatedFn = (newPopulation) => {
@@ -628,7 +782,9 @@ function gameLoop() {
             terrain.draw(ctx);
             if (useSpaceStation)
                 spaceStation.draw();
-            drawGasTanks(); // Draw the gas tanks on the mountain
+
+            let harvestedResources = countHarvestedResources()
+            drawResources(harvestedResources);
             for (let i = 0; i < asteroidsCount; i++) {
                 asteroids[i].rigidBody.update();
                 asteroids[i].getPolygon();
@@ -641,14 +797,14 @@ function gameLoop() {
                 if (!lander.neuralNetwork.isDead) {
                     lander.checkChangeAction();
                     if (lander.checkTargetReached(lander.target)) {
-                         if (targets.length > 1) {
+                        if (targets.length > 1 && !lander.harvesting) {
                             // if(targets.length > 1)
                             //      lander.neuralNetwork.currentFitness += 5000;
                             lander.targetIndex++;
-                            if(cycleTargets){
+                            if (cycleTargets) {
                                 lander.targetIndex %= targets.length;
                             } else {
-                                if(lander.targetIndex >= targets.length){
+                                if (lander.targetIndex >= targets.length) {
                                     lander.targetIndex = targets.length - 1;
                                 }
                             }
@@ -668,8 +824,8 @@ function gameLoop() {
                         // inputArrays.push(lander.lastSpaceshipStates);
                         // targetArrays.push(lander.spaceshipStates.slice(0, lander.spaceshipStates.length - 2));
 
-                        lander.calculateFitness(lander.target, null)
-                        lander.refuelLander(terrain); // Check if the lander is refueling
+                        lander.calculateFitness()
+                        lander.harvestResource(terrain); // Check if the lander is refueling
                         lander.checkLanding();
                         if (useSpaceStation)
                             lander.checkDocking();
@@ -679,7 +835,7 @@ function gameLoop() {
                         lander.handleCollision(asteroids[i]);
                     }
                 } else {
-                    lander.calculateFitness(lander.target, null)
+                    lander.calculateFitness()
                     lander.drawLander();
                 }
                 index++;
@@ -693,7 +849,7 @@ function gameLoop() {
             //spaceStation.polygon.draw();
             drawLines(walls);
 
-            drawFuelBar();
+            //drawFuelBar();
             drawScore();
             ctx.restore();
             frameCount++;
@@ -706,14 +862,44 @@ function gameLoop() {
     }
 }
 
+function countHarvestedResources() {
+    let harvestedResourceCounts = {};
 
+    for (let i = 0; i < landers.length; i++) {
+        const lander = landers[i];
 
-for (let i = 0; i < gasTankAmount; i++) {
-    const x = Math.random() * (canvas.width - gasTankRadius * 2) + gasTankRadius;
-    const y = terrain.getY(x) - gasTankRadius - 10; // Add a -10 offset to move the gas tank above the mountain surface
-    gasTanks.push({
+        for (let j = 0; j < lander.harvestedResources.length; j++) {
+            const resourceIndex = lander.harvestedResources[j];
+
+            if (harvestedResourceCounts[resourceIndex] === undefined) {
+                harvestedResourceCounts[resourceIndex] = 1;
+            } else {
+                harvestedResourceCounts[resourceIndex]++;
+            }
+        }
+    }
+
+    return harvestedResourceCounts;
+}
+
+function getRandomPositionInsideCircle(centerX, centerY, radius) {
+    // Generate a random radius within the circle
+    const randomRadius = Math.random() * radius;
+
+    // Generate a random angle
+    const angle = Math.random() * 2 * Math.PI;
+
+    // Calculate the random position inside the circle
+    const x = centerX + randomRadius * Math.cos(angle);
+    const y = centerY + randomRadius * Math.sin(angle);
+
+    return {
         x,
         y
-    });
+    };
+}
+
+for (let i = 0; i < resourceAmount; i++) {
+    resources.push(getRandomPositionInsideCircle(0, 0, 500))
 }
 gameLoop();
