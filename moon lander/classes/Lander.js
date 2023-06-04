@@ -8,8 +8,6 @@ class Lander {
         this.thrust = 0;
         this.sideThrust = 0;
         this.angularAcceleration = 0;
-        this.fuelConsumption = 0;
-        //this.neuralNetwork = neuralNetwork;
         this.successfulLanding = false;
         this.targetReached = false;
         this.timeToReachTarget = 0;
@@ -35,6 +33,89 @@ class Lander {
         this.currentActionName = "";
         this.harvestCapacity = 10;
         this.harvestedResources = [];
+
+        this.lasers = [];
+        this.laserSpeed = 20;
+        this.laserLifeTime = 100;
+        this.laserCooldown = 0;
+        this.laserCooldownTime = 50;
+        this.laserEnergyCost = 20;
+        this.laserLength = 30;
+        this.laserDamage = 50;
+
+        this.energyLevel = 100;
+        this.energyRegainRate = 0.1;
+        this.healthLevel = 100;
+
+        this.shieldEnergyCost = 30;
+        this.shieldCoolDown = 100;
+        this.shieldActivatingTime = 200;
+        this.shieldActive = false;
+        this.shieldCooldownTimer = 0;
+        this.shieldActivationTimer = 0;
+
+        this.fuelConsumption = 0;
+        this.fuelCapacity = 1000;
+        this.fuelLevel = this.fuelCapacity;
+        this.enemies = [];
+        //this.enemies.push(new Enemy());
+    }
+
+    addEnemy(enemy) {
+        enemy.enemies.push(this);
+        this.enemies.push(enemy);
+    }
+
+    activateShield() {
+        if (this.energyLevel >= this.shieldEnergyCost && !this.shieldActive && this.shieldCooldownTimer === 0) {
+            this.shieldActive = true;
+            this.shieldActivationTimer = this.shieldActivatingTime;
+            this.energyLevel -= this.shieldEnergyCost;
+        }
+    }
+
+    updateShield() {
+        if (this.shieldActive) {
+            this.shieldActivationTimer--;
+
+            if (this.shieldActivationTimer === 0) {
+                this.shieldActive = false;
+                this.shieldCooldownTimer = this.shieldCoolDown;
+            }
+        } else if (this.shieldCooldownTimer > 0) {
+            this.shieldCooldownTimer--;
+        }
+    }
+
+    fireLaser() {
+        if (this.energyLevel < this.laserEnergyCost || this.laserCooldownTimer > 0) {
+            return; // Cannot fire laser due to insufficient energy or cooldown in progress
+        }
+        let bodyAngle = this.rigidBody.angle;
+        bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
+        const facingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
+
+        this.energyLevel -= this.laserEnergyCost;
+        const laser = {
+            position: {
+                x: this.rigidBody.position.x,
+                y: this.rigidBody.position.y
+            },
+            end: {
+                x: this.rigidBody.position.x - facingDirection.x * this.laserLength,
+                y: this.rigidBody.position.y - facingDirection.y * this.laserLength
+            },
+            direction: facingDirection,
+            life: 0,
+        };
+
+        this.lasers.push(laser);
+        this.laserCooldownTimer = this.laserCooldownTime; // Start the cooldown timer
+    }
+
+
+    removeLaser(index) {
+        this.lasers.splice(index, 1);
     }
 
     setActiveNeuralNetwork(name) {
@@ -76,25 +157,83 @@ class Lander {
         }
     }
 
-    updateLander(asteroids) {
-        if (this.neuralNetwork.isDead)
-            return;
+    updateLasers() {
+        for (let i = this.lasers.length - 1; i >= 0; i--) {
+            const laser = this.lasers[i];
+            laser.life++;
+            if (laser.life > this.laserLifeTime) {
+                this.lasers.splice(i, 1);
+            }
+            laser.position.x = laser.position.x + laser.direction.x * this.laserSpeed;
+            laser.position.y = laser.position.y + laser.direction.y * this.laserSpeed;
+            laser.end.x = laser.position.x - laser.direction.x * this.laserLength;
+            laser.end.y = laser.position.y - laser.direction.y * this.laserLength;
+
+        }
+    }
+
+    updateEnemies() {
+        for (let enemy of this.enemies) {
+            enemy.update(this);
+            enemy.handleCollision();
+        }
+    }
+
+    updateLander() {
+        if (!this.isEnemy)
+            this.updateEnemies();
+
+        // Update the cooldown timer
+        if (this.laserCooldownTimer > 0) {
+            this.laserCooldownTimer--;
+        }
+
+
         // fuel consumption is calculated based on the thrust and angular acceleration
         this.fuelConsumption = 0;
         this.fuelConsumption += FuelConsumption_thrust * (this.thrust / maxThrustPower);
         this.fuelConsumption += FuelConsumption_rotate * (Math.abs(this.angularAcceleration) / maxRotationAccel);
-        let force = new Vector(this.thrust * Math.sin(this.rigidBody.angle), gravity - (this.thrust * Math.cos(this.rigidBody.angle)));
-        let sideForce = new Vector(this.sideThrust * Math.sin(this.rigidBody.angle + Math.PI / 2), gravity - (this.sideThrust * Math.cos(this.rigidBody.angle + Math.PI / 2)));
-        this.rigidBody.applyForce(force);
-        this.rigidBody.applyForce(sideForce);
-        this.rigidBody.applyTorque(this.angularAcceleration);
+        this.fuelConsumption += FuelConsumption_sideThrust * (this.sideThrust / maxSideThrustPower);
+        this.fuelLevel -= this.fuelConsumption;
+        if (this.fuelLevel < 0)
+            this.fuelLevel = 0;
+
+        if (this.fuelLevel > 0) {
+            let force = new Vector(this.thrust * Math.sin(this.rigidBody.angle), gravity - (this.thrust * Math.cos(this.rigidBody.angle)));
+            let sideForce = new Vector(this.sideThrust * Math.sin(this.rigidBody.angle + Math.PI / 2), gravity - (this.sideThrust * Math.cos(this.rigidBody.angle + Math.PI / 2)));
+            this.rigidBody.applyForce(force);
+            this.rigidBody.applyForce(sideForce);
+            this.rigidBody.applyTorque(this.angularAcceleration);
+        } else { // No fuel left
+            this.thrust = 0;
+            this.sideThrust = 0;
+            this.angularAcceleration = 0;
+        }
         this.rigidBody.update();
 
         this.lastSpaceshipStates = this.spaceshipStates;
-        this.spaceshipStates = this.calculateStates(this.target, asteroids);
+        if (!this.neuralNetwork.isDead)
+            this.spaceshipStates = this.calculateStates(this.target, asteroids);
         //this.spaceshipStates = [...this.spaceshipStates, this.thrust, this.angularAcceleration]
         if (!this.lastSpaceshipStates)
             this.lastSpaceshipStates = this.spaceshipStates;
+
+        this.updateLasers();
+
+        this.updateShield();
+
+        if (!this.shieldActive && this.energyLevel < 100) {
+            this.energyLevel += this.energyRegainRate;
+        }
+
+        if (this.healthLevel <= 0 && !this.neuralNetwork.isDead) {
+            this.die();
+            this.explosion = new Explosion(this.rigidBody.position.x, this.rigidBody.position.y, ctx);
+        }
+        if (this.explosion) {
+            this.explosion.update();
+            if (this.explosion.isDone()) {}
+        }        
     }
 
     resetLander() {
@@ -135,9 +274,65 @@ class Lander {
         this.startTimeReached = 0;
     }
 
+    drawLasers() {
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 5;
+
+        for (let i = 0; i < this.lasers.length; i++) {
+            const laser = this.lasers[i];
+
+            ctx.beginPath();
+            ctx.moveTo(laser.position.x, laser.position.y);
+            ctx.lineTo(laser.end.x, laser.end.y);
+            ctx.stroke();
+        }
+    }
+
+    drawBars() {
+        // Draw Health bar
+        ctx.save();
+        ctx.translate(this.rigidBody.position.x + 50, this.rigidBody.position.y - 50);
+        ctx.strokeStyle = 'white';
+        ctx.strokeRect(0, 0, 10, 100); // Total health bar
+        ctx.fillStyle = 'green';
+        ctx.fillRect(0, 100, 10, -this.healthLevel); // Current health
+
+        // Draw Energy bar
+        ctx.translate(15, 0); // Move 15 units right from health bar
+        ctx.strokeStyle = 'white';
+        ctx.strokeRect(0, 0, 10, 100); // Total energy bar
+        ctx.fillStyle = 'blue';
+        ctx.fillRect(0, 100, 10, -this.energyLevel); // Current energy
+
+        // Draw Energy bar
+        ctx.translate(15, 0); // Move 15 units right from Energy bar
+        ctx.strokeStyle = 'white';
+        ctx.strokeRect(0, 0, 10, 100); // Total energy bar
+        ctx.fillStyle = 'yellow';
+        ctx.fillRect(0, 100, 10, -(this.fuelLevel / this.fuelCapacity) * 100); // Current energy
+
+        ctx.restore();
+
+
+    }
+
     drawLander() {
+        if (!this.isEnemy) {
+            for (let enemy of this.enemies) {
+                enemy.drawLander();
+            }
+        }
+
+        if (this.explosion) {
+            return;
+        }
+
         ctx.save();
         ctx.translate(this.rigidBody.position.x, this.rigidBody.position.y);
+
+        let rocketColor = 'silver';
+        if (this.isEnemy)
+            rocketColor = '#CB9EFB';
 
         if (this.neuralNetwork.positionNumber) {
             if (this.neuralNetwork.positionNumber <= 10)
@@ -160,7 +355,7 @@ class Lander {
         ctx.quadraticCurveTo(-15, -15, 0, -30);
         ctx.quadraticCurveTo(15, -15, 15, 15);
         ctx.closePath();
-        ctx.fillStyle = 'silver';
+        ctx.fillStyle = rocketColor;
         ctx.fill();
         ctx.strokeStyle = 'gray';
         ctx.stroke();
@@ -179,7 +374,7 @@ class Lander {
         ctx.quadraticCurveTo(-25, 10, -25, 30);
         ctx.lineTo(-15, 30);
         ctx.closePath();
-        ctx.fillStyle = 'silver';
+        ctx.fillStyle = rocketColor;
         ctx.fill();
         ctx.strokeStyle = 'gray';
         ctx.stroke();
@@ -189,7 +384,7 @@ class Lander {
         ctx.quadraticCurveTo(25, 10, 25, 30);
         ctx.lineTo(15, 30);
         ctx.closePath();
-        ctx.fillStyle = 'silver';
+        ctx.fillStyle = rocketColor;
         ctx.fill();
         ctx.strokeStyle = 'gray';
         ctx.stroke();
@@ -277,8 +472,25 @@ class Lander {
             ctx.strokeStyle = '#03C03C';
             ctx.stroke();
         }
+
+        if (this.shieldActive) {
+            // Draw shield
+            ctx.beginPath();
+            ctx.arc(0, 0, 50, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'lightblue';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.closePath();
+        }
+
         ctx.restore();
+
+        this.drawBars();
+        this.drawLasers();
     }
+
+
 
     isLanderOutOfScreen() {
         return false;
@@ -611,13 +823,22 @@ class Lander {
     }
 
     calculateFitness() {
+        if (enableManualControl)
+            return;
+
         let fitness = 0;
 
         let fitnessInputs = nnConfigs[this.currentActionName].fitness;
         let inputIndex = 1;
-        for(let input of fitnessInputs){
-            if (!input.checked)
-            {
+
+        let bodyAngle = this.rigidBody.angle;
+        bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
+        const facingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
+        let distanceVector = new Vector(this.target.x - this.rigidBody.position.x, this.target.y - this.rigidBody.position.y);
+        let distanceVectorNormal = new Vector(distanceVector.x, distanceVector.y).normalize();
+
+        for (let input of fitnessInputs) {
+            if (!input.checked) {
                 inputIndex++;
                 continue;
             }
@@ -625,14 +846,9 @@ class Lander {
 
             switch (inputIndex++) {
                 case 1:
-                    let distanceVector = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
                     value = Math.max(0, 1 - distanceVector.length() / this.startDistance);
                     break;
                 case 2:
-                    let bodyAngle = this.rigidBody.angle;
-                    bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
-                    const facingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
-                    let distanceVectorNormal = new Vector(distanceVector.x, distanceVector.y).normalize();
                     value = facingDirection.dot(distanceVectorNormal);
                     break;
                 case 3:
@@ -647,7 +863,8 @@ class Lander {
                 case 6:
                     if (this.targetReached) {
                         value = Math.max(1 - this.rigidBody.velocity.length() / 10, 1);
-                    }
+                    } else
+                        value = 0;
                     break;
                 case 7:
                     value = 1 - Math.abs(this.thrust) / maxThrustPower;
@@ -656,7 +873,7 @@ class Lander {
                     value = spaceStation.dockAlignment.dot(facingDirection);
                     break;
                 case 9:
-                    value = this.distanceFromLineToPoint(spaceStation.dockPosition, spaceStation.dockPosition.add(spaceStation.dockAlignment), this.rigidBody.position) / 1000;
+                    value = 1 - this.distanceFromLineToPoint(spaceStation.dockPosition, spaceStation.dockPosition.add(spaceStation.dockAlignment), this.rigidBody.position) / 1000;
                     break;
                 case 10:
                     value = this.rigidBody.velocity.length();
@@ -835,26 +1052,32 @@ class Lander {
         return spaceshipStates;
     }
 
-    getNearestProjectileInfo(projectiles) {
-        let nearestProjectile = null;
+    getNearestLaserInfo(lasers) {
+        let nearestLaser = null;
         let minDistance = Infinity;
-        let projectileDirection = null;
+        let laserDirection = null;
 
-        // Find nearest projectile
-        for (let projectile of projectiles) {
-            let dx = this.rigidBody.position.x - projectile.position.x;
-            let dy = this.rigidBody.position.y - projectile.position.y;
-            let distance = Math.sqrt(dx * dx + dy * dy);
+        // Find nearest laser
+        for (let laser of lasers) {
+            // Calculate the distance from both endpoints of the laser to the spaceship, use the minimum of the two
+            let dx1 = this.rigidBody.position.x - laser.position.x;
+            let dy1 = this.rigidBody.position.y - laser.position.y;
+            let distance1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
 
+            let dx2 = this.rigidBody.position.x - laser.end.x;
+            let dy2 = this.rigidBody.position.y - laser.end.x;
+            let distance2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+
+            let distance = Math.min(distance1, distance2);
             if (distance < minDistance) {
                 minDistance = distance;
-                nearestProjectile = projectile;
-                projectileDirection = new Vector(dx, dy).normalize();
+                nearestLaser = laser;
+                laserDirection = new Vector(dx1, dy1).normalize();
             }
         }
 
-        if (!nearestProjectile) {
-            return null; // No projectiles found
+        if (!nearestLaser) {
+            return null; // No lasers found
         }
 
         // Calculate the angle of the spaceship's body
@@ -862,25 +1085,26 @@ class Lander {
         bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
         const headingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
 
-        // Calculate the cosine and sine of the angle between the spaceship's heading and the projectile direction
-        const projectileAngle = this.calculateCosSinAngle(projectileDirection, headingDirection);
+        // Calculate the cosine and sine of the angle between the spaceship's heading and the laser direction
+        const laserAngle = this.calculateCosSinAngle(laserDirection, headingDirection);
 
-        // Calculate the relative position and velocity to the nearest projectile
-        const deltaProjectile = new Vector(nearestProjectile.position.x - this.rigidBody.position.x, nearestProjectile.position.y - this.rigidBody.position.y);
-        const deltaVelocity = new Vector(nearestProjectile.velocity.x - this.rigidBody.velocity.x, nearestProjectile.velocity.y - this.rigidBody.velocity.y);
-        const r = deltaProjectile.length();
-        const dr_dt = this.compute_dr_dt(-deltaProjectile.x, -deltaProjectile.y, deltaVelocity.x, deltaVelocity.y);
-        const dtheta_dt = this.compute_dtheta_dt(-deltaProjectile.x, -deltaProjectile.y, deltaVelocity.x, deltaVelocity.y);
+        // Calculate the relative position and velocity to the nearest laser
+        const deltaLaser = new Vector(nearestLaser.position.x - this.rigidBody.position.x, nearestLaser.position.y - this.rigidBody.position.y);
+        const deltaVelocity = new Vector(nearestLaser.velocity.x - this.rigidBody.velocity.x, nearestLaser.velocity.y - this.rigidBody.velocity.y);
+        const r = deltaLaser.length();
+        const dr_dt = this.compute_dr_dt(-deltaLaser.x, -deltaLaser.y, deltaVelocity.x, deltaVelocity.y);
+        const dtheta_dt = this.compute_dtheta_dt(-deltaLaser.x, -deltaLaser.y, deltaVelocity.x, deltaVelocity.y);
         const velocity = this.velocityInPolarCoordinates(r, dr_dt, dtheta_dt);
 
         return {
-            cos_angle: projectileAngle.cos_angle,
-            sin_angle: projectileAngle.sin_angle,
+            cos_angle: laserAngle.cos_angle,
+            sin_angle: laserAngle.sin_angle,
             distance: r,
             v_r: velocity.v_r,
             v_theta: velocity.v_theta
         };
     }
+
 
 
     calculateStates(target, asteroids) {
@@ -889,10 +1113,13 @@ class Lander {
 
         const spaceshipStates = [];
 
+        if (enableManualControl)
+            return spaceshipStates;
+
         let inputs = nnConfigs[this.currentActionName].inputs;
         let inputIndex = 1;
         for (const input of inputs) {
-            if (!input.checked){
+            if (!input.checked) {
                 inputIndex++;
                 continue;
             }
@@ -961,16 +1188,16 @@ class Lander {
                     );
                     break;
                 case 5:
-                    const nearestProjectileInfo = this.getNearestProjectileInfo(projectiles);
+                    const nearestLaserInfo = this.getNearestLaserInfo(lasers);
 
-                    if (nearestProjectileInfo) {
+                    if (nearestLaserInfo) {
                         // Gather the spaceship states including position, velocity, target information, asteroid information, and projectile information
                         spaceshipStates.push(
-                            nearestProjectileInfo.cos_angle,
-                            nearestProjectileInfo.sin_angle,
-                            nearestProjectileInfo.distance,
-                            nearestProjectileInfo.v_r,
-                            nearestProjectileInfo.v_theta
+                            nearestLaserInfo.cos_angle,
+                            nearestLaserInfo.sin_angle,
+                            nearestLaserInfo.distance,
+                            nearestLaserInfo.v_r,
+                            nearestLaserInfo.v_theta
                         );
                     } else {
                         spaceshipStates.push(0, 0, 1, 0, 0);
@@ -1023,7 +1250,7 @@ class Lander {
         let outputs = nnConfigs[this.currentActionName].outputs;
         let outputIndex = 1;
         outputs.forEach((output, index) => {
-            if(!output.checked){
+            if (!output.checked) {
                 outputIndex++;
                 return;
             }
@@ -1048,23 +1275,23 @@ class Lander {
                     break;
                 case 5:
                     // Assuming value is used to determine if shield is active
-                    this.isShieldActive = value > 0; // threshold for activating shield can be adjusted
+                    this.shieldActive = value > 0; // threshold for activating shield can be adjusted
                     break;
                 default:
                     break;
             }
         });
-    
+
         let now = performance.now();
         if (!this.startTime)
             this.startTime = now;
-    
+
         let deltaTime = now - this.startTime;
         if (deltaTime > deathTimer) {
             this.die();
         }
     }
-    
+
 
     // getNearestMountainDistance(terrain) {
     //     const distanceArray = [];
@@ -1209,17 +1436,36 @@ class Lander {
         };
     }
 
-    handleCollision(asteroid) {
+    handleCollision() {
         // Get the polygons of the lander and asteroid
         const landerPolygons = this.getLanderPolygons();
 
         // Check for intersection between each pair of polygons
         for (const landerPolygon of landerPolygons) {
-            let nearestPoint = landerPolygon.getNearestIntersection(asteroid.polygon);
+            let nearestPoint;
+            for (let i = 0; i < asteroids.length; i++) {
+                const asteroidPolygon = asteroids[i].polygon;
+                nearestPoint = landerPolygon.getNearestIntersection(asteroidPolygon);
 
-            if (nearestPoint) {
-                this.rigidBody.resolveCollision(asteroid.rigidBody);
-                //this.neuralNetwork.currentFitness -= 1000;
+                if (nearestPoint) {
+                    this.rigidBody.resolveCollision(asteroid.rigidBody);
+                    //this.neuralNetwork.currentFitness -= 1000;
+                }
+            }
+
+            for (let enemy of this.enemies) {
+                for (let i = 0; i < enemy.lasers.length; i++) {
+                    const laser = enemy.lasers[i];
+                    nearestPoint = landerPolygon.getNearestRayIntersection({
+                        start: laser.position,
+                        end: laser.end
+                    });
+                    if (nearestPoint) {
+                        enemy.removeLaser(i);
+                        this.neuralNetwork.currentFitness -= 1000;
+                        this.healthLevel -= this.laserDamage;
+                    }
+                }
             }
 
             // Check for intersection with walls

@@ -32,17 +32,18 @@ class GeneticAlgorithm {
                 this.bestIndividual = null;
 
                 let copyArray = [...this.population];
-                copyArray.sort((a, b) => b.currentFitness - a.currentFitness);                
-                //this.population.sort((a, b) => b.currentFitness - a.currentFitness);
+                copyArray.sort((a, b) => b.currentFitness - a.currentFitness);
                 copyArray[0].isBest = true;
                 this.bestIndividual = copyArray[0];
 
                 for (let i = 0; i < copyArray.length; i++) {
-                    const neuralNetwork = copyArray;
+                    const neuralNetwork = copyArray[i];
                     neuralNetwork.positionNumber = i + 1;
-                    if (!neuralNetwork.isDead)
+                    if (!neuralNetwork.isDead) {
                         this.bestIndividual = neuralNetwork;
+                    }
                 }
+
                 if (!this.restart && !this.bestSolutionFound) {
                     if (this.allIndividualsDead()) {
                         //this.savePopulation();

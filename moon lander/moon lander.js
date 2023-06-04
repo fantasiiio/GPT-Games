@@ -3,14 +3,14 @@ const canvas = document.getElementById('gameCanvas');
 
 const ctx = canvas.getContext('2d');
 
-let enableManualControl = false;
+let enableManualControl = true;
 let useSpaceStation = true;
 let landers = [];
 let targets = [];
 let asteroids = [];
 let walls = [];
 let asteroidsCount = 0;
-let targetCount = 2;
+let targetCount = 0;
 let cycleTargets = false;
 const populationCount = enableManualControl ? 1 : 100;
 let targetRadius = 200;
@@ -27,7 +27,7 @@ const maxAngularVelocity = 0.1;
 const maxRotationAccel = 0.002;
 const FuelConsumption_thrust = 0.25;
 const FuelConsumption_rotate = 0.25;
-
+const FuelConsumption_sideThrust = 0.25 * 0.5;
 
 let score = 0;
 let zoomLevel = 0.25;
@@ -249,6 +249,12 @@ function getNeuralNetworksFromLanders() {
 function addNeuralNetworkToLanders(name) {
     for (let lander of landers) {
         lander.addNeuralNetwork(new NeuralNetwork2([inputSize, hiddenSize, outputSize]), name);
+    }
+}
+
+function addEnemyToLanders() {
+    for (let lander of landers) {
+        lander.addEnemy(new Enemy(lander.rigidBody.position.x, lander.rigidBody.position.y - 1000, Math.PI));
     }
 }
 
@@ -530,8 +536,15 @@ function updateLanderManually(lander) {
     }
     if (keys['ArrowUp']) {
         lander.thrust = maxThrustPower;
-    } else {
+    } 
+    if (keys['ArrowDown']) {
+        lander.thrust = -maxThrustPower;
+    }
+    if (!keys['ArrowUp'] && !keys['ArrowDown']) {
         lander.thrust = 0;
+    }
+    if (keys['Space']) {
+        lander.fireLaser();
     }
 }
 
@@ -630,13 +643,14 @@ function checkNodesPerLayer(individualData, config) {
 
 
 function getMatchingNodesPerLayer(config) {
-    const inputsCount = config.inputs.length;
+    const inputsCount = config.inputs.reduce((sum, input) => sum + (input.checked ? input.inputCount : 0), 0);
     const hiddenLayersCount = config.hiddenLayers.length;
-    const outputsCount = config.outputs.length;
+    const outputs = config.outputs;
+    const outputsCount = outputs.filter((output) => output.checked).length;
 
     const nodesPerLayer = [inputsCount];
     for (let i = 0; i < hiddenLayersCount; i++) {
-        nodesPerLayer.push(config.hiddenLayers[i].defaultValue);
+        nodesPerLayer.push(Number(config.hiddenLayers[i]));
     }
     nodesPerLayer.push(outputsCount);
 
@@ -654,42 +668,6 @@ function loadLanders() {
         let networkCount = 0;
 
         config.networks.forEach((network) => {
-            // networkCount++;
-            // let nnConfig = {
-            //     id: networkCount,
-            //     inputs: [],
-            //     hiddenLayers: [],
-            //     outputs: [],
-            //     fitness: [],
-            //     name: network.name,
-            //     isDefault: network.isDefault || false
-            // };
-
-            // network.fitness.forEach((fitness, index) => {
-            //     let newValue = {
-            //         value: network.fitness[index].checked,
-            //         multiplyFactor: network.fitness[index].multiplyFactor
-            //     }
-            //     nnConfig.fitness.push(newValue);
-            // });
-
-            // for (let i = 0; i < network.inputs.length; i++) {
-            //     nnConfig.inputs.push({
-            //         value: network.inputs[i].checked,
-            //         inputCount: network.inputs[i].inputCount
-            //     });
-            // }
-            // for (let i = 0; i < network.hiddenLayers.length; i++) {
-            //     nnConfig.hiddenLayers.push({
-            //         value: network.hiddenLayers[i]
-            //     });
-            // }
-            // for (let i = 0; i < network.outputs.length; i++) {
-            //     nnConfig.outputs.push({
-            //         value: network.outputs[i].checked
-            //     });
-            // }
-
             nnConfigs[network.name] = network;
 
             let key = Object.keys(localStorage).find(key => key == 'NeuralNetwork_' + network.name);
@@ -723,13 +701,13 @@ function loadLanders() {
                     if (!lander)
                         lander = new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel, i);
 
-                    lander.addNeuralNetwork(new NeuralNetwork2(nodesPerLayer), name);
+                    lander.addNeuralNetwork(new NeuralNetwork2(nodesPerLayer), network.name);
                     if (!landers[i])
                         landers.push(lander);
                 }
 
             }
-            if(network.isDefault)
+            if (network.isDefault)
                 SetLandersNeuralNetwork(network.name);
         });
     }
@@ -744,24 +722,29 @@ function SetLandersNeuralNetwork(name) {
     }
 }
 
-if (!loadLanders()) {
+//if (!loadLanders()) {
+{
+    // If the NeuralNetworks could not be loaded, create new ones
     for (let i = 0; i < populationCount; i++) {
         const lander = new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel, i);
         landers.push(lander);
     }
+    addNeuralNetworkToLanders('travel');
+    SetLandersNeuralNetwork('travel');
+    addEnemyToLanders();
 }
 
 
 changeAllTarget();
-
-geneticAlgorithm = initGeneticAlgorithm(populationCount);
-geneticAlgorithm.onNewGenerationCreatedFn = (newPopulation) => {
-    restart(newPopulation);
+if (!enableManualControl) {
+    geneticAlgorithm = initGeneticAlgorithm(populationCount);
+    geneticAlgorithm.onNewGenerationCreatedFn = (newPopulation) => {
+        restart(newPopulation);
+    }
+    geneticAlgorithm.run(bestIndividual => {
+        console.log("L'algorithme g\xE9n\xE9tique a terminé. Meilleur individu : ", bestIndividual);
+    });
 }
-geneticAlgorithm.run(bestIndividual => {
-    console.log("L'algorithme g\xE9n\xE9tique a terminé. Meilleur individu : ", bestIndividual);
-});
-
 
 
 function gameLoop() {
@@ -795,6 +778,7 @@ function gameLoop() {
             let targetArrays = [];
             for (let lander of landers) {
                 if (!lander.neuralNetwork.isDead) {
+                    //lander.activateShield();
                     lander.checkChangeAction();
                     if (lander.checkTargetReached(lander.target)) {
                         if (targets.length > 1 && !lander.harvesting) {
@@ -813,7 +797,8 @@ function gameLoop() {
                     }
 
 
-                    lander.updateLander(asteroids);
+                    lander.updateLander();
+                    lander.drawLander();
                     if (index == 0 && enableManualControl) {
                         updateLanderManually(lander);
                     } else {
@@ -830,13 +815,10 @@ function gameLoop() {
                         if (useSpaceStation)
                             lander.checkDocking();
                     }
-                    lander.drawLander();
-                    for (let i = 0; i < asteroidsCount; i++) {
-                        lander.handleCollision(asteroids[i]);
-                    }
+                    lander.handleCollision();
                 } else {
+                    lander.updateLander();
                     lander.calculateFitness()
-                    lander.drawLander();
                 }
                 index++;
             }

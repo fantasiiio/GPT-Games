@@ -49,7 +49,7 @@
         },
         {
             id: 6,
-            name: "Speed score calculated when target is reached",
+            name: "Speed / 10 calculated when target is reached",
             multiplyFactor: 1
         },
         {
@@ -59,17 +59,17 @@
         },
         {
             id: 8,
-            name: "Angle alignment score calculated from dot product during docking",
+            name: "Docking port angle alignment score",
             multiplyFactor: 1
         },
         {
             id: 9,
-            name: "Position alignment with center line penalty during docking",
+            name: "Docking port center line position alignment score",
             multiplyFactor: 1
         },
         {
             id: 10,
-            name: "Spaceship's speed",
+            name: "Spaceship's speed penality",
             multiplyFactor: 0.1
         },
     ];
@@ -118,7 +118,12 @@
             id: 9,
             name: "Energy Level",
             inputCount: 1
-        }
+        },        
+        {
+            id: 10,
+            name: "Nearest enemy info (distance, polar velocity, angle, health) (x5)",
+            inputCount: 5
+        },
     ];
 
     const outputs = [{
