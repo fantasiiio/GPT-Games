@@ -3,28 +3,11 @@ class Asteroid {
         this.vertices = [];
         this.radius = radius;
         this.numSubdivisions = 2;
-        this.polygon = this.generateRandomAsteroidPolygon()
+        this.polygon = this.generateRandomAsteroidPolygon(radius, this.numSubdivisions)
         let rectangle = this.polygon.createRectangleFromPolygon()
         this.rigidBody = new RigidBody(center.x, center.y, rectangle.width, rectangle.height, 1);
 
     }
-
-    createRandomAsteroid(numVertices, radius) {
-        const angleIncrement = (2 * Math.PI) / numVertices;
-
-        for (let i = 0; i < numVertices; i++) {
-            const angle = i * angleIncrement;
-            const distance = Math.random() * radius;
-
-            const x = Math.cos(angle) * distance;
-            const y = Math.sin(angle) * distance;
-
-            this.vertices.push(new Vector(x, y));
-        }
-
-        return new Polygon(this.vertices);
-    }
-
 
     getPolygon() {
         const polygon = new Polygon();

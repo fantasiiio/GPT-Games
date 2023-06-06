@@ -22,6 +22,56 @@
 </body>
 
 <script>
+    const fitnessOnEvents = [{
+            id: 1,
+            name: "OnCollisionAsteroid",
+            desc: "On collision with an asteroid",
+            value: -100
+        },
+        {
+            id: 2,
+            name: "OnCollisionSpaceStation",
+            desc: "On collision with spaceStation",
+            value: -100
+        },
+        {
+            id: 3,
+            name: "OnTargetReached",
+            desc: "On Target Reached",
+            value: 5000
+        },
+        {
+            id: 4,
+            name: "OnDocked",
+            desc: "On docked on spase station",
+            value: 10000
+        },
+        {
+            id: 5,
+            name: "OnGotHit",
+            desc: "On got hit by enemy",
+            value: -1000
+        },
+        {
+            id: 6,
+            name: "OnHitEnemy",
+            desc: "On Hit Enemy",
+            value: 5000
+        },
+        {
+            id: 7,
+            name: "OnGotShieldHit",
+            desc: "On got shield hit by enemy",
+            value: -200
+        },
+        {
+            id: 8,
+            name: "OnHitEnemyShield",
+            desc: "On hit enemy shield",
+            value: 1000
+        }
+    ]
+
     const fitnesses = [{
             id: 1,
             name: "Distance fitness based on the normalized distance to the target",
@@ -72,6 +122,11 @@
             name: "Spaceship's speed penality",
             multiplyFactor: 0.1
         },
+        {
+            id: 11,
+            name: "Fuel Level Normalized",
+            multiplyFactor: 1
+        },
     ];
 
     const inputs = [{
@@ -96,8 +151,8 @@
         },
         {
             id: 5,
-            name: "projectile info (distance, polar velocity, angle) (x5)",
-            inputCount: 5
+            name: "Unused",
+            inputCount: 0
         },
         {
             id: 6,
@@ -118,12 +173,17 @@
             id: 9,
             name: "Energy Level",
             inputCount: 1
-        },        
+        },
         {
             id: 10,
-            name: "Nearest enemy info (distance, polar velocity, angle, health) (x5)",
-            inputCount: 5
+            name: "targeted enemy info (health, shield) (x2)",
+            inputCount: 2
         },
+        {
+            id: 11,
+            name: "Sheild Status (isActive, CooldownTimer, ActivationTimer) (x3)",
+            inputCount: 3
+        }
     ];
 
     const outputs = [{
@@ -311,8 +371,17 @@
         fitnessContainer.appendChild(fitnessFieldsContainer);
         formGroup.appendChild(fitnessContainer);
 
+        // FitnessEvents
+        const fitnessEventsContainer = document.createElement('div');
+        fitnessEventsContainer.innerHTML = `<h2>Fitness On Events</h2>`;
+        const fitnessEventsFieldsContainer = document.createElement('div');
+        fitnessEventsFieldsContainer.id = `fitnessEventsFields${networkId}`;
+        fitnessEventsContainer.appendChild(fitnessEventsFieldsContainer);
+        formGroup.appendChild(fitnessEventsContainer);
+
         container.appendChild(formGroup);
 
+        populateSubFields(network, "fitnessOnEvents", `fitnessEventsFields${networkId}`);
         populateSubFields(network, "fitness", `fitnessFields${networkId}`);
         populateSubFields(network, "inputs", `inputFields${networkId}`);
         populateSubFields(network, "hiddenLayers", `hiddenLayerFields${networkId}`);
@@ -324,43 +393,46 @@
         const fields = network[propertyName] || [];
 
         fields.forEach((field, index) => {
-            addSubField(container, field.id, field.name, field.value, field.multiplyFactor, propertyName,
+            addSubField(container, field, propertyName,
                 targetId);
         });
     }
 
-    function addSubField(container, fieldId, fieldName, fieldValue, fieldMultiplyFactor, propertyName, targetId) {
+    function addSubField(container, field, propertyName, targetId) {
         let formGroup = document.createElement('div');
         formGroup.className = "form-group";
 
         let input = null;
-        if (propertyName != "hiddenLayers") {
+        if (propertyName != "hiddenLayers" && propertyName != "fitnessOnEvents") {
             input = document.createElement('input');
             input.type = "checkbox";
-            input.id = `${targetId}${fieldId}`;
-            input.name = `${targetId}${fieldId}`;
-            input.checked = fieldValue;
+            input.id = `${targetId}${field.id}`;
+            input.name = `${targetId}${field.id}`;
+            input.checked = field.value;
         }
 
         let inputNumber = null;
-        if (propertyName == "fitness" || propertyName == "hiddenLayers") {
+        if (propertyName == "fitness" || propertyName == "hiddenLayers" || propertyName == "fitnessOnEvents") {
             inputNumber = document.createElement('input');
             inputNumber.type = "number";
-            inputNumber.style = "width: 40px";
-            inputNumber.id = `num${targetId}${fieldId}`;
-            inputNumber.name = `num${targetId}${fieldId}`;
+            inputNumber.style = "width: 50px";
+            inputNumber.id = `num${targetId}${field.id}`;
+            inputNumber.name = `num${targetId}${field.id}`;
             if (propertyName == "fitness")
-                inputNumber.value = fieldMultiplyFactor;
+                inputNumber.value = field.multiplyFactor;
             else
-                inputNumber.value = fieldValue;
+                inputNumber.value = field.value;
         }
         let label = document.createElement('label');
-        label.htmlFor = fieldId;
-        label.innerHTML = fieldName;
+        label.htmlFor = field.id;
+        if (propertyName == "fitnessOnEvents")
+            label.innerHTML = field.desc;
+        else
+            label.innerHTML = field.name;
 
-        if (propertyName != "hiddenLayers")
+        if (propertyName != "hiddenLayers" && propertyName != "fitnessOnEvents")
             formGroup.appendChild(input);
-        if (propertyName == "fitness" || propertyName == "hiddenLayers")
+        if (propertyName == "fitness" || propertyName == "hiddenLayers" || propertyName == "fitnessOnEvents")
             formGroup.appendChild(inputNumber);
         formGroup.appendChild(label);
 
@@ -385,12 +457,21 @@
                     checked: input.checked,
                     multiplyFactor: document.getElementById(`num${input.id}`).value
                 }));
+
+            let fitnessEventsCount = 0;
+            const fitnessEventsFields = Array.from(document.querySelectorAll(`#fitnessEventsFields${network.id} input`)).map(
+                fitnessEvents => ({
+                    value: fitnessEvents.value,
+                    name: fitnessOnEvents[fitnessEventsCount++].name
+                }));
+
             let inputCount = 0;
             const inputFields = Array.from(document.querySelectorAll(`#inputFields${network.id} input`)).map(
                 input => ({
                     checked: input.checked,
                     inputCount: inputs[inputCount++].inputCount
                 }));
+
             const hiddenLayerFields = Array.from(document.querySelectorAll(
                 `#hiddenLayerFields${network.id} input`)).map(input => input.value);
             const outputFields = Array.from(document.querySelectorAll(`#outputFields${network.id} input`)).map(
@@ -403,6 +484,7 @@
                 name,
                 isDefault,
                 fitness: fitnessFields,
+                fitnessOnEvents: fitnessEventsFields,
                 inputs: inputFields,
                 hiddenLayers: hiddenLayerFields,
                 outputs: outputFields
@@ -427,6 +509,7 @@
                     hiddenLayers: [],
                     outputs: structuredClone(outputs),
                     fitness: structuredClone(fitnesses),
+                    fitnessOnEvents: structuredClone(fitnessOnEvents),
                     name: network.name,
                     isDefault: network.isDefault
                 };
@@ -435,6 +518,11 @@
                     newNetwork.fitness[index].value = network.fitness[index].checked;
                     newNetwork.fitness[index].multiplyFactor = network.fitness[index].multiplyFactor;
                 });
+
+                if (network.fitnessOnEvents)
+                    for (let i = 0; i < network.fitnessOnEvents.length; i++) {
+                        newNetwork.fitnessOnEvents[i].value = network.fitnessOnEvents[i].value;
+                    }
 
                 for (let i = 0; i < network.inputs.length; i++) {
                     newNetwork.inputs[i].value = network.inputs[i].checked;

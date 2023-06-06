@@ -3,38 +3,256 @@
 
 <head>
     <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
         canvas {
             border: 1px solid black;
+            margin-right: 1em;
+        }
+
+        button,
+        input,
+        select {
+            padding: 0.5em;
+            margin: 0.2em 0;
+            font-size: 1em;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 0.5em;
+            text-align: left;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .flex-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            -webkit-transition: .4s;
+            transition: .4s;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            -webkit-transition: .4s;
+            transition: .4s;
+        }
+
+        input:checked+.slider {
+            background-color: #2196F3;
+        }
+
+        input:focus+.slider {
+            box-shadow: 0 0 1px #2196F3;
+        }
+
+        input:checked+.slider:before {
+            -webkit-transform: translateX(26px);
+            -ms-transform: translateX(26px);
+            transform: translateX(26px);
+        }
+
+        .slider.round {
+            border-radius: 34px;
+        }
+
+        .slider.round:before {
+            border-radius: 50%;
+        }
+
+        #circle-slider {
+            width: 200px;
+            height: 200px;
+            position: relative;
+            border: 1px solid #000;
+            border-radius: 50%;
+        }
+
+        #handle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            background: red;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
         }
     </style>
 </head>
 
 <body>
     <div style="display: flex;">
-        <canvas id="gameCanvas" width="1200" height="1000"></canvas>
-        <div>
-            <div>
+        <canvas id="gameCanvas"  style="width:1200px; height: 1000px;" width="1200" height="1000"></canvas>
+        <div class="flex-container">
+            <div style="display: grid;">
                 <button id="saveGenerationBtn">Save Generation</button>
-            </div>
-            <div>
                 <button id="skipGenerationBtn">Skip Generation</button>
-            </div>
-            <div>
                 <button id="stopShipBtn">Stop Ship</button>
+                <button id="drawBtn">Draw Walls</button>
+                <button id="addTargetBtn">Add Target</button>
+                <button id="addAsteroidBtn">Add Asteroid</button>
+                <button id="addSpaceStationBtn">Add Space Station</button>
             </div>
-            <div>
-                <button id="drawBtn">Draw</button>
-            </div>            
-            <div>
-                <div>Number of targets</div>
-                <input id="numberOfTargets" type="number" />
-            </div>
-            <div>
-                <div>Number of starship</div>
-                <input id="numberOfStarship" type="number"/>
-            </div>
+            <br>
+            <input id="sceneName" type="text" placeholder="Scene Name">
+            <button id="addSceneBtn">Add Scene</button>
+            Scene:<select id="sceneSelect"></select>
+            <table id="targetProperties" style="display: none;">
+                <tr>
+                    <td colspan="2">
+                        <h1>Target</h1>
+                </tr>                
+                <tr>
+                    <th>Property</th>
+                    <th>Value</th>
+                </tr>
+                <tr>
+                    <td>Activate Radius</td>
+                    <td><input type="number" id="targetActivateRadius"></td>
+                </tr>
+                <tr>
+                    <td>Target Mode</td>
+                    <td>
+                        <select id="targetMode" style="width: 100%;">
+                            <option value="nextTarget">Next Target</option>
+                            <option value="nearestTarget">Nearest Target</option>
+                            <option value="nearestEnemy">Nearest Enemy</option>
+                            <option value="nearestResource">Nearest Resource</option>
+                            <option value="nearestAsteroid">Nearest Asteroid</option>
+                            <option value="spaceStation">Space Station</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Action Mode</td>
+                    <td>
+                        <select id="targetAction" style="width: 100%;">
+                            <!-- Populate this select with options dynamically -->
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <button id="removeTargetBtn">Remove Target</button>
+                    </td>
+                </tr>
+            </table>
+
+            <table id="asteroidPropertiesTable" style="display: none;">
+                <tr>
+                    <td colspan="2">
+                        <h1>Asteroid</h1>
+                </tr>                
+                <tr>
+                    <th>Property</th>
+                    <th>Value</th>
+                </tr>
+                <tr>
+                    <td>Radius</td>
+                    <td><input type="number" id="asteroidRadiusInput"></td>
+                </tr>
+                <tr>
+                    <td>Num Subdivisions</td>
+                    <td><input type="number" id="asteroidNumSubdivisionsInput"></td>
+                </tr>
+                <tr>
+                    <td>Angle</td>
+                    <td>
+                        <svg id="asteroidSvg">
+                            <circle id="asteroidMainCircle" cx="100" cy="100" r="80" stroke="black" fill="transparent" />
+                            <circle id="asteroidKnob" cx="100" cy="20" r="10" fill="red" />
+                        </svg>
+                        <p><label>Snap angle: <input id="asteroidSnapCheckbox" type="checkbox" /></label></p>
+                        <p>Angle: <span id="asteroidAngleDisplay">0</span> degrees</p>                        
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <button id="regenerateAsteroidBtn">Regenerate</button>
+                    </td>
+                </tr>
+            </table>
+
+            <table id="spaceStationPropertiesTable" style="display: none;">
+                <tr>
+                    <td colspan="2">
+                        <h1>Space Station</h1>
+                </tr>
+                <tr>
+                    <th>Property</th>
+                    <th>Value</th>
+                </tr>
+                <tr>
+                    <td>Width</td>
+                    <td><input type="number" id="spaceStationWidthInput"></td>
+                </tr>
+                <tr>
+                    <td>Height</td>
+                    <td><input type="number" id="spaceStationHeightInput"></td>
+                </tr>
+                <tr>
+                    <td>Angle</td>
+                    <td>
+                        <svg id="spaceStationSvg" width="200" height="200">
+                            <circle id="spaceStationMainCircle" cx="100" cy="100" r="80" stroke="black" fill="transparent" />
+                            <circle id="spaceStationKnob" cx="100" cy="20" r="10" fill="red" />
+                        </svg>
+                        <p><label>Snap angle: <input id="spaceStationSnapCheckbox" type="checkbox" /></label></p>
+                        <p>Angle: <span id="spaceStationAngleDisplay">0</span> degrees</p>                        
+                    </td>
+                </tr>
+            </table>
+
+            <button id="saveSceneBtn">Save Scene</button>
         </div>
     </div>
+
+
+
+
     <script src="classes/Explosion.js"></script>
     <script src="classes/Firework2.js"></script>
     <script src="classes/Terrain.js"></script>

@@ -6,7 +6,7 @@ class Enemy extends Lander {
         this.isEnemy = true;
         this.fireTime = 200;
         this.fireTimer = 0;
-        this.neuralNetwork = {isDead : false};
+        this.neuralNetwork = {isDead : true};
         this.rigidBody.angle = angle;
     }
 

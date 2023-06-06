@@ -17,7 +17,7 @@ class Lander {
         this.cumulRotationPenaltyFactor = 0;
         this.frameCount = 0;
         this.target = null;
-        this.targetIndex = 0;
+        this.targetIndex = -1;
         this.rigidBody = new RigidBody(x, y, 50, 50);
         this.polygons = this.getLanderPolygons();
         let area = 0;
@@ -41,7 +41,7 @@ class Lander {
         this.laserCooldownTime = 50;
         this.laserEnergyCost = 20;
         this.laserLength = 30;
-        this.laserDamage = 50;
+        this.laserDamage = 10;
 
         this.energyLevel = 100;
         this.energyRegainRate = 0.1;
@@ -58,7 +58,57 @@ class Lander {
         this.fuelCapacity = 1000;
         this.fuelLevel = this.fuelCapacity;
         this.enemies = [];
+        this.target = null;
         //this.enemies.push(new Enemy());
+        this.chooseTargetMode =  "nextTarget", "nearestTarget", "nearestEnemy", "nearestResource", "nearestAsteroid", "spaceStation"
+    }
+
+    setTarget(target, activateRadius, targetMode, action) {
+        this.target = {
+            position: target,
+            velocity: new Vector(0, 0),
+            targetType: "target",
+            activateRadius,
+            targetMode,
+            action
+        };
+        this.changeTarget();
+    }
+
+    setTargetEnemy(enemy) {
+        this.target = {
+            position: enemy.rigidBody.position,
+            velocity: enemy.rigidBody.velocity,
+            targetType: "enemy"
+        };
+        this.changeTarget();
+    }
+
+    setTargetResource(resource) {
+        this.target = {
+            position: resource.position,
+            velocity: new Vector(0, 0),
+            targetType: "resource"
+        };
+        this.changeTarget();
+    }
+
+    setTargetLaser(laser) {
+        this.target = {
+            position: laser.position,
+            velocity: laser.velocity,
+            targetType: "laser"
+        };
+        this.changeTarget();
+    }
+
+    setTargetSpaceStation(spaceStation) {
+        this.target = {
+            position: spaceStation.position,
+            velocity: spaceStation.velocity,
+            targetType: "spaceStation"
+        };
+        this.changeTarget();
     }
 
     addEnemy(enemy) {
@@ -97,15 +147,10 @@ class Lander {
 
         this.energyLevel -= this.laserEnergyCost;
         const laser = {
-            position: {
-                x: this.rigidBody.position.x,
-                y: this.rigidBody.position.y
-            },
-            end: {
-                x: this.rigidBody.position.x - facingDirection.x * this.laserLength,
-                y: this.rigidBody.position.y - facingDirection.y * this.laserLength
-            },
+            position: new Vector(this.rigidBody.position.x, this.rigidBody.position.y),
+            end: new Vector(this.rigidBody.position.x - facingDirection.x * this.laserLength, this.rigidBody.position.y - facingDirection.y * this.laserLength),
             direction: facingDirection,
+            velocity: facingDirection.multiply(this.laserSpeed),
             life: 0,
         };
 
@@ -144,7 +189,7 @@ class Lander {
 
     getLastTargetDistance() {
         let lastTarget = targets[targets.length - 1];
-        const distanceVector = new Vector(lastTarget.x - this.rigidBody.position.x, lastTarget.y - this.rigidBody.position.y);
+        const distanceVector = new Vector(lastTarget.position.x - this.rigidBody.position.x, lastTarget.position.y - this.rigidBody.position.y);
         return distanceVector.length();
     }
 
@@ -164,11 +209,8 @@ class Lander {
             if (laser.life > this.laserLifeTime) {
                 this.lasers.splice(i, 1);
             }
-            laser.position.x = laser.position.x + laser.direction.x * this.laserSpeed;
-            laser.position.y = laser.position.y + laser.direction.y * this.laserSpeed;
-            laser.end.x = laser.position.x - laser.direction.x * this.laserLength;
-            laser.end.y = laser.position.y - laser.direction.y * this.laserLength;
-
+            laser.position = laser.position.add(laser.velocity)
+            laser.end = laser.position.subtract(laser.direction.multiply(this.laserLength));
         }
     }
 
@@ -233,7 +275,7 @@ class Lander {
         if (this.explosion) {
             this.explosion.update();
             if (this.explosion.isDone()) {}
-        }        
+        }
     }
 
     resetLander() {
@@ -254,21 +296,22 @@ class Lander {
         this.cumulRotationPenaltyFactor = 0;
         this.frameCount = 0;
         this.target = null;
-        this.targetIndex = 0;
+        this.targetIndex = -1;
         this.neuralNetwork.currentFitness = startingTimeBonus;
         this.fitnessMultiplier = 1;
-        this.startDistance = 0;
         this.timeBonus = startingTimeBonus;
         this.harvestCount = 0;
         this.harvestedResources.length = 0;
-        this.harvesting = false;
         for (let name in this.neuralNetworks)
             this.neuralNetworks[name].isDead = false;
 
+        this.energyLevel = 100;
+        this.fuelLevel = this.fuelCapacity;
+        this.healthLevel = 100;
+
     }
 
-    changeTarget(target) {
-        this.target = target;
+    changeTarget() {
         this.targetReached = false;
         this.timeToReachTarget = 0;
         this.startTimeReached = 0;
@@ -301,7 +344,7 @@ class Lander {
         ctx.translate(15, 0); // Move 15 units right from health bar
         ctx.strokeStyle = 'white';
         ctx.strokeRect(0, 0, 10, 100); // Total energy bar
-        ctx.fillStyle = 'blue';
+        ctx.fillStyle = '#E275AD';
         ctx.fillRect(0, 100, 10, -this.energyLevel); // Current energy
 
         // Draw Energy bar
@@ -343,7 +386,20 @@ class Lander {
             ctx.font = '40px Arial';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.fillText(this.neuralNetwork.positionNumber + "(" + this.neuralNetwork.currentFitness.toFixed() + ")", 50, 0);
+            ctx.fillText(this.neuralNetwork.positionNumber + "(" + this.neuralNetwork.currentFitness.toFixed() + ")", 100, -30);
+
+            ctx.moveTo(0, 15);
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.currentActionName, 100, 15);
+
+            ctx.moveTo(0, -15);
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.chooseTargetMode, 100, 40);
+
             //ctx.fillText(this.neuralNetwork.positionNumber, 50, 0);
         }
 
@@ -538,14 +594,15 @@ class Lander {
 
         for (let i = 0; i < resources.length; i++) {
             const resource = resources[i];
-            const dx = this.rigidBody.position.x - resource.x;
-            const dy = this.rigidBody.position.y - resource.y;
+            const dx = this.rigidBody.position.x - resource.position.x;
+            const dy = this.rigidBody.position.y - resource.position.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < resourceRadius + 25) {
                 if (this.harvestedResources.length < this.harvestCapacity && !this.harvestedResources.includes(i)) {
-                    this.harvesting = true;
                     this.harvestedResources.push(i);
+                    if (this.target.position == resource.position)
+                        this.target = null;
                 }
             }
 
@@ -557,16 +614,32 @@ class Lander {
             }
         }
 
+        return resources[closestResourceIndex];
         // If a resource was found, change the target
-        if (closestResourceIndex !== null) {
-            this.changeTarget(this.nearestResource);
+        // if (closestResourceIndex !== null) {
+        //     this.changeTarget(this.nearestResource);
+        // }
+    }
+
+    nextTarget() {
+        if (this.targetReached || !this.target) {
+            this.targetIndex++;
+            if (cycleTargets) {
+                this.targetIndex %= targets.length;
+            } else {
+                if (this.targetIndex >= targets.length) {
+                    this.targetIndex = targets.length - 1;
+                }
+            }
+            this.setTarget(targets[this.targetIndex]);
         }
     }
 
-
-    checkTargetReached(target) {
-
-        const distanceVector = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
+    checkTargetReached() {
+        const target = this.target;
+        if (!target)
+            return true;
+        const distanceVector = new Vector(target.position.x - this.rigidBody.position.x, target.position.y - this.rigidBody.position.y);
         let targetReached = distanceVector.length() < targetRadius;
         if (targetReached && !this.targetReached) {
             if (this.startTimeReached == 0)
@@ -575,13 +648,53 @@ class Lander {
             this.timeToReachTarget = performance.now() - this.startTimeReached;
             if (this.timeToReachTarget > 20) {
                 this.targetReached = true;
-                this.neuralNetwork.currentFitness += 15000;
+                this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnTargetReached"]);
+                this.target = null;
+                //nextTarget();
             }
         } else if (!targetReached) {
             this.startTimeReached = 0;
         }
 
         return this.targetReached;
+    }
+
+    checkTargetModes() {
+        if(!this.target) 
+            return;
+        // Check if target is activated (within radius) and if so, change the action to the target action
+        const distanceVector = new Vector(this.target.position.x - this.rigidBody.position.x, this.target.position.y - this.rigidBody.position.y);
+        let targetActivated = distanceVector.length() < (this.target.activateRadius || 1000);
+        if (targetActivated) {
+            if(this.target.targetMode && this.chooseTargetMode != this.target.targetMode){
+                this.chooseTargetMode = this.target.targetMode;
+                // Reset target
+                this.targetIndex = -1;
+                this.target = null;
+            }
+            if(this.target.action && this.currentActionName != this.target.action)
+                this.changeAction(this.target.action);
+        }
+    }
+
+    checkTargets() {
+        if (this.chooseTargetMode == "spaceStation")
+            this.target = spaceStation.dockPosition;
+        else if (this.chooseTargetMode == "nextTarget") {
+            if (this.checkTargetReached()) {
+                this.nextTarget();
+            }
+        } else if (this.chooseTargetMode == "nearestEnemy") {
+            if (!this.target) {
+                let enemy = this.getNearestEnemy();
+                this.target = enemy.rigidBody.position;
+            }
+        } else if (this.chooseTargetMode == "nearestResource") {
+            let closestResource = this.harvestResource();
+            if (closestResource && !this.target) {
+                this.setTargetResource(closestResource)
+            }
+        }
     }
 
     wrapAroundAngle(angle) {
@@ -617,7 +730,7 @@ class Lander {
             end: this.rigidBody.position.add(this.rigidBody.velocity.normalize().multiply(10000)) // multiply by 10000 to extend the line
         };
         const targetCircle = {
-            center: new Vector(target.x, target.y),
+            center: new Vector(target.position.x, target.position.y),
             radius: targetRadius
         };
         const intersection = IntersectionUtil.lineCircleIntersection(trajectoryLine.start, trajectoryLine.end, targetCircle.center, targetCircle.radius);
@@ -635,7 +748,7 @@ class Lander {
             this.timeBonus--;
         }
         // Calculate the vector pointing from the spaceship to the target
-        let distanceVector = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
+        let distanceVector = new Vector(target.position.x - this.rigidBody.position.x, target.position.y - this.rigidBody.position.y);
 
         // Calculate the angle of the spaceship's body
         let bodyAngle = this.rigidBody.angle;
@@ -645,7 +758,7 @@ class Lander {
         const facingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
 
         // Calculate distance fitness based on the normalized distance to the target
-        let distanceFitness = Math.max(0, 1 - distanceVector.length() / this.startDistance);
+        let distanceFitness = Math.max(0, 1 - distanceVector.length() / maxDistance);
 
         // Normalize the distance vector
         let distanceVectorNormal = new Vector(distanceVector.x, distanceVector.y).normalize();
@@ -718,7 +831,7 @@ class Lander {
             this.rigidBody.position = spaceStation.dockPosition.add(spaceStation.dockAlignment.multiply(30));
             this.rigidBody.angle = spaceStation.dockAlignment.angle() + Math.PI;
             this.docked = true;
-            this.neuralNetwork.currentFitness += 10000;
+            this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnDocked"]);
             this.die();
         }
     }
@@ -736,7 +849,7 @@ class Lander {
         let distanceVector = new Vector(spaceStation.dockPosition.x - this.rigidBody.position.x, spaceStation.dockPosition.y - this.rigidBody.position.y);
 
         // Calculate distance fitness based on the normalized distance to the target
-        let distanceFitness = Math.max(0, 1 - distanceVector.length() / this.startDistance);
+        let distanceFitness = Math.max(0, 1 - distanceVector.length() / maxDistance);
 
 
         // Calculate the angle of the spaceship's body
@@ -772,7 +885,7 @@ class Lander {
             this.timeBonus--;
         }
         // Calculate the vector pointing from the spaceship to the target
-        let distanceVector = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
+        let distanceVector = new Vector(target.position.x - this.rigidBody.position.x, target.position.y - this.rigidBody.position.y);
 
         // Calculate the angle of the spaceship's body
         let bodyAngle = this.rigidBody.angle;
@@ -782,7 +895,7 @@ class Lander {
         const facingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
 
         // Calculate distance fitness based on the normalized distance to the target
-        let distanceFitness = Math.max(0, 1 - distanceVector.length() / this.startDistance);
+        let distanceFitness = Math.max(0, 1 - distanceVector.length() / maxDistance);
 
         // Normalize the distance vector
         let distanceVectorNormal = new Vector(distanceVector.x, distanceVector.y).normalize();
@@ -834,7 +947,7 @@ class Lander {
         let bodyAngle = this.rigidBody.angle;
         bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
         const facingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
-        let distanceVector = new Vector(this.target.x - this.rigidBody.position.x, this.target.y - this.rigidBody.position.y);
+        let distanceVector = new Vector(this.target.position.x - this.rigidBody.position.x, this.target.position.y - this.rigidBody.position.y);
         let distanceVectorNormal = new Vector(distanceVector.x, distanceVector.y).normalize();
 
         for (let input of fitnessInputs) {
@@ -846,13 +959,16 @@ class Lander {
 
             switch (inputIndex++) {
                 case 1:
-                    value = Math.max(0, 1 - distanceVector.length() / this.startDistance);
+                    value = Math.max(0, 1 - distanceVector.length() / maxDistance);
                     break;
                 case 2:
                     value = facingDirection.dot(distanceVectorNormal);
                     break;
                 case 3:
-                    value = this.rigidBody.velocity.normalize().dot(distanceVectorNormal);
+                    if (this.rigidBody.velocity.length() == 0)
+                        value = 0;
+                    else
+                        value = this.rigidBody.velocity.normalize().dot(distanceVectorNormal);
                     break;
                 case 4:
                     value = Math.abs(this.rigidBody.angularVelocity) / maxAngularVelocity;
@@ -877,6 +993,9 @@ class Lander {
                     break;
                 case 10:
                     value = this.rigidBody.velocity.length();
+                    break;
+                case 11:
+                    value = this.fuelLevel / this.fuelCapacity;
                     break;
                 default:
                     break;
@@ -1002,7 +1121,7 @@ class Lander {
             return;
 
         // Calculate the vector pointing from the spaceship to the target
-        const deltaTarget = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
+        const deltaTarget = new Vector(target.position.x - this.rigidBody.position.x, target.position.y - this.rigidBody.position.y);
 
         // Calculate the angle of the spaceship's body
         let bodyAngle = this.rigidBody.angle;
@@ -1013,15 +1132,7 @@ class Lander {
         const targetAngle = this.calculateCosSinAngle(deltaTarget, headingDirection);
 
 
-        let r;
-        if (this.startDistance)
-            r = deltaTarget.length() / this.startDistance;
-        else
-            r = 1;
-
-        // Store the initial target distance for normalization
-        if (!this.startDistance)
-            this.startDistance = deltaTarget.length();
+        let r = Math.max(1, deltaTarget.length() / maxDistance);
 
         // Calculate the velocity in polar coordinates relative to the target
         const dr_dt = this.compute_dr_dt(-deltaTarget.x, -deltaTarget.y, this.rigidBody.velocity.x, this.rigidBody.velocity.y);
@@ -1052,27 +1163,29 @@ class Lander {
         return spaceshipStates;
     }
 
-    getNearestLaserInfo(lasers) {
+    getNearestLaserInfo() {
         let nearestLaser = null;
         let minDistance = Infinity;
         let laserDirection = null;
 
-        // Find nearest laser
-        for (let laser of lasers) {
-            // Calculate the distance from both endpoints of the laser to the spaceship, use the minimum of the two
-            let dx1 = this.rigidBody.position.x - laser.position.x;
-            let dy1 = this.rigidBody.position.y - laser.position.y;
-            let distance1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+        for (let enemy of this.enemies) {
+            // Find nearest laser
+            for (let laser of enemy.lasers) {
+                // Calculate the distance from both endpoints of the laser to the spaceship, use the minimum of the two
+                let dx1 = this.rigidBody.position.x - laser.position.x;
+                let dy1 = this.rigidBody.position.y - laser.position.y;
+                let distance1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
 
-            let dx2 = this.rigidBody.position.x - laser.end.x;
-            let dy2 = this.rigidBody.position.y - laser.end.x;
-            let distance2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+                let dx2 = this.rigidBody.position.x - laser.end.x;
+                let dy2 = this.rigidBody.position.y - laser.end.x;
+                let distance2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
 
-            let distance = Math.min(distance1, distance2);
-            if (distance < minDistance) {
-                minDistance = distance;
-                nearestLaser = laser;
-                laserDirection = new Vector(dx1, dy1).normalize();
+                let distance = Math.min(distance1, distance2);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestLaser = laser;
+                    laserDirection = new Vector(dx1, dy1).normalize();
+                }
             }
         }
 
@@ -1080,32 +1193,35 @@ class Lander {
             return null; // No lasers found
         }
 
-        // Calculate the angle of the spaceship's body
-        let bodyAngle = this.rigidBody.angle;
-        bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
-        const headingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
+        return nearestLaser;
 
-        // Calculate the cosine and sine of the angle between the spaceship's heading and the laser direction
-        const laserAngle = this.calculateCosSinAngle(laserDirection, headingDirection);
 
-        // Calculate the relative position and velocity to the nearest laser
-        const deltaLaser = new Vector(nearestLaser.position.x - this.rigidBody.position.x, nearestLaser.position.y - this.rigidBody.position.y);
-        const deltaVelocity = new Vector(nearestLaser.velocity.x - this.rigidBody.velocity.x, nearestLaser.velocity.y - this.rigidBody.velocity.y);
-        const r = deltaLaser.length();
-        const dr_dt = this.compute_dr_dt(-deltaLaser.x, -deltaLaser.y, deltaVelocity.x, deltaVelocity.y);
-        const dtheta_dt = this.compute_dtheta_dt(-deltaLaser.x, -deltaLaser.y, deltaVelocity.x, deltaVelocity.y);
-        const velocity = this.velocityInPolarCoordinates(r, dr_dt, dtheta_dt);
-
-        return {
-            cos_angle: laserAngle.cos_angle,
-            sin_angle: laserAngle.sin_angle,
-            distance: r,
-            v_r: velocity.v_r,
-            v_theta: velocity.v_theta
-        };
     }
 
+    getNearestEnemy() {
+        let nearestEnemy = null;
+        let nearestDistance = Infinity;
+        for (let enemy of enemies) {
+            if (enemy.isDead)
+                continue;
+            let dx = this.rigidBody.position.x - enemy.rigidBody.position.x;
+            let dy = this.rigidBody.position.y - enemy.rigidBody.position.y;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestEnemy = enemy;
+            }
+        }
+        return nearestEnemy;
+    }
 
+    getTargetedEnemy() {
+        for (let enemy of this.enemies) {
+            if (enemy.rigidBody.position == this.target.position)
+                return enemy;
+        }
+        return null;
+    }
 
     calculateStates(target, asteroids) {
         if (this.neuralNetwork.isDead)
@@ -1116,6 +1232,9 @@ class Lander {
         if (enableManualControl)
             return spaceshipStates;
 
+        const bodyAngle = this.wrapAroundAngle(this.rigidBody.angle) + Math.PI / 2 * 3;
+        const headingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
+
         let inputs = nnConfigs[this.currentActionName].inputs;
         let inputIndex = 1;
         for (const input of inputs) {
@@ -1124,60 +1243,44 @@ class Lander {
                 continue;
             }
             switch (inputIndex++) {
-                case 1:
+                case 1: // spaceship's angle + Angular velocity (x3)
                     spaceshipStates.push(
-                        Math.cos(this.rigidBody.angle),
-                        Math.sin(this.rigidBody.angle),
+                        headingDirection.x,
+                        headingDirection.y,
                         this.rigidBody.angularVelocity / maxAngularVelocity
                     );
                     break;
-                case 2:
-                    const bodyAngle = this.wrapAroundAngle(this.rigidBody.angle) + Math.PI / 2 * 3;
-                    const headingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
+                case 2: // target info (distance, polar velocity, target angle) (x5)
 
-                    // Calculate the vector pointing from the spaceship to the target
-                    let deltaTarget;
-                    if (target) {
-                        deltaTarget = new Vector(target.x - this.rigidBody.position.x, target.y - this.rigidBody.position.y);
-                    }
+                    // Calculate the vector pointing from the spaceship tors the target
+                    let deltaTarget = new Vector(target.position.x - this.rigidBody.position.x, target.position.y - this.rigidBody.position.y);
 
                     // Calculate the cosine and sine of the angle between the spaceship's heading and the target direction
-                    let targetAngle;
-                    if (target) {
-                        targetAngle = this.calculateCosSinAngle(deltaTarget, headingDirection);
-                    }
+                    let targetAngle = this.calculateCosSinAngle(deltaTarget, headingDirection);
 
                     // Store the initial target distance for normalization and calculate normalized target distance
-                    let r = 1;
-                    if (this.startDistance && target) {
-                        r = deltaTarget.length() / this.startDistance;
-                    } else if (!this.startDistance && target) {
-                        this.startDistance = deltaTarget.length();
-                    }
+                    let targetDistance = Math.max(1, deltaTarget.length() / maxDistance);
 
                     // Calculate the velocity in polar coordinates relative to the target
-                    let velocity;
-                    if (target) {
-                        const dr_dt = this.compute_dr_dt(-deltaTarget.x, -deltaTarget.y, this.rigidBody.velocity.x, this.rigidBody.velocity.y);
-                        const dtheta_dt = this.compute_dtheta_dt(-deltaTarget.x, -deltaTarget.y, this.rigidBody.velocity.x, this.rigidBody.velocity.y);
-                        velocity = this.velocityInPolarCoordinates(r, dr_dt, dtheta_dt);
-                    }
+                    const dr_dt = this.compute_dr_dt(-deltaTarget.x, -deltaTarget.y, target.velocity.x - this.rigidBody.velocity.x, target.velocity.y - this.rigidBody.velocity.y);
+                    const dtheta_dt = this.compute_dtheta_dt(-deltaTarget.x, -deltaTarget.y, target.velocity.x - this.rigidBody.velocity.x, target.velocity.y - this.rigidBody.velocity.y);
+                    let velocity = this.velocityInPolarCoordinates(targetDistance, dr_dt, dtheta_dt);
 
                     spaceshipStates.push(
-                        r,
+                        targetDistance,
                         velocity.v_r,
                         velocity.v_theta,
                         targetAngle.cos_angle,
                         targetAngle.sin_angle
                     );
                     break;
-                case 3:
+                case 3: // Asteroids Radar Rays ( x5)
                     // Find the nearest asteroid and calculate the angle and distance to it
                     let radar = this.getRayDistances(asteroids, walls, numRadarRays);
 
                     spaceshipStates.push(...radar);
                     break;
-                case 4:
+                case 4: // Asteroids Radar Nearest ( x3)
                     let nearestAsteroidPoint = this.getNearestAsteroidPoint(asteroids);
                     let distanceToNearestAsteroid = this.rigidBody.position.distanceTo(nearestAsteroidPoint);
                     let angleToNearestAsteroid = this.calculateCosSinAngle(this.rigidBody.position, nearestAsteroidPoint);
@@ -1187,44 +1290,34 @@ class Lander {
                         angleToNearestAsteroid.sin_angle
                     );
                     break;
-                case 5:
-                    const nearestLaserInfo = this.getNearestLaserInfo(lasers);
+                case 5: // Nearest Laser Info (distance, polar velocity, angle) (x5)
+                    const nearestLaser = this.getNearestLaserInfo();
 
-                    if (nearestLaserInfo) {
+                    if (nearestLaser) {
+                        // Calculate the cosine and sine of the angle between the spaceship's heading and the laser direction
+                        const laserAngle = this.calculateCosSinAngle(laserDirection, headingDirection);
+
+                        // Calculate the relative position and velocity to the nearest laser
+                        const deltaLaser = new Vector(nearestLaser.position.x - this.rigidBody.position.x, nearestLaser.position.y - this.rigidBody.position.y);
+                        const deltaVelocity = new Vector(nearestLaser.velocity.x - this.rigidBody.velocity.x, nearestLaser.velocity.y - this.rigidBody.velocity.y);
+                        const laserDistance = deltaLaser.length();
+                        const laser_dr_dt = this.compute_dr_dt(-deltaLaser.x, -deltaLaser.y, deltaVelocity.x, deltaVelocity.y);
+                        const laser_dtheta_dt = this.compute_dtheta_dt(-deltaLaser.x, -deltaLaser.y, deltaVelocity.x, deltaVelocity.y);
+                        const laser_velocity = this.velocityInPolarCoordinates(laserDistance, laser_dr_dt, laser_dtheta_dt);
+
                         // Gather the spaceship states including position, velocity, target information, asteroid information, and projectile information
                         spaceshipStates.push(
-                            nearestLaserInfo.cos_angle,
-                            nearestLaserInfo.sin_angle,
-                            nearestLaserInfo.distance,
-                            nearestLaserInfo.v_r,
-                            nearestLaserInfo.v_theta
+                            laserAngle.cos_angle,
+                            laserAngle.sin_angle,
+                            laserDistance,
+                            laser_velocity.v_r,
+                            laser_velocity.v_theta
                         );
                     } else {
                         spaceshipStates.push(0, 0, 1, 0, 0);
                     }
                     break;
                 case 6:
-                    if (this.nearestResource) {
-                        // Calculate the vector pointing from the spaceship to the nearest resource
-                        const deltaResource = new Vector(this.nearestResource.x - this.rigidBody.position.x, this.nearestResource.y - this.rigidBody.position.y);
-
-                        // Calculate the angle of the spaceship's body
-                        let resourceAngle = this.rigidBody.angle;
-                        resourceAngle = this.wrapAroundAngle(resourceAngle) + Math.PI / 2 * 3;
-                        const resourceDirection = new Vector(Math.cos(resourceAngle), Math.sin(resourceAngle));
-
-                        // Calculate the cosine and sine of the angle between the spaceship's heading and the resource direction
-                        const resourceTargetAngle = this.calculateCosSinAngle(deltaResource, resourceDirection);
-
-                        // Add to spaceshipStates
-                        spaceshipStates.push(
-                            resourceTargetAngle.cos_angle, // cosine of angle between heading and resource direction
-                            resourceTargetAngle.sin_angle, // sine of angle between heading and resource direction
-                            deltaResource.length() / this.startDistance // normalized distance to nearest resource
-                        );
-                    } else {
-                        spaceshipStates.push(0, 0, 1);
-                    }
                     break;
                 case 7:
                     spaceshipStates.push(this.fuelLevel);
@@ -1235,6 +1328,24 @@ class Lander {
                 case 9:
                     spaceshipStates.push(this.energyLevel);
                     break;
+                case 10: // targeted enemy info (health, shield) (x2)
+                    let enemy = this.getTargetedEnemy();
+                    if (enemy) {
+                        spaceshipStates.push(
+                            enemy.healthLevel,
+                            enemy.shieldActive
+                        )
+                    } else {
+                        spaceshipStates.push(0, 0);
+                    }
+                    break;
+                case 11: // Sheild Status (isActive, CooldownTimer, ActivationTimer) (x3)
+                    spaceshipStates.push(
+                        this.shieldActive,
+                        this.shieldCooldownTimer / this.shieldCoolDown,
+                        this.shieldActivationTimer / this.shieldActivatingTime
+                    );
+                    break;
             }
         }
 
@@ -1243,6 +1354,8 @@ class Lander {
 
 
     applyNeuralNetwork() {
+        if (this.neuralNetwork.isDead)
+            return;
 
         let inputs = this.spaceshipStates;
         const outputValues = this.neuralNetwork.predict(inputs);
@@ -1440,15 +1553,36 @@ class Lander {
         // Get the polygons of the lander and asteroid
         const landerPolygons = this.getLanderPolygons();
 
+        for (let enemy of this.enemies) {
+            for (let i = 0; i < enemy.lasers.length; i++) {
+                const laser = enemy.lasers[i];
+
+                nearestPoint = IntersectionUtil.lineCircleIntersection({
+                    start: laser.position,
+                    end: laser.end
+                }, this.rigidBody.position, 50);
+
+                if (nearestPoint) {
+                    if (this.rigidBody.position == enemy.target.position)
+                        enemy.target = null;
+                    enemy.removeLaser(i);
+                    this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnGotShieldHit"]);
+                    enemy.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnHitEnemyShield"]);
+                    this.healthLevel -= this.laserDamage;
+                }
+            }
+        }
         // Check for intersection between each pair of polygons
         for (const landerPolygon of landerPolygons) {
             let nearestPoint;
             for (let i = 0; i < asteroids.length; i++) {
+                let asteroid = asteroids[i];
                 const asteroidPolygon = asteroids[i].polygon;
                 nearestPoint = landerPolygon.getNearestIntersection(asteroidPolygon);
 
                 if (nearestPoint) {
                     this.rigidBody.resolveCollision(asteroid.rigidBody);
+                    this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnCollisionAsteroid"]);
                     //this.neuralNetwork.currentFitness -= 1000;
                 }
             }
@@ -1461,8 +1595,11 @@ class Lander {
                         end: laser.end
                     });
                     if (nearestPoint) {
+                        if (this.rigidBody.position == enemy.target.position)
+                            enemy.target = null;
                         enemy.removeLaser(i);
-                        this.neuralNetwork.currentFitness -= 1000;
+                        this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnGotHit"]);
+                        enemy.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnHitEnemy"]);
                         this.healthLevel -= this.laserDamage;
                     }
                 }
@@ -1487,7 +1624,7 @@ class Lander {
                 nearestPoint = spaceStation.polygon.getNearestIntersection(landerPolygon);
                 if (nearestPoint) {
                     this.rigidBody.resolveCollision(spaceStation.rigidBody);
-                    this.neuralNetwork.currentFitness -= 100;
+                    this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnCollisionSpaceStation"]);
                 }
             }
         }

@@ -47,7 +47,7 @@ class GeneticAlgorithm {
                 if (!this.restart && !this.bestSolutionFound) {
                     if (this.allIndividualsDead()) {
                         //this.savePopulation();
-                        console.log(`G\xE9n\xE9ration ${this.generationCount}: Meilleure fitness = ${this.population[0].currentFitness}`);
+                        console.log(`G\xE9n\xE9ration ${this.generationCount}: Meilleure fitness = ${this.bestIndividual.currentFitness}`);
 
                         this.population = this.createNewGeneration();
                         this.onNewGenerationCreatedFn(this.population);
@@ -101,24 +101,30 @@ class GeneticAlgorithm {
         return newGeneration;
     }
 
-    savePopulation() {
+    static getMaxFileIndex(actionName){
+        let maxIndex = -1;
+        for (const [key, value] of Object.entries(localStorage)) {
+            if (key.startsWith('NeuralNetwork_' + actionName + '_')) {
+                let index = parseInt(key.replace('NeuralNetwork_' + actionName + '_', ''));
+                if (index > maxIndex) {
+                    maxIndex = index;
+                }
+            }
+        }  
+        return Number(maxIndex);      
+    }
+
+    savePopulation(actionName) {
         //localStorage.setItem('bestSolutionFound', confirm('Est-ce que l\'\xC9volution est termin\xE9e?'));
         const json = JSON.stringify(this.population);
-        localStorage.setItem('generation' + this.generationCount, json);
+        let maxIndex = GeneticAlgorithm.getMaxFileIndex(actionName);
+        localStorage.setItem('NeuralNetwork_' + actionName + '_' + (maxIndex+1), json);
     }
 
     loadPopulation2() {
         let generationJson;
         let maxGenerationNumber = 0;
-        for (const [key, value] of Object.entries(localStorage)) {
-            if (key.startsWith('generation')) {
-                let generationNumber = parseInt(key.replace('generation', ''));
-                if (generationNumber > maxGenerationNumber) {
-                    maxGenerationNumber = generationNumber;
-                    generationJson = value;
-                }
-            }
-        }
+
         if (generationJson && confirm('Charger la population?')) {
             this.generationCount = maxGenerationNumber;
 

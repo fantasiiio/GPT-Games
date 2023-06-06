@@ -16,6 +16,7 @@ class NeuralNetwork2 {
 
         this.isDead = false;
         this.currentFitness = 0;
+        this.generationNumber = 1;
     }
 
     // Fisher-Yates Shuffle Algorithm to shuffle indices

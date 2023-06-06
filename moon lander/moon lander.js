@@ -3,22 +3,26 @@ const canvas = document.getElementById('gameCanvas');
 
 const ctx = canvas.getContext('2d');
 
-let enableManualControl = true;
-let useSpaceStation = true;
+let enableManualControl = false;
+let useSpaceStation = false;
 let landers = [];
 let targets = [];
 let asteroids = [];
 let walls = [];
+let spaceStations = [];
 let asteroidsCount = 0;
-let targetCount = 0;
-let cycleTargets = false;
-const populationCount = enableManualControl ? 1 : 100;
+
+let targetCount = 1;
+let cycleTargets = true;
 let targetRadius = 200;
+
+let scenes = [];
+const populationCount = enableManualControl ? 1 : 100;
 let numRadarRays = 5;
 let startingTimeBonus = 2000;
 let frameCount = 0;
 let geneticAlgorithm = null;
-const deathTimer = Number.MAX_VALUE;
+const deathTimer = 60000; //Number.MAX_VALUE;
 const gravity = 0.0;
 const maxThrustPower = 0.1;
 const maxSideThrustPower = 0.05;
@@ -28,6 +32,7 @@ const maxRotationAccel = 0.002;
 const FuelConsumption_thrust = 0.25;
 const FuelConsumption_rotate = 0.25;
 const FuelConsumption_sideThrust = 0.25 * 0.5;
+const maxDistance = 2000;
 
 let score = 0;
 let zoomLevel = 0.25;
@@ -57,31 +62,254 @@ let resources = [];
 let drawingMode = false;
 let drawing = false;
 
+let targetFound = null;
+let asteroidFound = null;
+let panning = false;
+let spaceStationFound = null;
+
+
 const saveGenerationBtn = document.getElementById('saveGenerationBtn');
 const skipGenerationBtn = document.getElementById('skipGenerationBtn');
 const stopShipBtn = document.getElementById('stopShipBtn');
-const numberOfTargets = document.getElementById('numberOfTargets');
-const numberOfStarship = document.getElementById('numberOfStarship');
+const addTargetBtn = document.getElementById('addTargetBtn');
 const drawBtn = document.getElementById('drawBtn');
+const targetPropertiesDiv = document.getElementById('targetProperties');
+const targetActivateRadiusInput = document.getElementById('targetActivateRadius');
+const targetModeSelect = document.getElementById('targetMode');
+const targetActionSelect = document.getElementById('targetAction');
+const removeTargetBtn = document.getElementById('removeTargetBtn');
+let asteroidRadiusInput = document.getElementById('asteroidRadiusInput');
+let asteroidNumSubdivisionsInput = document.getElementById('asteroidNumSubdivisionsInput');
+const addAsteroidBtn = document.getElementById('addAsteroidBtn');
+const regenerateAsteroidBtn = document.getElementById('regenerateAsteroidBtn');
+const saveSceneBtn = document.getElementById('saveSceneBtn');
+const sceneSelect = document.getElementById('sceneSelect');
+const addSceneBtn = document.getElementById('addSceneBtn');
+const sceneNameInput = document.getElementById('sceneName');
+let slider = document.getElementById('circle-slider');
+let handle = document.getElementById('handle');
+const spaceStationAngleDisplay = document.querySelector("#spaceStationAngleDisplay");
+const spaceStationSnapCheckbox = document.querySelector("#spaceStationSnapCheckbox");
+const addSpaceStationBtn = document.getElementById('addSpaceStationBtn');
+const spaceStationWidthInput = document.getElementById('spaceStationWidthInput');
+const spaceStationHeightInput = document.getElementById('spaceStationHeightInput');
 
-numberOfTargets.value = targetCount;
-numberOfStarship.value = populationCount;
+spaceStationWidthInput.addEventListener('change', (event) => {
+    if (spaceStationFound) {
+        let index = spaceStations.indexOf(spaceStationFound)
+        let spaceStation = spaceStations[index];
+        let newWidth = Number(spaceStationWidthInput.value);
+        spaceStations[index] = new SpaceStation(spaceStation.x, spaceStation.y, newWidth, spaceStation.height, spaceStation.dockingWidth, spaceStation.dockingHeight, spaceStation.angle);
+        spaceStationFound = spaceStations[index];
+    }
 
-numberOfStarship.addEventListener('change', () => {
-    populationCount = numberOfStarship.value;
-})
+});
 
-numberOfTargets.addEventListener('change', () => {
-    targetCount = numberOfTargets.value;
-    generateTargets();
-})
+spaceStationHeightInput.addEventListener('change', (event) => {
+
+});
+
+addSpaceStationBtn.addEventListener('click', () => {
+    spaceStation = new SpaceStation(canvas.width / zoomLevel / 2, canvas.height / zoomLevel / 2 + 1000, 200, 200, 100, 10, 0);
+    spaceStations.push(spaceStation);
+});
+
+let mouseDown = false;
+let circleCenter;
+let lastAngle;
+const spaceStationKnob = document.querySelector("#spaceStationKnob");
+const spaceStationMainCircle = document.querySelector("#spaceStationMainCircle");
+const spaceStationSvg = document.querySelector("#spaceStationSvg");
+const snapInterval = Math.PI / 4; // Change this to adjust snap interval
+
+
+//let angle = 0;
+let radius = 40;
+let center = {
+    x: 0,
+    y: 0
+};
+
+spaceStationMainCircle.setAttribute("r", radius);
+
+let isMouseDown = false;
+
+spaceStationKnob.addEventListener("mousedown", function (e) {
+    isMouseDown = true;
+});
+
+spaceStationSvg.addEventListener("mouseup", function (e) {
+    isMouseDown = false;
+});
+
+spaceStationSvg.addEventListener("mousemove", function (e) {
+    if (!isMouseDown) return;
+    let rect = this.getBoundingClientRect();
+    let x = e.clientX - rect.left - center.x;
+    let y = e.clientY - rect.top - center.y;
+    let spaceStation = spaceStationFound;
+
+    spaceStation.angle = Math.atan2(y, x);
+    if (spaceStationSnapCheckbox.checked)
+        spaceStation.angle = Math.round(Math.atan2(y, x) / snapInterval) * snapInterval;
+    updateKnobPosition();
+    updateAngleDisplay();
+});
+
+function updateKnobPosition() {
+    if (!spaceStationFound) {
+        spaceStationKnob.setAttribute("cx", center.x + Math.cos(0) * radius);
+        spaceStationKnob.setAttribute("cy", center.y + Math.sin(0) * radius);
+        return;
+    };
+    let spaceStation = spaceStationFound;
+    spaceStationKnob.setAttribute("cx", center.x + Math.cos(spaceStation.angle) * radius);
+    spaceStationKnob.setAttribute("cy", center.y + Math.sin(spaceStation.angle) * radius);
+}
+
+function updateAngleDisplay() {
+    if (!spaceStationFound) return;
+    let spaceStation = spaceStationFound;
+    spaceStationAngleDisplay.textContent = (spaceStation.angle * (180 / Math.PI)).toFixed(1);
+}
+
+updateAngleDisplay();
+
+let angleSliderSize = 2 * radius + 20;
+spaceStationSvg.setAttribute('width', angleSliderSize);
+spaceStationSvg.setAttribute('height', angleSliderSize);
+center = {
+    x: angleSliderSize / 2,
+    y: angleSliderSize / 2
+};
+spaceStationMainCircle.setAttribute('cx', angleSliderSize / 2);
+spaceStationMainCircle.setAttribute('cy', angleSliderSize / 2);
+updateKnobPosition();
+
+
+function saveScene() {
+    let scene = {
+        targets: targets,
+        asteroids: asteroids,
+        walls: walls,
+        resources: resources,
+        spaceStations: spaceStations,
+        useSpaceStation: useSpaceStation
+    }
+    maxIndex = 0;
+
+    localStorage.setItem('scene_' + sceneSelect.value, JSON.stringify(scene));
+}
+
+function loadScene(sceneName) {
+    let scene = JSON.parse(localStorage.getItem('scene_' + sceneName));
+    targets = scene.targets;
+    asteroids = scene.asteroids;
+    walls = scene.walls;
+    resources = scene.resources;
+    for (let spaceStation of scene.spaceStations)
+        spaceStations.push(new SpaceStation(spaceStation.x, spaceStation.y, spaceStation.width, spaceStation.height, spaceStation.dockingWidth, spaceStation.dockingHeight, spaceStation.angle));
+
+    useSpaceStation = scene.useSpaceStation
+    restart();
+}
+
+sceneSelect.addEventListener('change', (event) => {
+    loadScene(sceneSelect.value)
+});
+
+asteroidRadiusInput.addEventListener('change', (event) => {
+    if (asteroidFound) {
+        asteroidFound.radius = parseFloat(event.target.value);
+        asteroidFound.generateRandomAsteroidPolygon();
+    }
+});
+
+asteroidNumSubdivisionsInput.addEventListener('change', (event) => {
+    if (asteroidFound) {
+        asteroidFound.numSubdivisions = parseInt(event.target.value);
+        asteroidFound.generateRandomAsteroidPolygon();
+    }
+});
+
+
+
+let currentTarget = null;
+
+addSceneBtn.addEventListener('click', () => {
+    let sceneName = sceneNameInput.value;
+    scenes.push({
+        name: sceneName
+    });
+
+    let option = document.createElement('option');
+    option.value = sceneName;
+    option.text = sceneName;
+    sceneSelect.appendChild(option);
+});
+
+saveSceneBtn.addEventListener('click', () => {
+    saveScene()
+});
+
+regenerateAsteroidBtn.addEventListener('click', () => {
+    if (asteroidFound) {
+        asteroidFound.generateRandomAsteroidPolygon();
+    }
+});
+
+addAsteroidBtn.addEventListener('click', () => {
+    let asteroid = new Asteroid({
+            x: canvas.width / zoomLevel / 2,
+            y: canvas.height / zoomLevel / 2
+        },
+        50,
+    );
+    asteroids.push(asteroid);
+    asteroidFound = asteroid;
+
+});
+
+removeTargetBtn.addEventListener('click', () => {
+    if (currentTarget && targets.length > 1) {
+        let index = targets.indexOf(currentTarget);
+        targets.splice(index, 1);
+        currentTarget = null;
+    }
+});
+
+// Set up onChange listeners to update currentTarget dynamically
+targetActivateRadiusInput.addEventListener('input', () => {
+    if (currentTarget) {
+        currentTarget.activateRadius = parseFloat(targetActivateRadiusInput.value);
+    }
+});
+
+targetModeSelect.addEventListener('change', () => {
+    if (currentTarget) {
+        currentTarget.targetMode = targetModeSelect.value;
+    }
+});
+
+targetActionSelect.addEventListener('change', () => {
+    if (currentTarget) {
+        currentTarget.action = targetActionSelect.value;
+    }
+});
+
+addTargetBtn.addEventListener('click', () => {
+    targets.push({
+        x: canvas.width / zoomLevel / 2,
+        y: canvas.height / zoomLevel / 2
+    });
+});
 
 drawBtn.addEventListener('click', () => {
     drawingMode = true;
 });
 
 saveGenerationBtn.addEventListener('click', () => {
-    geneticAlgorithm.savePopulation()
+    geneticAlgorithm.savePopulation(landers[0].currentActionName)
     alert("saved")
 });
 
@@ -212,7 +440,7 @@ function drawResources(resourceCounts) {
     for (const [index, resource] of resources.entries()) {
         ctx.beginPath();
 
-        ctx.arc(resource.x, resource.y, resourceRadius, 0, 2 * Math.PI);
+        ctx.arc(resource.position.x, resource.position.y, resourceRadius, 0, 2 * Math.PI);
         ctx.fillStyle = "#03C03C";
         ctx.fill();
         ctx.stroke();
@@ -223,7 +451,7 @@ function drawResources(resourceCounts) {
             ctx.fillStyle = "black";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
-            ctx.fillText(resourceCounts[index].toString(), resource.x, resource.y);
+            ctx.fillText(resourceCounts[index].toString(), resource.position.x, resource.position.y);
         }
     }
     ctx.restore();
@@ -233,10 +461,9 @@ function clearCanvas(canvas, context, color) {
     context.fillStyle = color;
     context.fillRect(0, 0, canvas.width, canvas.height);
 }
-let terrain = new Terrain(canvas.width / zoomLevel, canvas.height / zoomLevel, mountainResolution, mountainHeightFactor, maxYOffset);
-terrain.generateTerrain();
+//let terrain = new Terrain(canvas.width / zoomLevel, canvas.height / zoomLevel, mountainResolution, mountainHeightFactor, maxYOffset);
+//terrain.generateTerrain();
 
-let spaceStation = new SpaceStation(canvas.width / zoomLevel / 2, canvas.height / zoomLevel / 2 + 1000, 200, 200, 100, 10, 0);
 
 function getNeuralNetworksFromLanders() {
     let neuralNetworks = [];
@@ -293,7 +520,10 @@ function generateObjectPositions(positionsCount, minDistance = 500, maxDistance 
     if (positionsCount == 0)
         return;
     // Add first positions
-    let center = new Vector(200 + Math.random() * (canvas.width / zoomLevel - 200), 200 + Math.random() * (canvas.height / zoomLevel / 3 * 2 - 200))
+    let center = {
+        x: (200 + Math.random() * (canvas.width / zoomLevel - 200)),
+        y: (200 + Math.random() * (canvas.height / zoomLevel / 3 * 2 - 200))
+    }
     positions.push(new Vector(center.x, center.y));
 
     for (let i = 0; i < positionsCount - 1; i++) {
@@ -318,7 +548,10 @@ function generateObjectPositions(positionsCount, minDistance = 500, maxDistance 
 
             if (!isTooCloseToExistingPositions && newX >= 200 && newX <= (canvas.width / zoomLevel - 200) && newY >= 200 && newY <= (canvas.height / zoomLevel / 3 * 2 - 200)) {
                 let center = new Vector(200 + Math.random() * (canvas.width / zoomLevel - 200), 200 + Math.random() * (canvas.height / zoomLevel / 3 * 2 - 200))
-                newPositions = new Vector(center.x, center.y);
+                newPositions = {
+                    x: center.x,
+                    y: center.y
+                };
                 break; // If a valid position is found, break out of the loop
             }
         }
@@ -350,45 +583,19 @@ function generateTargets() {
     targets = positions || [];
 }
 
-let populationCreated = false;
 
 function restart(newPopulation) {
-    populationCreated = false;
-    //generateAsteroids();
-    for (let i = 0; i < newPopulation.length; i++) {
-        landers[i].neuralNetwork = newPopulation[i];
-        landers[i].resetLander();
-        //landers[i].rigidBody.angle = Math.PI/2;
-        //landers[i].rigidBody.velocity = new Vector(10, 0);
+    if (newPopulation) {
+        for (let i = 0; i < newPopulation.length; i++) {
+            landers[i].neuralNetwork = newPopulation[i];
+            landers[i].resetLander();
+        }
+    } else {
+        for (let i = 0; i < landers.length; i++) {
+            landers[i].resetLander();
+        }
     }
-    changeAllTarget();
-    populationCreated = true;
 }
-
-
-
-generateTargets();
-generateAsteroids();
-
-
-canvas.addEventListener('mousemove', (event) => {
-    let mousePosition = new Vector(0, 0);
-    mousePosition.x = (event.clientX) / zoomLevel - pan.x - 30;
-    mousePosition.y = (event.clientY) / zoomLevel - pan.y - 30;
-
-    if (targetFound) {
-        targetFound.x = mousePosition.x;
-        targetFound.y = mousePosition.y;
-    } else if (asteroidFound) {
-        asteroidFound.rigidBody.position.x = mousePosition.x;
-        asteroidFound.rigidBody.position.y = mousePosition.y;
-    } else if (panning) {
-        panEvent(event);
-    } else if (drawing) {
-        walls[walls.length - 1].push(mousePosition)
-    }
-
-});
 
 function changeAllTarget(position) {
     for (let lander of landers) {
@@ -407,9 +614,33 @@ function killAll() {
     }
 }
 
-let targetFound = null;
-let asteroidFound = null;
-let panning = false;
+generateTargets();
+generateAsteroids();
+
+canvas.addEventListener('mousemove', (event) => {
+    let mousePosition = new Vector(0, 0);
+    mousePosition.x = (event.clientX) / zoomLevel - pan.x - 30;
+    mousePosition.y = (event.clientY) / zoomLevel - pan.y - 30;
+    if (event.buttons == 1) {
+        if (targetFound) {
+            targetFound.x = mousePosition.x;
+            targetFound.y = mousePosition.y;
+        } else if (asteroidFound) {
+            asteroidFound.rigidBody.position.x = mousePosition.x;
+            asteroidFound.rigidBody.position.y = mousePosition.y;
+        } else if (drawing) {
+            walls[walls.length - 1].push(mousePosition)
+        } else if (spaceStationFound) {
+            spaceStationFound.x = mousePosition.x - spaceStationFound.width / 2;
+            spaceStationFound.y = mousePosition.y - spaceStationFound.height / 2;
+        }
+    } else if (event.buttons == 4) {
+        if (panning) {
+            panEvent(event);
+        }
+    }
+});
+
 
 canvas.addEventListener('mousedown', (event) => {
     let mousePosition = new Vector(0, 0);
@@ -417,23 +648,54 @@ canvas.addEventListener('mousedown', (event) => {
     mousePosition.y = (event.clientY) / zoomLevel - pan.y - 30;
     if (event.button == 1) {
         panning = true;
-    } else if (event.button == 0) {
-        // check if the mouse is in a target circle
-        targetFound = null;
-        for (let i = 0; i < targetCount; i++) {
-            let distance = Math.sqrt(Math.pow(targets[i].x - mousePosition.x, 2) + Math.pow(targets[i].y - mousePosition.y, 2));
-            if (distance < targetRadius) {
-                targetFound = targets[i];
-                return;
+    } else if (event.buttons == 1) {
+        spaceStationFound = null;
+        for (let i = 0; i < spaceStations.length; i++) {
+            let distance = Math.sqrt(Math.pow(spaceStations[i].x - mousePosition.x, 2) + Math.pow(spaceStations[i].y - mousePosition.y, 2));
+            if (distance < spaceStations[i].width) {
+                spaceStationFound = spaceStations[i];
+                break;
             }
         }
 
+        if (spaceStationFound) {
+            showSpaceStationProperties(spaceStationFound);
+            updateKnobPosition();
+            updateAngleDisplay();
+        } else {
+            // Hide space station properties if not found (similar to the asteroidPropertiesTable)
+            document.getElementById('spaceStationPropertiesTable').style.display = 'none';
+        }
+
+        // check if the mouse is in a target circle
+        targetFound = null;
+        for (let i = 0; i < targets.length; i++) {
+            let distance = Math.sqrt(Math.pow(targets[i].x - mousePosition.x, 2) + Math.pow(targets[i].y - mousePosition.y, 2));
+            if (distance < targetRadius) {
+                targetFound = targets[i];
+                break;
+            }
+        }
+
+        if (targetFound) {
+            currentTarget = targetFound;
+            showTargetProperties(targetFound);
+        } else {
+            targetPropertiesDiv.style.display = 'none';
+        }
+
         asteroidFound = null;
-        for (let i = 0; i < asteroidsCount; i++) {
+        for (let i = 0; i < asteroids.length; i++) {
             if (asteroids[i].polygon.isPointInside(mousePosition)) {
                 asteroidFound = asteroids[i];
-                return;
+                break;
             }
+        }
+
+        if (asteroidFound) {
+            showAsteroidProperties(asteroidFound);
+        } else {
+            document.getElementById('asteroidPropertiesTable').style.display = 'none';
         }
 
         if (drawingMode) {
@@ -445,9 +707,26 @@ canvas.addEventListener('mousedown', (event) => {
     //changeAllTarget(mousePosition);
 });
 
+function showSpaceStationProperties(spaceStation) {
+    document.getElementById('spaceStationPropertiesTable').style.display = 'block';
+    spaceStationWidthInput.value = spaceStation.width;
+    spaceStationHeightInput.value = spaceStation.height;
+}
+
+function showAsteroidProperties(asteroid) {
+    document.getElementById('asteroidPropertiesTable').style.display = 'block';
+    asteroidRadiusInput.value = asteroid.radius;
+    asteroidNumSubdivisionsInput.value = asteroid.numSubdivisions;
+}
+
+function showTargetProperties(target) {
+    targetActivateRadiusInput.value = target.activateRadius;
+    targetModeSelect.value = target.targetMode;
+    targetActionSelect.value = target.action;
+    targetPropertiesDiv.style.display = 'block';
+}
+
 canvas.addEventListener('mouseup', (event) => {
-    targetFound = null;
-    asteroidFound = null;
     lastCursorX = null;
     lastCursorY = null;
     panning = false;
@@ -536,7 +815,7 @@ function updateLanderManually(lander) {
     }
     if (keys['ArrowUp']) {
         lander.thrust = maxThrustPower;
-    } 
+    }
     if (keys['ArrowDown']) {
         lander.thrust = -maxThrustPower;
     }
@@ -657,21 +936,50 @@ function getMatchingNodesPerLayer(config) {
     return nodesPerLayer;
 }
 
+function getSceneNames() {
+    let list = [];
+    for (const [key, value] of Object.entries(localStorage)) {
+        if (key.startsWith('scene_')) {
+            list.push(key.replace('scene_', ''));
+        }
+    }
+    return list;
+}
+
+function loadSceneNames() {
+    let scenes = getSceneNames();
+
+    let option = document.createElement('option');
+    option.value = "";
+    option.text = "";
+    sceneSelect.appendChild(option);
+
+    for (let scene of scenes) {
+        let option = document.createElement('option');
+        option.value = scene;
+        option.text = scene;
+        sceneSelect.appendChild(option);
+    }
+}
 
 let nnConfigs = {};
+loadSceneNames();
 
 function loadLanders() {
     const config = JSON.parse(localStorage.getItem('nnConfig'));
 
     if (config && config.networks) {
-        nnConfigs.length = 0;
-        let networkCount = 0;
 
         config.networks.forEach((network) => {
             nnConfigs[network.name] = network;
 
-            let key = Object.keys(localStorage).find(key => key == 'NeuralNetwork_' + network.name);
-            let populationData = JSON.parse(localStorage.getItem(key));
+            for (let fitnessOnEvent of network.fitnessOnEvents) {
+                network.fitnessOnEvents[fitnessOnEvent.name] = fitnessOnEvent.value;
+            }
+            let fileIndex = GeneticAlgorithm.getMaxFileIndex(network.name);
+            let fileName = 'NeuralNetwork_' + network.name + "_" + fileIndex;
+
+            let populationData = JSON.parse(localStorage.getItem(fileName));
             if (populationData) {
                 // For each saved individual, load the individual's data into the corresponding Lander
                 populationData.forEach((individualData, i) => {
@@ -722,8 +1030,7 @@ function SetLandersNeuralNetwork(name) {
     }
 }
 
-//if (!loadLanders()) {
-{
+if (!loadLanders()) {
     // If the NeuralNetworks could not be loaded, create new ones
     for (let i = 0; i < populationCount; i++) {
         const lander = new Lander(canvas.width / 2 / zoomLevel, canvas.height / 2 / zoomLevel, i);
@@ -734,8 +1041,21 @@ function SetLandersNeuralNetwork(name) {
     addEnemyToLanders();
 }
 
+let option = document.createElement('option');
+option.value = "";
+option.text = "Don't change";
+targetActionSelect.appendChild(option);
+// Fill action options dynamically
+for (let action in nnConfigs) {
+    let option = document.createElement('option');
+    option.value = action;
+    option.text = action;
+    targetActionSelect.appendChild(option);
+}
 
-changeAllTarget();
+
+
+//changeAllTarget();
 if (!enableManualControl) {
     geneticAlgorithm = initGeneticAlgorithm(populationCount);
     geneticAlgorithm.onNewGenerationCreatedFn = (newPopulation) => {
@@ -752,23 +1072,19 @@ function gameLoop() {
         gameLoop.debounced = true;
         setTimeout(() => {
             gameLoop.debounced = false;
-            if (!populationCreated)
-                requestAnimationFrame(gameLoop);
 
-            if (keysPressed["KeyS"])
-                geneticAlgorithm.savePopulation();
             //ctx.clearRect(0, 0, canvas.width, canvas.height);
             clearCanvas(canvas, ctx, '#03002e');
             ctx.save();
             ctx.scale(zoomLevel, zoomLevel);
             ctx.translate(pan.x, pan.y);
-            terrain.draw(ctx);
-            if (useSpaceStation)
+            //terrain.draw(ctx);
+            for (let spaceStation of spaceStations)
                 spaceStation.draw();
 
             let harvestedResources = countHarvestedResources()
             drawResources(harvestedResources);
-            for (let i = 0; i < asteroidsCount; i++) {
+            for (let i = 0; i < asteroids.length; i++) {
                 asteroids[i].rigidBody.update();
                 asteroids[i].getPolygon();
                 asteroids[i].draw();
@@ -779,22 +1095,10 @@ function gameLoop() {
             for (let lander of landers) {
                 if (!lander.neuralNetwork.isDead) {
                     //lander.activateShield();
-                    lander.checkChangeAction();
-                    if (lander.checkTargetReached(lander.target)) {
-                        if (targets.length > 1 && !lander.harvesting) {
-                            // if(targets.length > 1)
-                            //      lander.neuralNetwork.currentFitness += 5000;
-                            lander.targetIndex++;
-                            if (cycleTargets) {
-                                lander.targetIndex %= targets.length;
-                            } else {
-                                if (lander.targetIndex >= targets.length) {
-                                    lander.targetIndex = targets.length - 1;
-                                }
-                            }
-                            lander.changeTarget(targets[lander.targetIndex]);
-                        }
-                    }
+                    //lander.checkChangeAction();
+                    lander.checkTargetModes();
+
+                    lander.checkTargets();
 
 
                     lander.updateLander();
@@ -810,8 +1114,8 @@ function gameLoop() {
                         // targetArrays.push(lander.spaceshipStates.slice(0, lander.spaceshipStates.length - 2));
 
                         lander.calculateFitness()
-                        lander.harvestResource(terrain); // Check if the lander is refueling
-                        lander.checkLanding();
+                        lander.harvestResource(); // Check if the lander is refueling
+                        //lander.checkLanding();
                         if (useSpaceStation)
                             lander.checkDocking();
                     }
@@ -825,7 +1129,7 @@ function gameLoop() {
 
             //predictionModel.trainBatch(inputArrays, targetArrays);
 
-            for (let i = 0; i < targetCount; i++) {
+            for (let i = 0; i < targets.length; i++) {
                 drawTarget(targets[i], targetRadius, i);
             }
             //spaceStation.polygon.draw();
@@ -876,8 +1180,7 @@ function getRandomPositionInsideCircle(centerX, centerY, radius) {
     const y = centerY + randomRadius * Math.sin(angle);
 
     return {
-        x,
-        y
+        position: new Vector(x, y)
     };
 }
 
