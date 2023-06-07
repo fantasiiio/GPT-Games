@@ -13,9 +13,12 @@
 <body>
     <div>
         <h2>Neural Networks</h2>
-        <div id="networkFields"></div>
+        <select id="networkSelect" onchange="changeNetwork()">
+            <option value="">Select a network</option>
+        </select>
         <button onclick="addNetwork()">Add Network</button>
-        <button onclick="removeNetwork()">Remove Network</button>
+
+        <div id="networkFields"></div>
     </div>
     <button onclick="saveConfiguration()">Save Configuration</button>
     <button onclick="loadConfiguration()">Load Configuration</button>
@@ -68,6 +71,12 @@
             id: 8,
             name: "OnHitEnemyShield",
             desc: "On hit enemy shield",
+            value: 1000
+        },
+        {
+            id: 9,
+            name: "OnResourceHarvested",
+            desc: "On Resource Harvested",
             value: 1000
         }
     ]
@@ -275,23 +284,46 @@
         };
         networks.push(newNetwork);
         populateFields(newNetwork, "networkFields");
+
+        // Add this network to the dropdown
+        let selectElement = document.getElementById("networkSelect");
+        let option = document.createElement('option');
+        option.value = newNetwork.id;
+        option.text = newNetwork.name;
+        selectElement.add(option);
+
+        selectElement.value = newNetwork.id;
+        changeNetwork();
     }
 
-    function removeNetwork() {
-        if (networkCount > 0) {
-            networkCount--;
-            networks.pop();
-            const networkContainer = document.getElementById("networkFields");
-            networkContainer.lastElementChild.remove();
+
+    function removeNetwork(networkId) {
+        // Find the network with the specified ID
+        const networkIndex = networks.findIndex(network => network.id === networkId);
+
+        // If the network was found, remove it
+        if (networkIndex > -1) {
+            networks.splice(networkIndex, 1);
+            const networkContainer = document.getElementById(`networkContainer${networkId}`);
+            networkContainer.remove();
         }
     }
+
 
     function populateFields(network, targetId) {
         const container = document.getElementById(targetId);
         const networkId = network.id;
 
+        const networkContainer = document.createElement('div');
+        networkContainer.id = `networkContainer${networkId}`;
+        networkContainer.style.display = 'none'; // hide all networks by default
+
+
         let formGroup = document.createElement('div');
         formGroup.className = "form-group";
+
+        // Append all the controls to the network container
+        networkContainer.appendChild(formGroup);
 
         let nametitle = document.createElement('H1');
         nametitle.innerHTML = `Network ${networkId}`;
@@ -319,12 +351,12 @@
         defaultNetworkRadio.value = networkId;
         defaultNetworkRadio.checked = network.isDefault;
 
-        formGroup.appendChild(nametitle);
-        formGroup.appendChild(nameLabel);
-        formGroup.appendChild(nameInput);
-        formGroup.appendChild(breakLine);
-        formGroup.appendChild(defaultNetworkLabel);
-        formGroup.appendChild(defaultNetworkRadio);
+        networkContainer.appendChild(nametitle);
+        networkContainer.appendChild(nameLabel);
+        networkContainer.appendChild(nameInput);
+        networkContainer.appendChild(breakLine);
+        networkContainer.appendChild(defaultNetworkLabel);
+        networkContainer.appendChild(defaultNetworkRadio);
 
         // Inputs
         const inputsContainer = document.createElement('div');
@@ -332,7 +364,7 @@
         const inputFieldsContainer = document.createElement('div');
         inputFieldsContainer.id = `inputFields${networkId}`;
         inputsContainer.appendChild(inputFieldsContainer);
-        formGroup.appendChild(inputsContainer);
+        networkContainer.appendChild(inputsContainer);
 
         // Hidden Layers
         const hiddenLayersContainer = document.createElement('div');
@@ -353,7 +385,7 @@
 
         hiddenLayersContainer.appendChild(addHiddenLayerButton);
         hiddenLayersContainer.appendChild(removeHiddenLayerButton);
-        formGroup.appendChild(hiddenLayersContainer);
+        networkContainer.appendChild(hiddenLayersContainer);
 
         // Outputs
         const outputsContainer = document.createElement('div');
@@ -361,7 +393,7 @@
         const outputFieldsContainer = document.createElement('div');
         outputFieldsContainer.id = `outputFields${networkId}`;
         outputsContainer.appendChild(outputFieldsContainer);
-        formGroup.appendChild(outputsContainer);
+        networkContainer.appendChild(outputsContainer);
 
         // Fitness
         const fitnessContainer = document.createElement('div');
@@ -369,7 +401,7 @@
         const fitnessFieldsContainer = document.createElement('div');
         fitnessFieldsContainer.id = `fitnessFields${networkId}`;
         fitnessContainer.appendChild(fitnessFieldsContainer);
-        formGroup.appendChild(fitnessContainer);
+        networkContainer.appendChild(fitnessContainer);
 
         // FitnessEvents
         const fitnessEventsContainer = document.createElement('div');
@@ -377,9 +409,15 @@
         const fitnessEventsFieldsContainer = document.createElement('div');
         fitnessEventsFieldsContainer.id = `fitnessEventsFields${networkId}`;
         fitnessEventsContainer.appendChild(fitnessEventsFieldsContainer);
-        formGroup.appendChild(fitnessEventsContainer);
+        networkContainer.appendChild(fitnessEventsContainer);
 
-        container.appendChild(formGroup);
+        let removeNetworkButton = document.createElement('button');
+        removeNetworkButton.innerHTML = 'Remove This Network';
+        removeNetworkButton.onclick = () => removeNetwork(networkId);
+        networkContainer.appendChild(removeNetworkButton);
+
+        container.appendChild(networkContainer);
+
 
         populateSubFields(network, "fitnessOnEvents", `fitnessEventsFields${networkId}`);
         populateSubFields(network, "fitness", `fitnessFields${networkId}`);
@@ -431,10 +469,10 @@
             label.innerHTML = field.name;
 
         if (propertyName != "hiddenLayers" && propertyName != "fitnessOnEvents")
-            formGroup.appendChild(input);
+            container.appendChild(input);
         if (propertyName == "fitness" || propertyName == "hiddenLayers" || propertyName == "fitnessOnEvents")
-            formGroup.appendChild(inputNumber);
-        formGroup.appendChild(label);
+            container.appendChild(inputNumber);
+        container.appendChild(label);
 
         container.appendChild(formGroup);
     }
@@ -459,7 +497,8 @@
                 }));
 
             let fitnessEventsCount = 0;
-            const fitnessEventsFields = Array.from(document.querySelectorAll(`#fitnessEventsFields${network.id} input`)).map(
+            const fitnessEventsFields = Array.from(document.querySelectorAll(
+                `#fitnessEventsFields${network.id} input`)).map(
                 fitnessEvents => ({
                     value: fitnessEvents.value,
                     name: fitnessOnEvents[fitnessEventsCount++].name
@@ -537,6 +576,7 @@
                 }
 
                 networks.push(newNetwork);
+
             });
 
             const networkContainer = document.getElementById("networkFields");
@@ -544,12 +584,43 @@
 
             networks.forEach((network) => {
                 populateFields(network, "networkFields");
+
+                // Add this network to the dropdown
+                let selectElement = document.getElementById("networkSelect");
+                let option = document.createElement('option');
+                option.value = network.id;
+                option.text = network.name;
+                selectElement.add(option);
+
+                // If this network is the default, select it in the dropdown
+                if (network.isDefault) {
+                    selectElement.value = network.id;
+                }
             });
+
+            // Trigger change event to display the default network
+            changeNetwork();
+
         }
     }
 
 
     loadConfiguration();
+
+    function changeNetwork() {
+        let selectElement = document.getElementById("networkSelect");
+        let selectedValue = selectElement.value;
+
+        // hide all networks
+        networks.forEach(network => {
+            document.getElementById(`networkContainer${network.id}`).style.display = "none";
+        });
+
+        // show selected network
+        if (selectedValue !== '') {
+            document.getElementById(`networkContainer${selectedValue}`).style.display = "block";
+        }
+    }
 </script>
 
 </html>

@@ -28,19 +28,18 @@ class GeneticAlgorithm {
             }
 
             const checkPopulation = () => {
-                // find best population based on it's currentFitness that is not dead
-                this.bestIndividual = null;
-
                 let copyArray = [...this.population];
                 copyArray.sort((a, b) => b.currentFitness - a.currentFitness);
-                copyArray[0].isBest = true;
-                this.bestIndividual = copyArray[0];
-
+                
+                this.bestIndividual = null;
                 for (let i = 0; i < copyArray.length; i++) {
                     const neuralNetwork = copyArray[i];
                     neuralNetwork.positionNumber = i + 1;
-                    if (!neuralNetwork.isDead) {
+                    if (i == 0) {
                         this.bestIndividual = neuralNetwork;
+                        neuralNetwork.isBest = true;
+                    } else {
+                        neuralNetwork.isBest = false;
                     }
                 }
 

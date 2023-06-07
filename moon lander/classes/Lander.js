@@ -1,5 +1,5 @@
 class Lander {
-    constructor(x, y, populationIndex) {
+    constructor(x, y, populationIndex, angle) {
         this.retartPosition = {
             x,
             y
@@ -19,6 +19,7 @@ class Lander {
         this.target = null;
         this.targetIndex = -1;
         this.rigidBody = new RigidBody(x, y, 50, 50);
+        this.rigidBody.angle = angle || 0;
         this.polygons = this.getLanderPolygons();
         let area = 0;
         this.fitnessMultiplier = 1;
@@ -31,8 +32,9 @@ class Lander {
         //this.neuralNetwork.currentFitness = startingTimeBonus;
         this.neuralNetworks = {}; // Array to store multiple neural networks indexed by name
         this.currentActionName = "";
-        this.harvestCapacity = 10;
-        this.harvestedResources = [];
+
+        this.harvestCapacity = 1000;
+        this.harvestedResources = {};
 
         this.lasers = [];
         this.laserSpeed = 20;
@@ -60,18 +62,11 @@ class Lander {
         this.enemies = [];
         this.target = null;
         //this.enemies.push(new Enemy());
-        this.chooseTargetMode =  "nextTarget", "nearestTarget", "nearestEnemy", "nearestResource", "nearestAsteroid", "spaceStation"
+        this.chooseTargetMode = "nextTarget", "nearestTarget", "nearestEnemy", "nearestResource", "nearestAsteroid", "spaceStation"
     }
 
-    setTarget(target, activateRadius, targetMode, action) {
-        this.target = {
-            position: target,
-            velocity: new Vector(0, 0),
-            targetType: "target",
-            activateRadius,
-            targetMode,
-            action
-        };
+    setTarget(target) {
+        this.target = target;
         this.changeTarget();
     }
 
@@ -84,9 +79,13 @@ class Lander {
         this.changeTarget();
     }
 
-    setTargetResource(resource) {
+    setTargetResource(resourceSpot) {
+        let resource = resourceSpot.spot.resources[resourceSpot.resourceIndex];
         this.target = {
-            position: resource.position,
+            position: {
+                x: resource.position.x + resourceSpot.spot.position.x,
+                y: resource.position.y + resourceSpot.spot.position.y
+            },
             velocity: new Vector(0, 0),
             targetType: "resource"
         };
@@ -279,12 +278,13 @@ class Lander {
     }
 
     resetLander() {
-        this.rigidBody.position.x = this.retartPosition.x;
-        this.rigidBody.position.y = this.retartPosition.y;
-        this.rigidBody.angle = 0;
+        this.rigidBody.position.x = targets[0].position.x;
+        this.rigidBody.position.y = targets[0].position.y + 1;
         this.rigidBody.velocity.x = 0;
         this.rigidBody.velocity.y = 0;
         this.rigidBody.angularVelocity = 0;
+        this.rigidBody.angle = targets[0].startAngle || 0;
+
         this.thrust = 0;
         this.fuelConsumption = 0;
         this.successfulLanding = false;
@@ -301,14 +301,14 @@ class Lander {
         this.fitnessMultiplier = 1;
         this.timeBonus = startingTimeBonus;
         this.harvestCount = 0;
-        this.harvestedResources.length = 0;
+        this.harvestedResources = {};
         for (let name in this.neuralNetworks)
             this.neuralNetworks[name].isDead = false;
 
         this.energyLevel = 100;
         this.fuelLevel = this.fuelCapacity;
         this.healthLevel = 100;
-
+        this.setTarget(targets[0]);
     }
 
     changeTarget() {
@@ -359,6 +359,18 @@ class Lander {
 
     }
 
+
+    getResourcesCount() {
+        let count = 0;
+        let obj = this.harvestedResources
+        for (let key in obj) {
+            if (obj.hasOwnProperty(key) && Array.isArray(obj[key])) {
+                count += obj[key].length;
+            }
+        }
+        return count;
+    }
+
     drawLander() {
         if (!this.isEnemy) {
             for (let enemy of this.enemies) {
@@ -392,7 +404,10 @@ class Lander {
             ctx.font = '20px Arial';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.fillText(this.currentActionName, 100, 15);
+            if (this.currentActionName == "harvest")
+                ctx.fillText(this.currentActionName + " (" + this.getResourcesCount() + ")", 100, 15);
+            else
+                ctx.fillText(this.currentActionName, 100, 15);
 
             ctx.moveTo(0, -15);
             ctx.font = '20px Arial';
@@ -588,37 +603,61 @@ class Lander {
         }
     }
 
+    getNearestResourceSpotIndex() {
+        let nearestresourcesSpot = null;
+        let nearestDistance = Infinity;
+        for (let resourcesSpot of resourcesSpots) {
+            let dx = this.rigidBody.position.x - resourcesSpot.position.x;
+            let dy = this.rigidBody.position.y - resourcesSpot.position.y;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestresourcesSpot = resourcesSpot;
+            }
+        }
+        return resourcesSpots.indexOf(nearestresourcesSpot);
+    }
+
     harvestResource() {
         let closestResourceIndex = null;
-        let minDistance = 50;
+        let minDistance = Number.MAX_SAFE_INTEGER;
 
-        for (let i = 0; i < resources.length; i++) {
-            const resource = resources[i];
-            const dx = this.rigidBody.position.x - resource.position.x;
-            const dy = this.rigidBody.position.y - resource.position.y;
+        let nearestresourcesSpotIndex = this.getNearestResourceSpotIndex();
+        let nearestresourcesSpot = resourcesSpots[nearestresourcesSpotIndex];
+        if (!nearestresourcesSpot)
+            return null;
+        for (let i = 0; i < nearestresourcesSpot.resources.length; i++) {
+            const resource = nearestresourcesSpot.resources[i];
+            const dx = this.rigidBody.position.x - (resource.position.x + nearestresourcesSpot.position.x);
+            const dy = this.rigidBody.position.y - (resource.position.y + nearestresourcesSpot.position.y);
             const distance = Math.sqrt(dx * dx + dy * dy);
 
-            if (distance < resourceRadius + 25) {
-                if (this.harvestedResources.length < this.harvestCapacity && !this.harvestedResources.includes(i)) {
-                    this.harvestedResources.push(i);
-                    if (this.target.position == resource.position)
+            if (!this.harvestedResources[nearestresourcesSpotIndex])
+                this.harvestedResources[nearestresourcesSpotIndex] = [];
+
+            let resources = this.harvestedResources[nearestresourcesSpotIndex];
+
+            if (distance < nearestresourcesSpot.resourceRadius + 25) {
+                if (resources.length < this.harvestCapacity && !resources.includes(i)) {
+                    resources.push(i);
+                    this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnResourceHarvested"]);
+                    if (this.target && this.target.position == resource.position)
                         this.target = null;
                 }
             }
 
             // If this resource is closer than the current closest resource, update closestResourceIndex and minDistance
-            if (distance < minDistance && !this.harvestedResources.includes(i)) {
+            if (distance < minDistance && !resources.includes(i)) {
                 minDistance = distance;
                 closestResourceIndex = i;
                 this.nearestResource = resource;
             }
         }
 
-        return resources[closestResourceIndex];
-        // If a resource was found, change the target
-        // if (closestResourceIndex !== null) {
-        //     this.changeTarget(this.nearestResource);
-        // }
+        return {
+            spot: nearestresourcesSpot,
+            resourceIndex: closestResourceIndex
+        };
     }
 
     nextTarget() {
@@ -646,7 +685,7 @@ class Lander {
                 this.startTimeReached = performance.now();
 
             this.timeToReachTarget = performance.now() - this.startTimeReached;
-            if (this.timeToReachTarget > 20) {
+            if (this.timeToReachTarget > 20 && targets.length > 1) {
                 this.targetReached = true;
                 this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnTargetReached"]);
                 this.target = null;
@@ -660,20 +699,26 @@ class Lander {
     }
 
     checkTargetModes() {
-        if(!this.target) 
+        if (!this.target)
             return;
         // Check if target is activated (within radius) and if so, change the action to the target action
         const distanceVector = new Vector(this.target.position.x - this.rigidBody.position.x, this.target.position.y - this.rigidBody.position.y);
         let targetActivated = distanceVector.length() < (this.target.activateRadius || 1000);
         if (targetActivated) {
-            if(this.target.targetMode && this.chooseTargetMode != this.target.targetMode){
+            let resetTarget = false;
+            if (this.target.targetMode && this.chooseTargetMode != this.target.targetMode) {
                 this.chooseTargetMode = this.target.targetMode;
+                resetTarget = true;
+            }
+            if (this.target.action && this.currentActionName != this.target.action)
+                this.setActiveNeuralNetwork(this.target.action);
+
+            if (resetTarget) {
                 // Reset target
                 this.targetIndex = -1;
                 this.target = null;
             }
-            if(this.target.action && this.currentActionName != this.target.action)
-                this.changeAction(this.target.action);
+
         }
     }
 
@@ -691,7 +736,7 @@ class Lander {
             }
         } else if (this.chooseTargetMode == "nearestResource") {
             let closestResource = this.harvestResource();
-            if (closestResource && !this.target) {
+            if (closestResource) {
                 this.setTargetResource(closestResource)
             }
         }
@@ -817,6 +862,7 @@ class Lander {
 
 
     checkDocking() {
+        return false;
         if (this.docked)
             return;
         // Calculate the angle of the spaceship's body
@@ -1252,6 +1298,10 @@ class Lander {
                     break;
                 case 2: // target info (distance, polar velocity, target angle) (x5)
 
+                    if (!target) {
+                        spaceshipStates.push(0, 0, 0, 0, 0);
+                        break;
+                    }
                     // Calculate the vector pointing from the spaceship tors the target
                     let deltaTarget = new Vector(target.position.x - this.rigidBody.position.x, target.position.y - this.rigidBody.position.y);
 

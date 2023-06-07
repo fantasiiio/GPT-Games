@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Paint Application</title>
+    <style>
+        /* Add some basic styling */
+        #canvas {
+            border: 1px solid #000;
+        }
+
+        #toolbar {
+            margin-bottom: 10px;
+        }
+
+        #toolbar button {
+            margin-right: 5px;
+        }
+    </style>
+    <link href="toggle.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="toolbar">
+        <div class="switch-field">
+            <input type="radio" id="selectTool" name="selectedTool" value="line"  />
+            <label for="selectTool">Select</label>
+            <input type="radio" id="lineTool" name="selectedTool" value="line" checked/>
+            <label for="lineTool">Line</label>
+            <input type="radio" id="rectangleTool" name="selectedTool" value="Rectangle" />
+            <label for="rectangleTool">Rectangle</label>
+            <input type="radio" id="circleTool" name="selectedTool" value="Circle" />
+            <label for="circleTool">Circle</label>
+            <input type="radio" id="arcTool" name="selectedTool" value="Arc" />
+            <label for="arcTool">Arc</label>            
+        </div>
+
+        <input id="gridSnapButton" type="checkbox" checked>
+        <label>
+            Mode:
+            <select id="modeSelect">
+                <option value="stroke">Stroke</option>
+                <option value="fill">Fill</option>
+            </select>
+        </label>
+    </div>
+    <canvas id="canvas" width="800" height="600"></canvas>
+
+    <script src="canvas.js">
+
+
+    </script>
+</body>
+
+</html>

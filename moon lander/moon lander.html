@@ -135,15 +135,69 @@
                 <button id="addTargetBtn">Add Target</button>
                 <button id="addAsteroidBtn">Add Asteroid</button>
                 <button id="addSpaceStationBtn">Add Space Station</button>
+                <button id="addResourcesSpotBtn">Add Resources Spot</button>
             </div>
             <br>
             <input id="sceneName" type="text" placeholder="Scene Name">
             <button id="addSceneBtn">Add Scene</button>
             Scene:<select id="sceneSelect"></select>
+
+            <!-- resourcesSpots -->
+            <table id="resourcesSpotProperties" style="display: none;">
+                <tr>
+                    <td colspan="2">
+                        <h1 id="resourcesSpotName">resourcesSpot</h1>
+                </tr>                
+                <tr>
+                    <th>Property</th>
+                    <th>Value</th>
+                </tr>
+                <tr>
+                    <td>Spot Radius</td>
+                    <td><input type="number" id="resourcesSpotRadius"></td>
+                </tr>
+                <tr>
+                    <td>Number Of Resources</td>
+                    <td><input type="number" id="resourcesSpotNumResources"></td>
+                </tr>                                
+                <tr>
+                    <td>Resource Radius</td>
+                    <td><input type="number" id="resourcesSpotResourceRadius"></td>
+                </tr>                                
+
+                <tr>
+                    <td>Full Target Mode</td>
+                    <td>
+                        <select id="resourcesSpotModeSelect" style="width: 100%;">
+                            <option value="nextresourcesSpot">Next resourcesSpot</option>
+                            <option value="nearestresourcesSpot">Nearest resourcesSpot</option>
+                            <option value="nearestEnemy">Nearest Enemy</option>
+                            <option value="nearestResource">Nearest Resource</option>
+                            <option value="nearestAsteroid">Nearest Asteroid</option>
+                            <option value="spaceStation">Space Station</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Full Action Mode</td>
+                    <td>
+                        <select id="resourcesSpotAction" style="width: 100%;">
+                            <!-- Populate this select with options dynamically -->
+                        </select>
+                    </td>
+                </tr>              
+                <tr>
+                    <td colspan="2">
+                        <button id="removeresourcesSpotBtn">Remove resourcesSpot</button>
+                    </td>
+                </tr>
+            </table>
+            
+            <!-- Targets -->
             <table id="targetProperties" style="display: none;">
                 <tr>
                     <td colspan="2">
-                        <h1>Target</h1>
+                        <h1 id="targetName">Target</h1>
                 </tr>                
                 <tr>
                     <th>Property</th>
@@ -174,6 +228,17 @@
                         </select>
                     </td>
                 </tr>
+                <tr id="startAngleRow">
+                    <td>Angle</td>
+                    <td>
+                        <svg id="startSvg" width="200" height="200">
+                            <circle id="startMainCircle" cx="100" cy="100" r="80" stroke="black" fill="transparent" />
+                            <circle id="startKnob" cx="100" cy="20" r="10" fill="red" />
+                        </svg>
+                        <p><label>Snap angle: <input id="startSnapCheckbox" type="checkbox" /></label></p>
+                        <p>Angle: <span id="startAngleDisplay">0</span> degrees</p>                        
+                    </td>
+                </tr>                
                 <tr>
                     <td colspan="2">
                         <button id="removeTargetBtn">Remove Target</button>
@@ -181,6 +246,7 @@
                 </tr>
             </table>
 
+            <!-- Asteroids -->
             <table id="asteroidPropertiesTable" style="display: none;">
                 <tr>
                     <td colspan="2">
@@ -216,6 +282,7 @@
                 </tr>
             </table>
 
+            <!-- Space Stations -->
             <table id="spaceStationPropertiesTable" style="display: none;">
                 <tr>
                     <td colspan="2">
