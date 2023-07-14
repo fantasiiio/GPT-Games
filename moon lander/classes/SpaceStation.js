@@ -18,6 +18,23 @@ class SpaceStation {
         this.polygon.rotate(angle, center);
         this.rigidBody = new RigidBody(this.x, this.y, this.width, this.height, 1);
         this.rigidBody.center = center;
+        this.docked
+    }
+    // Update the space station position and rotation
+    updateDockPosition() {
+        
+        this.dockAlignment = new Vector(Math.cos(this.angle-Math.PI/2), Math.sin(this.angle-Math.PI/2));
+
+        this.x = position.x;
+        this.y = position.y;
+        this.dockPosition.x = this.x + this.width / 2;
+        this.dockPosition.y = this.y - this.dockingHeight;
+        this.polygon = Polygon.createRectangle(this.x, this.y, this.width, this.height);
+        let center = this.polygon.calculateCenter();
+        let rotatedPosition = this.rotatePoint(this.dockPosition, center, this.angle);
+        this.dockPosition = new Vector(rotatedPosition.x, rotatedPosition.y);
+        this.polygon.rotate(this.angle, center);
+        this.rigidBody.center = center;
     }
 
     rotatePoint(point, center, angle) {

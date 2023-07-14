@@ -6,11 +6,13 @@ const ctx = canvas.getContext('2d');
 let enableManualControl = false;
 let useSpaceStation = false;
 let landers = [];
+let PPOLander = null;
 let targets = [];
 let asteroids = [];
 let walls = [];
 let spaceStations = [];
 let asteroidsCount = 0;
+let showfirstN = 0; //0 = all
 
 let targetCount = 1;
 let cycleTargets = true;
@@ -19,10 +21,10 @@ let targetRadius = 200;
 let scenes = [];
 const populationCount = enableManualControl ? 1 : 100;
 let numRadarRays = 5;
-let startingTimeBonus = 2000;
+let startingTimeBonus = 0;
 let frameCount = 0;
 let geneticAlgorithm = null;
-const deathTimer = 60000; //Number.MAX_VALUE;
+let deathTimer = 60000; //Number.MAX_VALUE;
 const gravity = 0.0;
 const maxThrustPower = 0.1;
 const maxSideThrustPower = 0.05;
@@ -86,7 +88,11 @@ const addSceneBtn = document.getElementById('addSceneBtn');
 const sceneNameInput = document.getElementById('sceneName');
 let slider = document.getElementById('circle-slider');
 let handle = document.getElementById('handle');
-
+let spaceStationActivateRadius = document.getElementById('spaceStationActivateRadius');
+let spaceStationEnterMode = document.getElementById('spaceStationEnterMode');
+let spaceStationEnterAction = document.getElementById('spaceStationEnterAction');
+let spaceStationExitMode = document.getElementById('spaceStationExitMode');
+let spaceStationExitAction = document.getElementById('spaceStationExitAction');
 
 const addSpaceStationBtn = document.getElementById('addSpaceStationBtn');
 const spaceStationWidthInput = document.getElementById('spaceStationWidthInput');
@@ -99,6 +105,8 @@ let resourcesSpotNumResources = document.getElementById('resourcesSpotNumResourc
 let resourcesSpotModeSelect = document.getElementById('resourcesSpotModeSelect');
 let resourcesSpotAction = document.getElementById('resourcesSpotAction');
 let resourcesSpotResourceRadius = document.getElementById('resourcesSpotResourceRadius');
+let deathTimeoutInput = document.getElementById('deathTimeoutInput');
+
 
 
 removeresourcesSpotBtn.addEventListener('click', (event) => {
@@ -107,6 +115,49 @@ removeresourcesSpotBtn.addEventListener('click', (event) => {
         resourcesSpots.splice(index, 1);
         resourcesSpotFound = null;
     }
+});
+
+
+document.getElementById('spaceStationDockMaxSpeed').addEventListener('change', (event) => {
+    spaceStationFound.maxDockingSpeed = Number(document.getElementById('spaceStationDockMaxSpeed').value);
+})
+
+document.getElementById('showfirstN').addEventListener('change', (event) => {
+    showfirstN = Number(document.getElementById('showfirstN').value);
+})
+
+document.getElementById('enableManualControlChk').addEventListener('change', (event) => {
+    enableManualControl = document.getElementById('enableManualControlChk').checked;
+    if (enableManualControl) {
+        landers[0].resetLander()
+    }
+});
+
+
+deathTimeoutInput.addEventListener('change', (event) => {
+    deathTimer = Number(deathTimeoutInput.value) * 1000;
+});
+
+deathTimeoutInput.value = deathTimer / 1000;
+
+spaceStationActivateRadius.addEventListener('change', (event) => {
+    spaceStationFound.activateRadius = parseFloat(spaceStationActivateRadius.value);
+});
+
+spaceStationEnterMode.addEventListener('change', (event) => {
+    spaceStationFound.mode = spaceStationEnterMode.value;
+});
+
+spaceStationEnterAction.addEventListener('change', (event) => {
+    spaceStationFound.action = spaceStationEnterAction.value;
+});
+
+spaceStationExitMode.addEventListener('change', (event) => {
+    spaceStationFound.exitMode = spaceStationExitMode.value;
+});
+
+spaceStationExitAction.addEventListener('change', (event) => {
+    spaceStationFound.exitAction = spaceStationExitAction.value;
 });
 
 resourcesSpotResourceRadius.addEventListener('change', (event) => {
@@ -148,13 +199,13 @@ spaceStationHeightInput.addEventListener('change', (event) => {
 
 addResourcesSpotBtn.addEventListener('click', () => {
     let spot = addResourcesSpot(canvas.width / 2, canvas.height / 2, 500, 50);
-    showresourcesSpotProperties(spot);    
+    showresourcesSpotProperties(spot);
 });
 
 
 addSpaceStationBtn.addEventListener('click', () => {
     spaceStation = new SpaceStation(canvas.width / zoomLevel / 2, canvas.height / zoomLevel / 2 + 1000, 200, 200, 100, 10, 0);
-    showSpaceStationProperties(spaceStation);    
+    showSpaceStationProperties(spaceStation);
     spaceStations.push(spaceStation);
 });
 
@@ -194,7 +245,35 @@ startMainCircle.setAttribute('cy', angleSliderSize / 2);
 startMainCircle.setAttribute("r", radius);
 
 
+const spaceStationDockSvg = document.querySelector("#spaceStationDockSvg");
+spaceStationDockSvg.setAttribute('width', angleSliderSize);
+spaceStationDockSvg.setAttribute('height', angleSliderSize);
+const spaceStationDockMainCircle = document.querySelector("#spaceStationDockMainCircle");
+spaceStationDockMainCircle.setAttribute('cx', angleSliderSize / 2);
+spaceStationDockMainCircle.setAttribute('cy', angleSliderSize / 2);
+spaceStationDockMainCircle.setAttribute("r", radius);
+document.getElementById('spaceStationDockAngleDisplay').addEventListener('change', (event) => {
+    spaceStationFound.maxDockingAngle = Number(event.target.value) * Math.PI / 180;
+    updateKnobPosition(spaceStationFound.maxDockingAngle, "spaceStationDock");
+    updateAngleDisplay(spaceStationFound.maxDockingAngle, "spaceStationDock");
+})
 let isMouseDown = false;
+
+spaceStationDockKnob.addEventListener("mousedown", function (e) {
+    isMouseDown = true;
+});
+
+spaceStationDockSvg.addEventListener("mouseup", function (e) {
+    isMouseDown = false;
+});
+
+spaceStationDockSvg.addEventListener("mousemove", function (e) {
+    if (!isMouseDown) return;
+    let angle = onAngleSliderMouseMove(e, "spaceStationDock");
+
+    let spaceStation = spaceStationFound;
+    spaceStation.maxDockingAngle = angle
+});
 
 spaceStationKnob.addEventListener("mousedown", function (e) {
     isMouseDown = true;
@@ -208,8 +287,8 @@ spaceStationSvg.addEventListener("mousemove", function (e) {
     if (!isMouseDown) return;
     let angle = onAngleSliderMouseMove(e, "spaceStation");
 
-    let spaceStation = spaceStationFound;
-    spaceStation.angle = angle
+    spaceStationFound.angle = angle
+    spaceStationFound.updateDockPosition();
 });
 
 
@@ -276,6 +355,7 @@ function updateAngleDisplay(angle, controlName) {
     angle = angle || 0;
     let angleDisplay = document.querySelector("#" + controlName + "AngleDisplay");
     angleDisplay.textContent = (angle * (180 / Math.PI)).toFixed(1);
+    angleDisplay.value = (angle * (180 / Math.PI)).toFixed(1);
 }
 
 //updateAngleDisplay();
@@ -292,12 +372,23 @@ function saveScene() {
         walls: walls,
         resourcesSpots: resourcesSpots,
         spaceStations: spaceStations,
-        useSpaceStation: useSpaceStation
+        useSpaceStation: useSpaceStation,
+        deathTimer: deathTimer,
     }
     maxIndex = 0;
 
     localStorage.setItem('scene_' + sceneSelect.value, JSON.stringify(scene));
 }
+
+function copyNonObjectProperties(target, source) {
+    for (let key in source) {
+        // Check if the property is not an object and exists in the source object
+        if (typeof source[key] !== 'object' && source.hasOwnProperty(key)) {
+            target[key] = source[key];
+        }
+    }
+}
+
 
 function loadScene(sceneName) {
     sceneSelect.value = sceneName;
@@ -306,9 +397,12 @@ function loadScene(sceneName) {
     asteroids = scene.asteroids;
     walls = scene.walls;
     resourcesSpots = scene.resourcesSpots || [];
-    for (let spaceStation of scene.spaceStations)
+    for (let spaceStation of scene.spaceStations) {
         spaceStations.push(new SpaceStation(spaceStation.x, spaceStation.y, spaceStation.width, spaceStation.height, spaceStation.dockingWidth, spaceStation.dockingHeight, spaceStation.angle));
-
+        copyNonObjectProperties(spaceStations[spaceStations.length - 1], spaceStation)
+    }
+    deathTimer = scene.deathTimer || 30000;
+    deathTimeoutInput.value = deathTimer / 1000;
     useSpaceStation = scene.useSpaceStation
     restart();
 }
@@ -368,7 +462,7 @@ addAsteroidBtn.addEventListener('click', () => {
     );
     asteroids.push(asteroid);
     asteroidFound = asteroid;
-    showAsteroidProperties(asteroid);    
+    showAsteroidProperties(asteroid);
 });
 
 removeTargetBtn.addEventListener('click', () => {
@@ -407,7 +501,7 @@ addTargetBtn.addEventListener('click', () => {
         velocity: new Vector(0, 0),
     };
     targets.push(target);
-    showTargetProperties(target);        
+    showTargetProperties(target);
 });
 
 drawBtn.addEventListener('click', () => {
@@ -415,12 +509,15 @@ drawBtn.addEventListener('click', () => {
 });
 
 saveGenerationBtn.addEventListener('click', () => {
-    geneticAlgorithm.savePopulation(landers[0].currentActionName)
+    //geneticAlgorithm.savePopulation(landers[0].currentActionName)
+
     alert("saved")
+    PPOLander.saveGenetics()
 });
 
 skipGenerationBtn.addEventListener('click', () => {
-    killAll();
+    //killAll();
+    PPOLander.die()
 });
 
 stopShipBtn.addEventListener('click', () => {
@@ -448,48 +545,6 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keyup', (e) => {
     keys[e.code] = false;
 });
-
-
-function saveSettings() {
-    localStorage.setItem('moonLanderSettings', JSON.stringify({
-        mountainResolution,
-        mountainHeightFactor,
-        maxYOffset,
-        resourceAmount,
-        targetCount,
-        populationCount,
-        deathTimer,
-        gravity,
-        maxThrustPower,
-        landingSpeed,
-        maxAngularVelocity,
-        maxRotationAccel,
-        FuelConsumption_thrust,
-        FuelConsumption_rotate,
-        zoomLevel
-    }));
-}
-
-function loadSettings() {
-    const settings = JSON.parse(localStorage.getItem('moonLanderSettings'));
-    if (settings) {
-        mountainResolution = settings.mountainResolution;
-        mountainHeightFactor = settings.mountainHeightFactor;
-        maxYOffset = settings.maxYOffset;
-        resourceAmount = settings.resourceAmount;
-        targetCount = settings.targetCount;
-        populationCount = settings.populationCount;
-        deathTimer = settings.deathTimer;
-        gravity = settings.gravity;
-        maxThrustPower = settings.maxThrustPower;
-        landingSpeed = settings.landingSpeed;
-        maxAngularVelocity = settings.maxAngularVelocity;
-        maxRotationAccel = settings.maxRotationAccel;
-        FuelConsumption_thrust = settings.FuelConsumption_thrust;
-        FuelConsumption_rotate = settings.FuelConsumption_rotate;
-        zoomLevel = settings.zoomLevel;
-    }
-}
 
 function drawFuelBar() {
     const fuelBarHeight = 20;
@@ -699,6 +754,7 @@ function generateTargets() {
     let positions = generateObjectPositions(targetCount);
     targets = (positions || []).map((position) => {
         position.velocity = new Vector(0, 0)
+        position.startAngle = 0;
         return position
     });
 }
@@ -753,6 +809,7 @@ canvas.addEventListener('mousemove', (event) => {
         } else if (spaceStationFound) {
             spaceStationFound.x = mousePosition.x - spaceStationFound.width / 2;
             spaceStationFound.y = mousePosition.y - spaceStationFound.height / 2;
+            spaceStationFound.updateDockPosition();
         } else if (resourcesSpotFound) {
             resourcesSpotFound.position.x = mousePosition.x;
             resourcesSpotFound.position.y = mousePosition.y;
@@ -766,9 +823,10 @@ canvas.addEventListener('mousemove', (event) => {
 
 
 canvas.addEventListener('mousedown', (event) => {
+    let rect = canvas.getBoundingClientRect();
     let mousePosition = new Vector(0, 0);
-    mousePosition.x = (event.clientX) / zoomLevel - pan.x - 30;
-    mousePosition.y = (event.clientY) / zoomLevel - pan.y - 30;
+    mousePosition.x = (event.clientX - rect.left) / zoomLevel - pan.x - 30;
+    mousePosition.y = (event.clientY - rect.top) / zoomLevel - pan.y - 30;
     if (event.button == 1) {
         panning = true;
     } else if (event.buttons == 1) {
@@ -801,8 +859,6 @@ canvas.addEventListener('mousedown', (event) => {
 
         if (spaceStationFound) {
             showSpaceStationProperties(spaceStationFound);
-            updateKnobPosition(spaceStation.angle, 'spaceStation');
-            updateAngleDisplay(spaceStation.angle, 'spaceStation');
         } else {
             // Hide space station properties if not found (similar to the asteroidPropertiesTable)
             document.getElementById('spaceStationPropertiesTable').style.display = 'none';
@@ -821,8 +877,8 @@ canvas.addEventListener('mousedown', (event) => {
         if (targetFound) {
             currentTarget = targetFound;
             showTargetProperties(targetFound);
-            updateKnobPosition(targetFound.angle, 'start');
-            updateAngleDisplay(targetFound.angle, 'start');
+            updateKnobPosition(targetFound.startAngle || 0, 'start');
+            updateAngleDisplay(targetFound.startAngle || 0, 'start');
         } else {
             targetPropertiesDiv.style.display = 'none';
         }
@@ -867,8 +923,21 @@ function showresourcesSpotProperties(resourcesSpot) {
 
 function showSpaceStationProperties(spaceStation) {
     document.getElementById('spaceStationPropertiesTable').style.display = 'block';
+    document.getElementById('spaceStationDockMaxSpeed').value = spaceStation.maxDockingSpeed;
+
     spaceStationWidthInput.value = spaceStation.width;
     spaceStationHeightInput.value = spaceStation.height;
+    spaceStationEnterMode.value = spaceStation.mode;
+    spaceStationEnterAction.value = spaceStation.action;
+    spaceStationExitMode.value = spaceStation.exitMode;
+    spaceStationExitAction.value = spaceStation.exitAction;
+    spaceStationActivateRadius.value = spaceStation.activateRadius;
+
+    updateKnobPosition(spaceStationFound.angle, 'spaceStation');
+    updateAngleDisplay(spaceStationFound.angle, 'spaceStation');
+    updateKnobPosition(spaceStationFound.maxDockingAngle, 'spaceStationDock');
+    updateAngleDisplay(spaceStationFound.maxDockingAngle, 'spaceStationDock');
+
 }
 
 function showAsteroidProperties(asteroid) {
@@ -939,6 +1008,27 @@ function drawText(text, x, y, textAlign = 'left') {
     ctx.fillText(text, x, y);
 }
 
+function drawArrow(fromX, fromY, angle, length) {
+    ctx.save();
+
+    ctx.beginPath();
+    ctx.translate(fromX, fromY);
+    ctx.rotate(angle);
+
+    // Draw the main part of the arrow along the positive x-axis
+    ctx.moveTo(0, 0);
+    ctx.lineTo(length, 0);
+
+    // Draw arrow head
+    ctx.lineTo(length - 20, -20);
+    ctx.moveTo(length, 0);
+    ctx.lineTo(length - 20, 20);
+
+    ctx.restore();
+    ctx.stroke();
+}
+
+
 function drawTarget(target, size, index) {
     if (index == 0)
         index = 'Start';
@@ -951,6 +1041,10 @@ function drawTarget(target, size, index) {
     ctx.strokeStyle = 'white';
     ctx.lineWidth = 2;
     ctx.stroke();
+
+    if (index == "Start") {
+        drawArrow(target.position.x, target.position.y, target.startAngle - Math.PI / 2, size);
+    }
 }
 
 function updateLanderManually(lander) {
@@ -1174,6 +1268,56 @@ function loadLanders() {
     return true;
 }
 
+function loadPPOLander() {
+    const config = JSON.parse(localStorage.getItem('nnConfig'));
+
+    if (config && config.networks) {
+
+        config.networks.forEach((network) => {
+            nnConfigs[network.name] = network;
+
+            for (let fitnessOnEvent of network.fitnessOnEvents) {
+                network.fitnessOnEvents[fitnessOnEvent.name] = fitnessOnEvent.value;
+            }
+            let fileIndex = GeneticAlgorithm.getMaxFileIndex(network.name, "PPO_");
+            let fileName = 'PPO_' + network.name + "_" + fileIndex;
+
+            let populationData = JSON.parse(localStorage.getItem(fileName));
+            if (populationData) {
+                if (!PPOLander)
+                    PPOLander = new PPOLander(targets[0].position.x, targets[0].position.y + 1, i, targets[0].startAngle);
+
+                Object.setPrototypeOf(individualData, PPOAgent.prototype);
+
+                if (!checkNodesPerLayer(individualData, network)) {
+                    console.error('The number of nodes per layer in the saved NeuralNetwork does not match the number of nodes per layer in the config.');
+                    return false;
+                }
+                // Add the loaded NeuralNetwork to the PPOLander
+                PPOLander.addNeuralNetwork(individualData, network.name);
+                if (!landers[i])
+                    landers.push(PPOLander);
+
+                // Convert weights and biases back to Matrix objects
+                individualData.weights = individualData.weights.map(weightMatrix => Matrix.map(weightMatrix, x => x));
+                individualData.biases = individualData.biases.map(biasMatrix => Matrix.map(biasMatrix, x => x));
+            } else {
+                let nodesPerLayer = getMatchingNodesPerLayer(network);
+                if (!PPOLander)
+                    PPOLander = new PPOLander(targets[0].position.x, targets[0].position.y + 1, i, targets[0].startAngle);
+
+                PPOLander.addNeuralNetwork(new PPOAgent(nodesPerLayer), network.name);
+                if (!landers[i])
+                    landers.push(PPOLander);
+
+            }
+            if (network.isDefault)
+                SetLandersNeuralNetwork(network.name);
+        });
+    }
+
+    return true;
+}
 
 function SetLandersNeuralNetwork(name) {
     for (let i = 0; i < populationCount; i++) {
@@ -1192,19 +1336,24 @@ if (!loadLanders()) {
     addEnemyToLanders();
 }
 
-let option = document.createElement('option');
-option.value = "";
-option.text = "Don't change";
-targetActionSelect.appendChild(option);
-// Fill action options dynamically
-for (let action in nnConfigs) {
+function loadActions(selectCtrl) {
     let option = document.createElement('option');
-    option.value = action;
-    option.text = action;
-    targetActionSelect.appendChild(option);
+    option.value = "";
+    option.text = "Don't change";
+    selectCtrl.appendChild(option);
+    // Fill action options dynamically
+    for (let action in nnConfigs) {
+        let option = document.createElement('option');
+        option.value = action;
+        option.text = action;
+        selectCtrl.appendChild(option);
+    }
 }
 
-
+loadActions(targetActionSelect)
+loadActions(resourcesSpotAction)
+loadActions(spaceStationEnterAction)
+loadActions(spaceStationExitAction)
 
 //changeAllTarget();
 if (!enableManualControl) {
@@ -1217,7 +1366,11 @@ if (!enableManualControl) {
     });
 }
 
-loadScene("harvest")
+loadScene("SpaceStation")
+
+function step() {
+    states
+}
 
 function gameLoop() {
     if (!gameLoop.debounced) {
@@ -1240,21 +1393,27 @@ function gameLoop() {
             }
             let index = 0;
             for (let lander of landers) {
+                if (enableManualControl && index > 0)
+                    continue;
+                let showIt = true;
+                if (showfirstN && lander.neuralNetwork.positionNumber > showfirstN)
+                    showIt = false;
                 // if(!lander.neuralNetwork.isBest)
                 //     continue;
                 if (!lander.neuralNetwork.isDead) {
+                    lander.checkDocking();
                     lander.checkTargetModes();
                     lander.checkTargets();
 
                     lander.updateLander();
-                    lander.drawLander();
+                    if (showIt)
+                        lander.drawLander();
                     if (index == 0 && enableManualControl)
                         updateLanderManually(lander);
                     else
                         lander.applyNeuralNetwork(lander.target); // Update the neural network input                    
 
                     lander.calculateFitness()
-                    lander.checkDocking();
                     lander.handleCollision();
                 } else {
                     lander.updateLander();
@@ -1280,18 +1439,77 @@ function gameLoop() {
     }
 }
 
+function step(action) {
+
+    clearCanvas(canvas, ctx, '#03002e');
+    ctx.save();
+    ctx.scale(zoomLevel, zoomLevel);
+    ctx.translate(pan.x, pan.y);
+    for (let spaceStation of spaceStations)
+        spaceStation.draw();
+
+    let harvestedResources = countHarvestedResources()
+    drawResources(harvestedResources);
+    for (let i = 0; i < asteroids.length; i++) {
+        asteroids[i].rigidBody.update();
+        asteroids[i].getPolygon();
+        asteroids[i].draw();
+    }
+    let index = 0;
+    let showIt = true;
+    if (showfirstN && this.PPOLander.neuralNetwork.positionNumber > showfirstN)
+        showIt = false;
+    // if(!this.PPOLander.neuralNetwork.isBest)
+    //     continue;
+    if (!this.PPOLander.neuralNetwork.isDead) {
+        this.PPOLander.checkDocking();
+        this.PPOLander.checkTargetModes();
+        this.PPOLander.checkTargets();
+
+        this.PPOLander.updateLander();
+        if (showIt)
+            this.PPOLander.drawLander();
+        if (index == 0 && enableManualControl)
+            updateLanderManually(this.PPOLander);
+        else
+            this.PPOLander.applyNeuralNetwork(this.PPOLander.target); // Update the neural network input                    
+
+        this.PPOLander.calculateFitness()
+        this.PPOLander.handleCollision();
+    } else {
+        this.PPOLander.updateLander();
+        this.PPOLander.calculateFitness()
+    }
+
+
+    //predictionModel.trainBatch(inputArrays, targetArrays);
+    for (let i = 0; i < targets.length; i++) {
+        drawTarget(targets[i], targetRadius, i);
+    }
+    drawLines(walls);
+    drawScore();
+    ctx.restore();
+    frameCount++;
+    requestAnimationFrame(gameLoop);
+
+
+    for (let key in keysPressed) {
+        delete keysPressed[key];
+    }
+}
+
 function countHarvestedResources() {
     let harvestedResourceCounts = {};
 
     for (let i = 0; i < landers.length; i++) {
         const lander = landers[i];
 
-        for(let resourcesSpotIndex in lander.harvestedResources) {
+        for (let resourcesSpotIndex in lander.harvestedResources) {
             const resourceArray = lander.harvestedResources[resourcesSpotIndex];
 
             for (let k = 0; k < resourceArray.length; k++) {
                 const resourceIndex = resourceArray[k];
-                if(!harvestedResourceCounts[resourcesSpotIndex])
+                if (!harvestedResourceCounts[resourcesSpotIndex])
                     harvestedResourceCounts[resourcesSpotIndex] = {};
                 if (harvestedResourceCounts[resourcesSpotIndex][resourceIndex] === undefined) {
                     harvestedResourceCounts[resourcesSpotIndex][resourceIndex] = 1;
@@ -1344,4 +1562,4 @@ function addResourcesSpot(x, y, radius, numResources) {
     return spot;
 }
 
-gameLoop();
+//gameLoop();

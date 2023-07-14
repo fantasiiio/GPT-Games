@@ -27,10 +27,10 @@ class RigidBody {
 
     // Method to update the object's position and rotation based on its velocity and angular velocity
     update() {
-        if (this.angularVelocity > maxAngularVelocity) {
-            this.angularVelocity = maxAngularVelocity;
-        } else if (this.angularVelocity < -maxAngularVelocity) {
-            this.angularVelocity = -maxAngularVelocity;
+        if (this.angularVelocity > env.maxAngularVelocity) {
+            this.angularVelocity = env.maxAngularVelocity;
+        } else if (this.angularVelocity < -env.maxAngularVelocity) {
+            this.angularVelocity = -env.maxAngularVelocity;
         }
         // Update the position based on the velocity
         this.position = this.position.add(this.velocity);

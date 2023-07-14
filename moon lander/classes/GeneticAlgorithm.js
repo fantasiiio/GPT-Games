@@ -100,11 +100,11 @@ class GeneticAlgorithm {
         return newGeneration;
     }
 
-    static getMaxFileIndex(actionName){
+    static getMaxFileIndex(actionName, startsWith = 'NeuralNetwork_'){
         let maxIndex = -1;
         for (const [key, value] of Object.entries(localStorage)) {
-            if (key.startsWith('NeuralNetwork_' + actionName + '_')) {
-                let index = parseInt(key.replace('NeuralNetwork_' + actionName + '_', ''));
+            if (key.startsWith(startsWith + actionName + '_')) {
+                let index = parseInt(key.replace(startsWith + actionName + '_', ''));
                 if (index > maxIndex) {
                     maxIndex = index;
                 }

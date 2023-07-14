@@ -82,6 +82,7 @@ class Matrix {
             .map((_, i, j) => matrix.data[j][i]);
     }
 
+    
     map(func) {
         // Apply a function to every element of matrix
         this.data = this.data.map((row, i) =>
@@ -154,6 +155,22 @@ class Matrix {
         }
 
         return result;
+    }
+
+    getRow(index) {
+        if (index < 0 || index >= this.rows) {
+            throw new Error('Invalid row index');
+        }
+
+        // Create a new matrix with 1 row and same number of columns
+        let rowMatrix = new Matrix(1, this.cols);
+
+        // Copy data from the specified row into the new matrix
+        for (let col = 0; col < this.cols; col++) {
+            rowMatrix.data[0][col] = this.data[index][col];
+        }
+
+        return rowMatrix;
     }
 
 }
