@@ -482,7 +482,8 @@ class Environment {
                             'shape': [nodesPerLayer[0]]
                         }
                     }
-                    this.ppoLander.addPPOAgent(new PPO(this, spaceConfig), network.name);
+                    //this.ppoLander.addPPOAgent(new PPO(this, spaceConfig), network.name);
+                    this.ppoLander.addPPOAgent(new PPO(nodesPerLayer[0], nodesPerLayer[nodesPerLayer.length - 1]), network.name);
                 }
                 if (network.isDefault)
                     this.ppoLander.setActivePPOAgent(network.name);
@@ -594,7 +595,7 @@ class Environment {
         // Increment frame count
         this.frameCount++;
 
-        //await new Promise(resolve => setTimeout(resolve, 1));
+        await new Promise(resolve => setTimeout(resolve, 1));
 
         return stepData;
     }

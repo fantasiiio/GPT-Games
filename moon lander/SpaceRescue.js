@@ -667,5 +667,5 @@ function main() {
     env.generateTargets();
     env.loadppoLander();
     env.loadSceneNames();
-    env.ppoLander.ppoAgent.learn();
+    env.ppoLander.ppoAgent.trainPPO(env);
 }

@@ -105,12 +105,13 @@ class Buffer {
         this.reset()
     }
 
-    add(observation, action, reward, value, logprobability) {
+    add(observation, action, reward, value, logprobability, predsScale) {
         this.observationBuffer.push(observation.slice(0))
         this.actionBuffer.push(action)
         this.rewardBuffer.push(reward)
         this.valueBuffer.push(value)
         this.logprobabilityBuffer.push(logprobability)
+        this.predsScaleBuffer.push(predsScale)
         this.pointer += 1
     }
 
@@ -139,7 +140,7 @@ class Buffer {
         this.returnBuffer = this.returnBuffer
             .concat(this.discountedCumulativeSums(rewards, this.gamma).slice(0, -1))
         this.trajectoryStartIndex = this.pointer
-
+        //ET CELLE-CI ?
     }
 
     get() {
@@ -168,6 +169,7 @@ class Buffer {
         this.returnBuffer = []
         this.valueBuffer = []
         this.logprobabilityBuffer = []
+        this.predsScaleBuffer = []
         this.trajectoryStartIndex = 0
         this.pointer = 0
     }
@@ -187,8 +189,8 @@ class PPO {
             targetKL: 0.01,
             useSDE: false, // TODO: State Dependent Exploration (gSDE)
             netArch: {
-                'pi': [32, 32],
-                'vf': [32, 32]
+                'pi': [7],
+                'vf': [7]
             },
             activation: 'sigmoid',
             verbose: 1
@@ -254,20 +256,13 @@ class PPO {
                 activation: this.config.activation
             }).apply(l)
         })
-        if (this.spaceConfig.actionSpace.class == 'Discrete') {
-            l = tf.layers.dense({
-                units: this.spaceConfig.actionSpace.n,
-                // kernelInitializer: 'glorotNormal'
-            }).apply(l)
-        } else if (this.spaceConfig.actionSpace.class == 'Box') {
-            l = tf.layers.dense({
-                units: this.spaceConfig.actionSpace.shape[0],
-                activation: this.config.activation
-                // kernelInitializer: 'glorotNormal'
-            }).apply(l)
-        } else {
-            throw new Error('Unknown action space class: ' + this.spaceConfig.actionSpace.class)
-        }
+
+        l = tf.layers.dense({
+            units: this.spaceConfig.actionSpace.shape[0],
+            activation: this.config.activation
+            // kernelInitializer: 'glorotNormal'
+        }).apply(l)
+
         return tf.model({
             inputs: input,
             outputs: l
@@ -300,19 +295,19 @@ class PPO {
         return tf.tidy(() => {
             const preds = tf.squeeze(this.actor.predict(observationT), 0)
             let action
-            if (this.spaceConfig.actionSpace.class == 'Discrete') {
-                action = tf.squeeze(tf.multinomial(preds, 1), 0) // > []
-            } else if (this.spaceConfig.actionSpace.class == 'Box') {
-                const noiseScale = tf.exp(this.logStd);
-                const predsScale = tf.sub(1, noiseScale);
-                const randomNoise = tf.mul(
-                    tf.sigmoid(tf.randomStandardNormal([this.spaceConfig.actionSpace.shape[0]])),
-                    noiseScale
-                );
-                const policyAction = tf.mul(preds, predsScale);
-                action = tf.add(randomNoise, policyAction); // > [actionSpace.shape[0]]
-            }
-            return [preds, action]
+            let noiseScale
+            let predsScale;
+
+            noiseScale = tf.exp(this.logStd);
+            const randomNoise = tf.mul(
+                tf.sigmoid(tf.randomStandardNormal([this.spaceConfig.actionSpace.shape[0]])),
+                noiseScale
+            );
+            predsScale = tf.sub(1, noiseScale);
+            const policyAction = tf.mul(preds, predsScale);
+            action = tf.add(randomNoise, policyAction);
+
+            return [preds, action, predsScale]
         })
     }
 
@@ -434,44 +429,34 @@ class PPO {
         this.buffer.reset()
         callback.onRolloutStart(this)
 
-        let sumReturn = 0
-        let sumLength = 0
-        let numEpisodes = 0
-
-        const allPreds = []
-        const allActions = []
-        let allClippedActions = [];
-
-        ({
-            sumReturn,
-            sumLength,
-            numEpisodes
-        } = await this.stepLoop(0, allPreds, allActions, allClippedActions, sumReturn, sumLength, callback, numEpisodes))
+        await this.stepLoop(callback)
 
         callback.onRolloutEnd(this)
     }
 
 
-    async stepLoop(step, allPreds, allActions, allClippedActions, sumReturn, sumLength, callback, numEpisodes) {
+    async stepLoop(callback) {
+        let step = 0;
+        let allNoiseScales = [];
+
         return new Promise((resolve) => {
             const maxSteps = this.config.nSteps; // replace with your maximum step count
 
             let intervalId = setInterval(async () => {
                 // Predict action, value and logprob from last observation
-                const [preds, action, value, logprobability] = tf.tidy(() => {
+                const [preds, action, value, logprobability, predsScale] = tf.tidy(() => {
                     const lastObservationT = tf.tensor([this.lastObservation])
-                    const [predsT, actionT] = this.sampleAction(lastObservationT)
+                    const [predsT, actionT, predsScaleT] = this.sampleAction(lastObservationT)
                     const valueT = this.critic.predict(lastObservationT)
                     const logprobabilityT = this.logProb(predsT, actionT)
                     return [
                         predsT.arraySync(),
                         actionT.arraySync(),
                         valueT.arraySync()[0][0],
-                        logprobabilityT.arraySync()
+                        logprobabilityT.arraySync(),
+                        predsScaleT.arraySync()
                     ]
                 })
-                allPreds.push(preds)
-                allActions.push(action)
 
                 // Rescale for continuous action space
                 //let clippedAction = action
@@ -484,12 +469,9 @@ class PPO {
                 //         })
                 //     }
                 // }
-                allClippedActions.push(action)
 
                 // Take action in environment
                 const [newObservation, reward, done] = await this.env.step(action)
-                sumReturn += reward
-                sumLength += 1
 
                 // Update global timestep counter
                 this.numTimesteps += 1
@@ -501,7 +483,8 @@ class PPO {
                     action,
                     reward,
                     value,
-                    logprobability
+                    logprobability,
+                    predsScale
                 )
 
                 this.lastObservation = newObservation
@@ -511,8 +494,10 @@ class PPO {
                         0 :
                         tf.tidy(() => this.critic.predict(tf.tensor([newObservation])).arraySync())[0][0]
                     this.buffer.finishTrajectory(lastValue)
-                    console.log("Reward:" + this.buffer.rewardBuffer.reduce((a, b) => a + b, 0));
-                    numEpisodes += 1
+                    console.log("Reward:" + this.buffer.rewardBuffer[this.buffer.rewardBuffer.length - 1]);
+                    let avgArr = tf.mean(this.buffer.predsScaleBuffer).arraySync()
+
+                    console.log("Predictions Scale:" + JSON.stringify(avgArr));
 
                     this.lastObservation = this.env.reset()
                 }
@@ -520,93 +505,9 @@ class PPO {
 
                 if (step >= maxSteps) {
                     clearInterval(intervalId);
-                    resolve({
-                        sumReturn,
-                        sumLength,
-                        numEpisodes
-                    });
+                    resolve(true);
                 }
             }, 0);
-        });
-    }
-
-
-    async stepLoop2(step, allPreds, allActions, allClippedActions, sumReturn, sumLength, callback, numEpisodes) {
-        return new Promise((resolve) => {
-            if (step < this.config.nSteps) {
-                setTimeout(async () => {
-                    // Predict action, value and logprob from last observation
-                    const [preds, action, value, logprobability] = tf.tidy(() => {
-                        const lastObservationT = tf.tensor([this.lastObservation])
-                        const [predsT, actionT] = this.sampleAction(lastObservationT)
-                        const valueT = this.critic.predict(lastObservationT)
-                        const logprobabilityT = this.logProb(predsT, actionT)
-                        return [
-                            predsT.arraySync(),
-                            actionT.arraySync(),
-                            valueT.arraySync()[0][0],
-                            logprobabilityT.arraySync()
-                        ]
-                    })
-                    allPreds.push(preds)
-                    allActions.push(action)
-
-                    // Rescale for continuous action space
-                    //let clippedAction = action
-                    // if (this.spaceConfig.actionSpace.class == 'Box') {
-                    //     let h = this.spaceConfig.actionSpace.high
-                    //     let l = this.spaceConfig.actionSpace.low
-                    //     if (typeof h === 'number' && typeof l === 'number') {
-                    //         clippedAction = action.map(a => {
-                    //             return Math.min(Math.max(a, l), h)
-                    //         })
-                    //     }
-                    // }
-                    allClippedActions.push(action)
-
-                    // Take action in environment
-                    const [newObservation, reward, done] = await this.env.step(action)
-                    sumReturn += reward
-                    sumLength += 1
-
-                    // Update global timestep counter
-                    this.numTimesteps += 1
-
-                    callback.onStep(this)
-
-                    this.buffer.add(
-                        this.lastObservation,
-                        action,
-                        reward,
-                        value,
-                        logprobability
-                    )
-
-                    this.lastObservation = newObservation
-
-                    if (done || step === this.config.nSteps - 1) {
-                        const lastValue = done ?
-                            0 :
-                            tf.tidy(() => this.critic.predict(tf.tensor([newObservation])).arraySync())[0][0]
-                        this.buffer.finishTrajectory(lastValue)
-                        console.log("Reward:" + this.buffer.returnBuffer[this.buffer.returnBuffer.length - 1])
-                        numEpisodes += 1
-
-                        this.lastObservation = this.env.reset()
-                    }
-                    const result = await this.stepLoop(step + 1, allPreds, allActions, allClippedActions, sumReturn, sumLength, callback, numEpisodes);
-                    resolve(result);
-                }, 0);
-
-            } else {
-                resolve({
-                    sumReturn,
-                    sumLength,
-                    numEpisodes
-                })
-            }
-
-
         });
     }
 
@@ -658,7 +559,7 @@ class PPO {
         ])
     }
 
-    async learn(learnConfig) {
+    async trainPPO(learnConfig) {
         const learnConfigDefault = {
             'logInterval': 1,
             'callback': null

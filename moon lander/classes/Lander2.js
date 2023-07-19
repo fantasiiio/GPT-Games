@@ -10,7 +10,7 @@ class Lander {
         this.sideThrust = 0;
         this.angularAcceleration = 0;
         this.successfulLanding = false;
-        this.targetReached = false;
+        this.targetReached = true;
         this.timeToReachTarget = 0;
         this.startTime = 0;
         this.currentTime = 0;
@@ -77,7 +77,7 @@ class Lander {
         this.thrust = 0;
         this.fuelConsumption = 0;
         this.successfulLanding = false;
-        this.targetReached = false;
+        this.targetReached = true;
         this.timeToReachTarget = 0;
         this.startTime = 0;
         this.currentTime = 0;
@@ -314,7 +314,7 @@ class Lander {
     }
 
     changeTarget() {
-        this.targetReached = false;
+        this.targetReached = true;
         this.timeToReachTarget = 0;
         this.startTimeReached = 0;
     }
@@ -919,8 +919,6 @@ class Lander {
             }
             fitness += value * input.multiplyFactor;
         };
-        if (this.neuralNetwork)
-            this.currentFitness += fitness;
 
         this.currentFitness = fitness;
     }
@@ -1218,16 +1216,7 @@ class Lander {
             this.calculateFitness()
             return this.spaceshipStates
         }
-
     }
-
-    reset() {
-        this.resetLander()
-        this.updateLander();
-        this.calculateFitness()
-        return [this.spaceshipStates, this.currentFitness, this.isDead]
-    }
-
 
     applyAction(action) {
         if (this.isDead)
