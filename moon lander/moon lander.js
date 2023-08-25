@@ -3,14 +3,18 @@ const canvas = document.getElementById('gameCanvas');
 
 const ctx = canvas.getContext('2d');
 
+let isSimulationRunning = false;
 let enableManualControl = false;
-let useSpaceStation = false;
+let enableAutoTunePID = true;
+let IncreaseP = false;
+let GetZieglerNichols = false;
 let landers = [];
 let targets = [];
 let asteroids = [];
 let walls = [];
 let spaceStations = [];
 let asteroidsCount = 0;
+let showfirstN = 0; //0 = all
 
 let targetCount = 1;
 let cycleTargets = true;
@@ -22,10 +26,10 @@ let numRadarRays = 5;
 let startingTimeBonus = 2000;
 let frameCount = 0;
 let geneticAlgorithm = null;
-const deathTimer = 60000; //Number.MAX_VALUE;
+let deathTimer = 60000; //Number.MAX_VALUE;
 const gravity = 0.0;
 const maxThrustPower = 0.1;
-const maxSideThrustPower = 0.05;
+const maxSideThrustPower = 0.1;
 const landingSpeed = 1;
 const maxAngularVelocity = 0.1;
 const maxRotationAccel = 0.002;
@@ -87,6 +91,11 @@ const sceneNameInput = document.getElementById('sceneName');
 let slider = document.getElementById('circle-slider');
 let handle = document.getElementById('handle');
 
+let spaceStationActivateRadius = document.getElementById('spaceStationActivateRadius');
+let spaceStationEnterMode = document.getElementById('spaceStationEnterMode');
+let spaceStationEnterAction = document.getElementById('spaceStationEnterAction');
+let spaceStationExitMode = document.getElementById('spaceStationExitMode');
+let spaceStationExitAction = document.getElementById('spaceStationExitAction');
 
 const addSpaceStationBtn = document.getElementById('addSpaceStationBtn');
 const spaceStationWidthInput = document.getElementById('spaceStationWidthInput');
@@ -100,6 +109,94 @@ let resourcesSpotModeSelect = document.getElementById('resourcesSpotModeSelect')
 let resourcesSpotAction = document.getElementById('resourcesSpotAction');
 let resourcesSpotResourceRadius = document.getElementById('resourcesSpotResourceRadius');
 
+let deathTimeoutInput = document.getElementById('deathTimeoutInput');
+
+
+document.getElementById('IncreasePBtn').addEventListener('click', (event) => {
+    IncreaseP = true;
+})
+
+document.getElementById('GetZieglerNicholsBtn').addEventListener('click', (event) => {
+    GetZieglerNichols = true;
+})
+
+
+
+document.getElementById('makeDefaultSceneBtn').addEventListener('click', (event) => {
+    localStorage.setItem('sceneDefault', sceneSelect.value);
+})
+
+document.getElementById('addEnemyBtn').addEventListener('click', (event) => {
+    addEnemyToLanders();
+})
+
+document.getElementById('resetSceneBtn').addEventListener('click', (event) => {
+    resetScene();
+})
+
+
+document.getElementById('playButton').addEventListener('click', (event) => {
+    isSimulationRunning = true;
+})
+
+document.getElementById('stopButton').addEventListener('click', (event) => {
+    isSimulationRunning = false;
+})
+
+removeresourcesSpotBtn.addEventListener('click', (event) => {
+    if (resourcesSpotFound) {
+        let index = resourcesSpots.indexOf(resourcesSpotFound);
+        resourcesSpots.splice(index, 1);
+        resourcesSpotFound = null;
+    }
+});
+
+
+document.getElementById('spaceStationDockMaxSpeed').addEventListener('change', (event) => {
+    spaceStationFound.maxDockingSpeed = Number(document.getElementById('spaceStationDockMaxSpeed').value);
+})
+
+document.getElementById('showfirstN').addEventListener('change', (event) => {
+    showfirstN = Number(document.getElementById('showfirstN').value);
+})
+
+document.getElementById('enableAutoTunePIDChk').addEventListener('change', (event) => {
+    enableAutoTunePID = document.getElementById('enableAutoTunePIDChk').checked;
+});
+
+document.getElementById('enableManualControlChk').addEventListener('change', (event) => {
+    enableManualControl = document.getElementById('enableManualControlChk').checked;
+    if (enableManualControl) {
+        landers[0].resetLander()
+    }
+});
+
+
+deathTimeoutInput.addEventListener('change', (event) => {
+    deathTimer = Number(deathTimeoutInput.value) * 1000;
+});
+
+deathTimeoutInput.value = deathTimer / 1000;
+
+spaceStationActivateRadius.addEventListener('change', (event) => {
+    spaceStationFound.activateRadius = parseFloat(spaceStationActivateRadius.value);
+});
+
+spaceStationEnterMode.addEventListener('change', (event) => {
+    spaceStationFound.mode = spaceStationEnterMode.value;
+});
+
+spaceStationEnterAction.addEventListener('change', (event) => {
+    spaceStationFound.action = spaceStationEnterAction.value;
+});
+
+spaceStationExitMode.addEventListener('change', (event) => {
+    spaceStationFound.exitMode = spaceStationExitMode.value;
+});
+
+spaceStationExitAction.addEventListener('change', (event) => {
+    spaceStationFound.exitAction = spaceStationExitAction.value;
+});
 
 removeresourcesSpotBtn.addEventListener('click', (event) => {
     if (resourcesSpotFound) {
@@ -148,13 +245,13 @@ spaceStationHeightInput.addEventListener('change', (event) => {
 
 addResourcesSpotBtn.addEventListener('click', () => {
     let spot = addResourcesSpot(canvas.width / 2, canvas.height / 2, 500, 50);
-    showresourcesSpotProperties(spot);    
+    showresourcesSpotProperties(spot);
 });
 
 
 addSpaceStationBtn.addEventListener('click', () => {
     spaceStation = new SpaceStation(canvas.width / zoomLevel / 2, canvas.height / zoomLevel / 2 + 1000, 200, 200, 100, 10, 0);
-    showSpaceStationProperties(spaceStation);    
+    showSpaceStationProperties(spaceStation);
     spaceStations.push(spaceStation);
 });
 
@@ -193,8 +290,36 @@ startMainCircle.setAttribute('cx', angleSliderSize / 2);
 startMainCircle.setAttribute('cy', angleSliderSize / 2);
 startMainCircle.setAttribute("r", radius);
 
-
+const spaceStationDockSvg = document.querySelector("#spaceStationDockSvg");
+spaceStationDockSvg.setAttribute('width', angleSliderSize);
+spaceStationDockSvg.setAttribute('height', angleSliderSize);
+const spaceStationDockMainCircle = document.querySelector("#spaceStationDockMainCircle");
+spaceStationDockMainCircle.setAttribute('cx', angleSliderSize / 2);
+spaceStationDockMainCircle.setAttribute('cy', angleSliderSize / 2);
+spaceStationDockMainCircle.setAttribute("r", radius);
+document.getElementById('spaceStationDockAngleDisplay').addEventListener('change', (event) => {
+    spaceStationFound.maxDockingAngle = Number(event.target.value) * Math.PI / 180;
+    updateKnobPosition(spaceStationFound.maxDockingAngle, "spaceStationDock");
+    updateAngleDisplay(spaceStationFound.maxDockingAngle, "spaceStationDock");
+})
 let isMouseDown = false;
+
+spaceStationDockKnob.addEventListener("mousedown", function (e) {
+    isMouseDown = true;
+});
+
+spaceStationDockSvg.addEventListener("mouseup", function (e) {
+    isMouseDown = false;
+});
+
+spaceStationDockSvg.addEventListener("mousemove", function (e) {
+    if (!isMouseDown) return;
+    let angle = onAngleSliderMouseMove(e, "spaceStationDock");
+
+    let spaceStation = spaceStationFound;
+    spaceStation.maxDockingAngle = angle
+    updateAngleDisplay(spaceStationFound.maxDockingAngle, "spaceStationDock");
+});
 
 spaceStationKnob.addEventListener("mousedown", function (e) {
     isMouseDown = true;
@@ -208,8 +333,8 @@ spaceStationSvg.addEventListener("mousemove", function (e) {
     if (!isMouseDown) return;
     let angle = onAngleSliderMouseMove(e, "spaceStation");
 
-    let spaceStation = spaceStationFound;
-    spaceStation.angle = angle
+    spaceStationFound.angle = angle
+    spaceStationFound.updateDockPosition();
 });
 
 
@@ -275,7 +400,7 @@ function updateKnobPosition(angle, controlName) {
 function updateAngleDisplay(angle, controlName) {
     angle = angle || 0;
     let angleDisplay = document.querySelector("#" + controlName + "AngleDisplay");
-    angleDisplay.textContent = (angle * (180 / Math.PI)).toFixed(1);
+    angleDisplay.value = (angle * (180 / Math.PI)).toFixed(1);
 }
 
 //updateAngleDisplay();
@@ -292,11 +417,39 @@ function saveScene() {
         walls: walls,
         resourcesSpots: resourcesSpots,
         spaceStations: spaceStations,
-        useSpaceStation: useSpaceStation
+        deathTimer: deathTimer,
+        numEnemies: landers[landers.length - 1].enemies.count,
     }
     maxIndex = 0;
 
     localStorage.setItem('scene_' + sceneSelect.value, JSON.stringify(scene));
+}
+
+function copyNonObjectProperties(target, source) {
+    for (let key in source) {
+        // Check if the property is not an object and exists in the source object
+        if (typeof source[key] !== 'object' && source.hasOwnProperty(key)) {
+            target[key] = source[key];
+        }
+    }
+}
+
+function resetScene() {
+    targets = [];
+    generateTargets();
+    changeAllTarget();
+    asteroids = [];
+    walls = [];
+    resourcesSpots = [];
+    spaceStations = [];
+    // create an option
+    let option = document.createElement('option');
+    option.value = "New Scene";
+    option.text = "New Scene";
+    option.selected = true;
+    sceneSelect.appendChild(option);
+
+    restart();
 }
 
 function loadScene(sceneName) {
@@ -306,10 +459,20 @@ function loadScene(sceneName) {
     asteroids = scene.asteroids;
     walls = scene.walls;
     resourcesSpots = scene.resourcesSpots || [];
-    for (let spaceStation of scene.spaceStations)
+    for (let spaceStation of scene.spaceStations) {
         spaceStations.push(new SpaceStation(spaceStation.x, spaceStation.y, spaceStation.width, spaceStation.height, spaceStation.dockingWidth, spaceStation.dockingHeight, spaceStation.angle));
-
-    useSpaceStation = scene.useSpaceStation
+        copyNonObjectProperties(spaceStations[spaceStations.length - 1], spaceStation)
+    }
+    numEnemies = scene.numEnemies || 0;
+    for(let lander of landers){
+        lander.resetLander();
+    }
+    for (let i = 0; i < numEnemies; i++) {
+        addEnemyToLanders();
+    }
+    addEnemyToLanders();
+    deathTimer = scene.deathTimer || 30000;
+    deathTimeoutInput.value = deathTimer / 1000;
     restart();
 }
 
@@ -368,7 +531,7 @@ addAsteroidBtn.addEventListener('click', () => {
     );
     asteroids.push(asteroid);
     asteroidFound = asteroid;
-    showAsteroidProperties(asteroid);    
+    showAsteroidProperties(asteroid);
 });
 
 removeTargetBtn.addEventListener('click', () => {
@@ -407,7 +570,7 @@ addTargetBtn.addEventListener('click', () => {
         velocity: new Vector(0, 0),
     };
     targets.push(target);
-    showTargetProperties(target);        
+    showTargetProperties(target);
 });
 
 drawBtn.addEventListener('click', () => {
@@ -424,8 +587,9 @@ skipGenerationBtn.addEventListener('click', () => {
 });
 
 stopShipBtn.addEventListener('click', () => {
-    landers[0].rigidBody.velocity = new Vector(0, 0);
-    landers[0].rigidBody.angularVelocity = 0;
+    landers[0].enemies[0].rigidBody.velocity = new Vector(0, 0);
+    landers[0].enemies[0].rigidBody.angularVelocity = 0;
+    landers[0].enemies[0].rigidBody.position.x = landers[0].rigidBody.position.x;
 });
 
 
@@ -699,6 +863,7 @@ function generateTargets() {
     let positions = generateObjectPositions(targetCount);
     targets = (positions || []).map((position) => {
         position.velocity = new Vector(0, 0)
+        position.startAngle = 0;
         return position
     });
 }
@@ -721,7 +886,7 @@ function changeAllTarget(position) {
     for (let lander of landers) {
         if (targets.length > 0)
             lander.target = targets[0];
-        else if (useSpaceStation)
+        else if (spaceStations.length > 0)
             lander.target = spaceStation.dockPosition;
         else
             lander.target = new Vector(canvas.width / zoomLevel / 2, canvas.height / zoomLevel - 50);
@@ -734,13 +899,13 @@ function killAll() {
     }
 }
 
-generateTargets();
-generateAsteroids();
+//generateTargets();
+//generateAsteroids();
 
 canvas.addEventListener('mousemove', (event) => {
     let mousePosition = new Vector(0, 0);
-    mousePosition.x = (event.clientX) / zoomLevel - pan.x - 30;
-    mousePosition.y = (event.clientY) / zoomLevel - pan.y - 30;
+    mousePosition.x = (event.offsetX) / zoomLevel - pan.x - 30;
+    mousePosition.y = (event.offsetY) / zoomLevel - pan.y - 30;
     if (event.buttons == 1) {
         if (targetFound) {
             targetFound.position.x = mousePosition.x;
@@ -753,6 +918,7 @@ canvas.addEventListener('mousemove', (event) => {
         } else if (spaceStationFound) {
             spaceStationFound.x = mousePosition.x - spaceStationFound.width / 2;
             spaceStationFound.y = mousePosition.y - spaceStationFound.height / 2;
+            spaceStationFound.updateDockPosition();
         } else if (resourcesSpotFound) {
             resourcesSpotFound.position.x = mousePosition.x;
             resourcesSpotFound.position.y = mousePosition.y;
@@ -767,8 +933,8 @@ canvas.addEventListener('mousemove', (event) => {
 
 canvas.addEventListener('mousedown', (event) => {
     let mousePosition = new Vector(0, 0);
-    mousePosition.x = (event.clientX) / zoomLevel - pan.x - 30;
-    mousePosition.y = (event.clientY) / zoomLevel - pan.y - 30;
+    mousePosition.x = (event.offsetX) / zoomLevel - pan.x - 30;
+    mousePosition.y = (event.offsetY) / zoomLevel - pan.y - 30;
     if (event.button == 1) {
         panning = true;
     } else if (event.buttons == 1) {
@@ -801,8 +967,8 @@ canvas.addEventListener('mousedown', (event) => {
 
         if (spaceStationFound) {
             showSpaceStationProperties(spaceStationFound);
-            updateKnobPosition(spaceStation.angle, 'spaceStation');
-            updateAngleDisplay(spaceStation.angle, 'spaceStation');
+            updateKnobPosition(spaceStationFound.angle, 'spaceStation');
+            updateAngleDisplay(spaceStationFound.angle, 'spaceStation');
         } else {
             // Hide space station properties if not found (similar to the asteroidPropertiesTable)
             document.getElementById('spaceStationPropertiesTable').style.display = 'none';
@@ -821,8 +987,8 @@ canvas.addEventListener('mousedown', (event) => {
         if (targetFound) {
             currentTarget = targetFound;
             showTargetProperties(targetFound);
-            updateKnobPosition(targetFound.angle, 'start');
-            updateAngleDisplay(targetFound.angle, 'start');
+            updateKnobPosition(targetFound.startAngle || 0, 'start');
+            updateAngleDisplay(targetFound.startAngle || 0, 'start');
         } else {
             targetPropertiesDiv.style.display = 'none';
         }
@@ -867,8 +1033,21 @@ function showresourcesSpotProperties(resourcesSpot) {
 
 function showSpaceStationProperties(spaceStation) {
     document.getElementById('spaceStationPropertiesTable').style.display = 'block';
+    document.getElementById('spaceStationDockMaxSpeed').value = spaceStation.maxDockingSpeed;
+
     spaceStationWidthInput.value = spaceStation.width;
     spaceStationHeightInput.value = spaceStation.height;
+    spaceStationEnterMode.value = spaceStation.mode;
+    spaceStationEnterAction.value = spaceStation.action;
+    spaceStationExitMode.value = spaceStation.exitMode;
+    spaceStationExitAction.value = spaceStation.exitAction;
+    spaceStationActivateRadius.value = spaceStation.activateRadius;
+
+    updateKnobPosition(spaceStationFound.angle, 'spaceStation');
+    updateAngleDisplay(spaceStationFound.angle, 'spaceStation');
+    updateKnobPosition(spaceStationFound.maxDockingAngle, 'spaceStationDock');
+    updateAngleDisplay(spaceStationFound.maxDockingAngle, 'spaceStationDock');
+
 }
 
 function showAsteroidProperties(asteroid) {
@@ -914,9 +1093,9 @@ function zoom(event) {
     const scaleFactor = 1.1;
     const zoomFactor = event.deltaY < 0 ? scaleFactor : 1 / scaleFactor;
 
-    const mousePosBefore = new Vector(event.clientX / zoomLevel - pan.x, event.clientY / zoomLevel - pan.y);
+    const mousePosBefore = new Vector(event.offsetX / zoomLevel - pan.x, event.offsetY / zoomLevel - pan.y);
     zoomLevel *= zoomFactor;
-    const mousePosAfter = new Vector(event.clientX / zoomLevel - pan.x, event.clientY / zoomLevel - pan.y);
+    const mousePosAfter = new Vector(event.offsetX / zoomLevel - pan.x, event.offsetY / zoomLevel - pan.y);
 
     pan.x = pan.x + mousePosAfter.x - mousePosBefore.x;
     pan.y = pan.y + mousePosAfter.y - mousePosBefore.y;
@@ -961,9 +1140,14 @@ function updateLanderManually(lander) {
     if (keys['ArrowRight']) {
         lander.rigidBody.angularVelocity += maxRotationAccel;
     }
-    if (!keys['ArrowLeft'] && !keys['ArrowRight']) {
-        //lander.rigidBody.angularVelocity = 0;
+
+    if (keys['KeyQ']) {
+        lander.sideThrust = -maxSideThrustPower;
     }
+    if (keys['KeyE']) {
+        lander.sideThrust = maxSideThrustPower;
+    }
+
     if (keys['ArrowUp']) {
         lander.thrust = maxThrustPower;
     }
@@ -1136,7 +1320,7 @@ function loadLanders() {
                 populationData.forEach((individualData, i) => {
                     let lander = landers[i];
                     if (!lander)
-                        lander = new Lander(targets[0].position.x, targets[0].position.y + 1, i, targets[0].startAngle);
+                        lander = new Lander(0,0,0);
 
                     Object.setPrototypeOf(individualData, NeuralNetwork2.prototype);
 
@@ -1158,7 +1342,7 @@ function loadLanders() {
                     let nodesPerLayer = getMatchingNodesPerLayer(network);
                     let lander = landers[i];
                     if (!lander)
-                        lander = new Lander(targets[0].position.x, targets[0].position.y + 1, i, targets[0].startAngle);
+                        lander = new Lander(0,0,0);
 
                     lander.addNeuralNetwork(new NeuralNetwork2(nodesPerLayer), network.name);
                     if (!landers[i])
@@ -1192,18 +1376,26 @@ if (!loadLanders()) {
     addEnemyToLanders();
 }
 
-let option = document.createElement('option');
-option.value = "";
-option.text = "Don't change";
-targetActionSelect.appendChild(option);
-// Fill action options dynamically
-for (let action in nnConfigs) {
-    let option = document.createElement('option');
-    option.value = action;
-    option.text = action;
-    targetActionSelect.appendChild(option);
+function createOptions(control) {
+    // Create and append the 'Don't change' option
+    let defaultOption = document.createElement('option');
+    defaultOption.value = "";
+    defaultOption.text = "Don't change";
+    control.appendChild(defaultOption);
+
+    // Fill action options dynamically
+    for (let action in nnConfigs) {
+        let option = document.createElement('option');
+        option.value = action;
+        option.text = action;
+        control.appendChild(option);
+    }
 }
 
+createOptions(targetActionSelect)
+createOptions(resourcesSpotAction)
+createOptions(spaceStationEnterAction)
+createOptions(spaceStationExitAction)
 
 
 //changeAllTarget();
@@ -1217,12 +1409,18 @@ if (!enableManualControl) {
     });
 }
 
-loadScene("harvest")
+let sceneDefault = localStorage.getItem('sceneDefault');
+if(sceneDefault)
+    loadScene(sceneDefault)
 
 function gameLoop() {
     if (!gameLoop.debounced) {
         gameLoop.debounced = true;
         setTimeout(() => {
+            // if(!isSimulationRunning){
+            //     requestAnimationFrame(gameLoop);            
+            //     return;
+            // }
             gameLoop.debounced = false;
             clearCanvas(canvas, ctx, '#03002e');
             ctx.save();
@@ -1240,21 +1438,28 @@ function gameLoop() {
             }
             let index = 0;
             for (let lander of landers) {
+                if (enableManualControl && index > 0)
+                    continue;
+                let showIt = true;
+                if (showfirstN && lander.neuralNetwork.positionNumber > showfirstN)
+                    showIt = false;
                 // if(!lander.neuralNetwork.isBest)
                 //     continue;
                 if (!lander.neuralNetwork.isDead) {
+                    lander.checkDocking();
                     lander.checkTargetModes();
                     lander.checkTargets();
 
-                    lander.updateLander();
+                    if (isSimulationRunning)
+                        lander.updateLander();
                     lander.drawLander();
                     if (index == 0 && enableManualControl)
                         updateLanderManually(lander);
                     else
+                    if (isSimulationRunning)
                         lander.applyNeuralNetwork(lander.target); // Update the neural network input                    
 
                     lander.calculateFitness()
-                    lander.checkDocking();
                     lander.handleCollision();
                 } else {
                     lander.updateLander();
@@ -1272,7 +1477,8 @@ function gameLoop() {
             ctx.restore();
             frameCount++;
             requestAnimationFrame(gameLoop);
-        }, 1);
+
+        });
     }
 
     for (let key in keysPressed) {
@@ -1286,12 +1492,12 @@ function countHarvestedResources() {
     for (let i = 0; i < landers.length; i++) {
         const lander = landers[i];
 
-        for(let resourcesSpotIndex in lander.harvestedResources) {
+        for (let resourcesSpotIndex in lander.harvestedResources) {
             const resourceArray = lander.harvestedResources[resourcesSpotIndex];
 
             for (let k = 0; k < resourceArray.length; k++) {
                 const resourceIndex = resourceArray[k];
-                if(!harvestedResourceCounts[resourcesSpotIndex])
+                if (!harvestedResourceCounts[resourcesSpotIndex])
                     harvestedResourceCounts[resourcesSpotIndex] = {};
                 if (harvestedResourceCounts[resourcesSpotIndex][resourceIndex] === undefined) {
                     harvestedResourceCounts[resourcesSpotIndex][resourceIndex] = 1;

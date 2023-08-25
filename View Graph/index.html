@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+
+<head>
+    <title>Line Graph</title>
+    <style>
+        body {
+            background-color: ivory;
+        }
+
+        canvas {
+            border: 1px solid red;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Line Graph</h1>
+    <div>
+        <textarea id="data" style="width: 500px;height: 500px;"></textarea>
+        <canvas id="canvas" width="500" height="500"></canvas>
+    </div>
+    <div>
+        <p>
+            Target: <input type="number" id="target" value="100" onblur="updateTarget()">
+            <span id="target-value">100</span>
+        </p>
+        <p>
+            Kp: <input type="range" id="Kp" min="0" max="0.01" step="0.00001" value="0.003" oninput="updatePID()">
+            <span id="Kp-value">0.1</span>
+        </p>
+        <p>
+            Ki: <input type="range" id="Ki" min="0" max="0.01" step="0.00001" value="0.0" oninput="updatePID()">
+            <span id="Ki-value">0.002</span>
+        </p>
+        <p>
+            Kd: <input type="range" id="Kd" min="0" max="0.2" step="0.00001" value="0.1" oninput="updatePID()">
+            <span id="Kd-value">0.1</span>
+        </p>
+
+        <p>
+            Max Acceleration: <input type="text" id="maxAcceleration" value="0.1">
+        </p>
+        <p>
+            Max Velocity: <input type="text" id="maxVelocity" value="1000">
+        </p>
+        <p>
+            Num Iterations: <input type="text" id="numIterations" value="1000">
+        </p>
+
+        <button onclick="runSimulation()">Run Simulation</button>
+
+        <h3>Simulation Data</h3>
+        <textarea id="output" style="width: 1000px;height: 500px;"></textarea>
+    </div>
+    <script>
+        var yMin
+        var yMax
+        var xMin
+        var xMax
+
+        // Set the graph dimensions.
+        var width = 500;
+        var height = 500;
+
+        var isPanning = false;
+        var initialPanX, initialPanY, initialXMin, initialXMax, initialYMin, initialYMax;
+
+        var data = [];
+
+        function drawGraph() {
+
+
+            // Create a canvas context.
+            var ctx = document.getElementById("canvas").getContext("2d");
+
+            // Clear the canvas and erase the old lines.
+            ctx.clearRect(0, 0, width, height);
+
+            // Set font and fill style for corner values.
+            ctx.font = "12px Arial";
+            ctx.fillStyle = "black";
+
+            // Display the min/max values in the corners.
+            ctx.fillText("xMin: " + xMin.toFixed(2), 5, height - 5); // bottom left
+            ctx.fillText("xMax: " + xMax.toFixed(2), width - 75, height - 5); // bottom right
+            ctx.fillText("yMin: " + yMin.toFixed(2), 5, height - 20); // just above xMin
+            ctx.fillText("yMax: " + yMax.toFixed(2), 5, 15); // top left            
+
+            // Draw the lines connecting the data points.
+            for (var i = 0; i < data.length - 1; i++) {
+                var x1 = (i - xMin) / (xMax - xMin) * width;
+                var y1 = height - (data[i] - yMin) / (yMax - yMin) * height;
+                var x2 = (i + 1 - xMin) / (xMax - xMin) * width;
+                var y2 = height - (data[i + 1] - yMin) / (yMax - yMin) * height;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+            const result = arrayToList(data);
+            document.getElementById("output").value = result;
+        }
+
+        document.getElementById("data").addEventListener("change", function () {
+            var rawData = document.getElementById("data").value;
+
+            // Remove BOM
+            if (rawData.charCodeAt(0) === 0xFEFF) {
+                rawData = rawData.slice(1);
+            }
+
+            try {
+                data = JSON.parse(rawData);
+            } catch (error) {
+                console.error("Error parsing JSON:", error);
+            }
+
+            // Validate the data.
+            if (!Array.isArray(data) || data.length === 0) {
+                alert("Invalid data.");
+                return;
+            }
+
+            // Set the x-axis and y-axis ranges whenever new data is provided.
+            yMin = Math.min(...data);
+            yMax = Math.max(...data);
+            xMin = 0;
+            xMax = data.length - 1;
+
+            drawGraph();
+        });
+
+        // Mousewheel event listener.
+        document.getElementById("canvas").addEventListener("wheel", function (event) {
+            var mouseX = event.clientX - document.getElementById("canvas").getBoundingClientRect()
+                .left; // Adjusted for canvas position
+            var mouseY = event.clientY - document.getElementById("canvas").getBoundingClientRect()
+                .top; // Adjusted for canvas position
+
+            const scaleFactor = 1.1;
+            const zoomFactor = event.deltaY < 0 ? 1 / scaleFactor : scaleFactor;
+
+            if (event.shiftKey) { // If Ctrl key is pressed, zoom on Y-axis.
+                const mouseYPercent = (1 - (mouseY / height)) * (yMax - yMin) +
+                    yMin; // We use 1 - because y is from top to bottom.
+
+                yMin = mouseYPercent - (mouseYPercent - yMin) * zoomFactor;
+                yMax = mouseYPercent + (yMax - mouseYPercent) * zoomFactor;
+            } else { // Else, zoom on X-axis.
+                const mouseXPercent = (mouseX / width) * (xMax - xMin) + xMin;
+
+                xMin = mouseXPercent - (mouseXPercent - xMin) * zoomFactor;
+                xMax = mouseXPercent + (xMax - mouseXPercent) * zoomFactor;
+            }
+
+            drawGraph();
+        });
+
+
+        document.getElementById("canvas").addEventListener("mousedown", function (event) {
+            if (event.button === 1) { // 1 indicates middle mouse button
+                isPanning = true;
+
+                initialPanX = event.clientX;
+                initialPanY = event.clientY;
+
+                initialXMin = xMin;
+                initialXMax = xMax;
+
+                initialYMin = yMin;
+                initialYMax = yMax;
+
+            }
+        });
+
+        document.getElementById("canvas").addEventListener("mousemove", function (event) {
+            if (isPanning) {
+                var dx = event.clientX - initialPanX; // Difference in X
+                var dy = event.clientY - initialPanY; // Difference in Y (can be used for vertical panning)
+
+                // Adjust the range based on the mouse movement
+                var deltaX = dx * (xMax - xMin) / width;
+
+                xMin = initialXMin - deltaX;
+                xMax = initialXMax - deltaX;
+
+                // Uncomment if you want vertical panning as well:
+                var deltaY = dy * (yMax - yMin) / height;
+                yMin = initialYMin + deltaY;
+                yMax = initialYMax + deltaY;
+
+                drawGraph();
+            }
+        });
+
+        document.getElementById("canvas").addEventListener("mouseup", function (event) {
+            if (event.button === 1) { // 1 indicates middle mouse button
+                isPanning = false;
+            }
+        });
+
+        class PID {
+            constructor(Kp = 0, Ki = 0, Kd = 0) {
+                this.Kp = Kp;
+                this.Ki = Ki;
+                this.Kd = Kd;
+                this.previousError = 0;
+                this.integral = 0;
+            }
+
+            compute(input, setpoint) {
+                const error = setpoint - input;
+
+                const P = this.Kp * error;
+                this.integral += error;
+                const I = this.Ki * this.integral;
+                const derivative = error - this.previousError;
+                const D = this.Kd * derivative;
+
+                this.previousError = error;
+
+                return P + I + D;
+            }
+
+            setTuningParams(Kp, Ki, Kd) {
+                this.Kp = Kp;
+                this.Ki = Ki;
+                this.Kd = Kd;
+            }
+        }
+        let target = 100;
+
+        function updateTarget() {
+            target = parseFloat(document.getElementById("target").value);
+            runSimulation();
+        }
+        let stepCount = 0;
+        function runSimulation() {
+            stepCount++;
+            let pid = new PID(parseFloat(document.getElementById("Kp").value),
+                parseFloat(document.getElementById("Ki").value),
+                parseFloat(document.getElementById("Kd").value));
+
+            let position = 0;
+            let velocity = 0;
+            let maxAcceleration = parseFloat(document.getElementById("maxAcceleration").value);
+            let maxVelocity = parseFloat(document.getElementById("maxVelocity").value);
+            let numIterations = parseInt(document.getElementById("numIterations").value);
+            data.length = 0;
+
+            for (let i = 0; i < numIterations; i++) {
+                acceleration = pid.compute(position, target);
+                acceleration = Math.max(-maxAcceleration, Math.min(maxAcceleration, acceleration));
+
+                velocity += acceleration;
+                velocity = Math.max(-maxVelocity, Math.min(velocity, maxVelocity));
+                // add noise to velocity
+                //velocity += (Math.random() - 0.5) * 0.5;
+                position += velocity;
+                //position += (Math.random() - 0.5) * 1;
+
+                data.push(position);
+            }
+
+            yMin = Math.min(...data);
+            yMax = Math.max(...data);
+            console.log(yMin, yMax);
+            let range = Math.abs(yMax - yMin);
+            yMin = target - range / 2;
+            yMax = target + range / 2;
+            xMin = 0;
+            xMax = data.length - 1;
+
+            drawGraph();
+            document.getElementById("data").value = JSON.stringify(data, null, 2);
+        }
+
+        function arrayToList(arr) {
+            let str = arr.join("\r\n");
+            return str.replaceAll(".", ",")
+        }
+
+        function updatePID() {
+            document.getElementById("Kp-value").textContent = document.getElementById("Kp").value;
+            document.getElementById("Ki-value").textContent = document.getElementById("Ki").value;
+            document.getElementById("Kd-value").textContent = document.getElementById("Kd").value;
+        }
+        updateTarget();
+        updatePID()
+    </script>
+</body>
+
+</html>

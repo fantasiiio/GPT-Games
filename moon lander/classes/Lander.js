@@ -33,7 +33,7 @@ class Lander {
         this.neuralNetworks = {}; // Array to store multiple neural networks indexed by name
         this.currentActionName = "";
 
-        this.harvestCapacity = 1000;
+        this.harvestCapacity = 10;
         this.harvestedResources = {};
 
         this.lasers = [];
@@ -57,12 +57,50 @@ class Lander {
         this.shieldActivationTimer = 0;
 
         this.fuelConsumption = 0;
-        this.fuelCapacity = 1000;
+        this.fuelCapacity = Number.MAX_SAFE_INTEGER;
         this.fuelLevel = this.fuelCapacity;
         this.enemies = [];
         this.target = null;
         //this.enemies.push(new Enemy());
-        this.chooseTargetMode = "nextTarget", "nearestTarget", "nearestEnemy", "nearestResource", "nearestAsteroid", "spaceStation"
+        this.chooseTargetMode = "nextTarget"; //, "nearestTarget", "nearestEnemy", "nearestResource", "nearestAsteroid", "spaceStation"
+        this.timeDocked = 0;
+    }
+
+    resetLander() {
+        this.rigidBody.position.x = targets[0].position.x;
+        this.rigidBody.position.y = targets[0].position.y + 1;
+        this.rigidBody.velocity.x = 0;
+        this.rigidBody.velocity.y = 0;
+        this.rigidBody.angularVelocity = 0;
+        this.rigidBody.angle = targets[0].startAngle || 0;
+        this.sideThrust = 0;
+        this.angularAcceleration = 0;
+        this.thrust = 0;
+        this.fuelConsumption = 0;
+        this.successfulLanding = false;
+        this.targetReached = false;
+        this.timeToReachTarget = 0;
+        this.startTime = 0;
+        this.currentTime = 0;
+        this.dockedSpaceStation = null;
+        this.cumulRotationPenaltyFactor = 0;
+        this.frameCount = 0;
+        this.target = null;
+        this.targetIndex = -1;
+        this.fitnessMultiplier = 1;
+        this.timeBonus = startingTimeBonus;
+        this.harvestedCount = 0;
+        this.harvestedResources = {};
+        for (let name in this.neuralNetworks) {
+            this.neuralNetworks[name].isDead = false;
+            this.neuralNetworks[name].currentFitness = startingTimeBonus
+        }
+        this.energyLevel = 100;
+        this.fuelLevel = this.fuelCapacity;
+        this.healthLevel = 100;
+        this.setTarget(targets[0]);
+        this.timeDocked = 0;
+        this.frameCount = 0;
     }
 
     setTarget(target) {
@@ -102,11 +140,9 @@ class Lander {
     }
 
     setTargetSpaceStation(spaceStation) {
-        this.target = {
-            position: spaceStation.position,
-            velocity: spaceStation.velocity,
-            targetType: "spaceStation"
-        };
+        this.target = spaceStation;
+        this.target.position = spaceStation.dockPosition;
+        this.target.velocity = spaceStation.rigidBody.velocity;
         this.changeTarget();
     }
 
@@ -221,6 +257,7 @@ class Lander {
     }
 
     updateLander() {
+        this.frameCount++;
         if (!this.isEnemy)
             this.updateEnemies();
 
@@ -235,7 +272,7 @@ class Lander {
         this.fuelConsumption += FuelConsumption_thrust * (this.thrust / maxThrustPower);
         this.fuelConsumption += FuelConsumption_rotate * (Math.abs(this.angularAcceleration) / maxRotationAccel);
         this.fuelConsumption += FuelConsumption_sideThrust * (this.sideThrust / maxSideThrustPower);
-        this.fuelLevel -= this.fuelConsumption;
+        //this.fuelLevel -= this.fuelConsumption;
         if (this.fuelLevel < 0)
             this.fuelLevel = 0;
 
@@ -275,40 +312,6 @@ class Lander {
             this.explosion.update();
             if (this.explosion.isDone()) {}
         }
-    }
-
-    resetLander() {
-        this.rigidBody.position.x = targets[0].position.x;
-        this.rigidBody.position.y = targets[0].position.y + 1;
-        this.rigidBody.velocity.x = 0;
-        this.rigidBody.velocity.y = 0;
-        this.rigidBody.angularVelocity = 0;
-        this.rigidBody.angle = targets[0].startAngle || 0;
-
-        this.thrust = 0;
-        this.fuelConsumption = 0;
-        this.successfulLanding = false;
-        this.targetReached = false;
-        this.timeToReachTarget = 0;
-        this.startTime = 0;
-        this.currentTime = 0;
-        this.docked = false;
-        this.cumulRotationPenaltyFactor = 0;
-        this.frameCount = 0;
-        this.target = null;
-        this.targetIndex = -1;
-        this.neuralNetwork.currentFitness = startingTimeBonus;
-        this.fitnessMultiplier = 1;
-        this.timeBonus = startingTimeBonus;
-        this.harvestCount = 0;
-        this.harvestedResources = {};
-        for (let name in this.neuralNetworks)
-            this.neuralNetworks[name].isDead = false;
-
-        this.energyLevel = 100;
-        this.fuelLevel = this.fuelCapacity;
-        this.healthLevel = 100;
-        this.setTarget(targets[0]);
     }
 
     changeTarget() {
@@ -374,7 +377,7 @@ class Lander {
     drawLander() {
         if (!this.isEnemy) {
             for (let enemy of this.enemies) {
-                enemy.drawLander();
+                enemy.drawEnemy();
             }
         }
 
@@ -561,7 +564,157 @@ class Lander {
         this.drawLasers();
     }
 
+    drawEnemy() {
+        ctx.save();
+        ctx.translate(this.rigidBody.position.x, this.rigidBody.position.y);
 
+        let rocketColor = '#00FF00'; // Changed to bright green
+        if (this.isEnemy)
+            rocketColor = '#FF0000'; // Changed to red
+
+        // Your position, fitness, action name, and target mode rendering here...
+        // ...
+
+        ctx.rotate(this.rigidBody.angle);
+
+        // Draw this body with a more triangular shape
+        ctx.beginPath();
+        ctx.moveTo(-30, 30); // Changed from -20, 20
+        ctx.lineTo(0, -50); // Changed from quadratic curves to straight lines
+        ctx.lineTo(30, 30); // Changed from 20, 20
+        ctx.closePath();
+        ctx.fillStyle = rocketColor;
+        ctx.fill();
+        ctx.strokeStyle = 'gray';
+        ctx.stroke();
+
+        // Draw this windows
+        ctx.beginPath();
+        ctx.arc(0, -10, 8, 0, 2 * Math.PI); // Moved up and made larger
+        ctx.fillStyle = 'white'; // Changed from blue to white
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw this wings with a different shape
+        ctx.beginPath();
+        ctx.moveTo(-30, 30);
+        ctx.lineTo(-40, 50);
+        ctx.lineTo(-20, 50);
+        ctx.closePath();
+        ctx.fillStyle = rocketColor;
+        ctx.fill();
+        ctx.strokeStyle = 'gray';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(30, 30);
+        ctx.lineTo(40, 50);
+        ctx.lineTo(20, 50);
+        ctx.closePath();
+        ctx.fillStyle = rocketColor;
+        ctx.fill();
+        ctx.strokeStyle = 'gray';
+        ctx.stroke();
+
+        // Draw this thruster
+        if (this.thrust > 0) {
+            const thrusterHeight = 30;
+            const adjustedThrusterHeight = thrusterHeight * (this.thrust / maxThrustPower);
+            ctx.beginPath();
+            ctx.moveTo(-5, 15);
+            ctx.lineTo(0, 15 + adjustedThrusterHeight);
+            ctx.lineTo(5, 15);
+            ctx.closePath();
+            ctx.fillStyle = 'red';
+            ctx.fill();
+            ctx.strokeStyle = 'red';
+            ctx.stroke();
+        } else if (this.thrust < 0) {
+            const thrusterHeight = 30;
+            const adjustedThrusterHeight = thrusterHeight * (this.thrust / maxThrustPower);
+            ctx.beginPath();
+            ctx.moveTo(-5, -25);
+            ctx.lineTo(0, -25 + adjustedThrusterHeight);
+            ctx.lineTo(5, -25);
+            ctx.closePath();
+            ctx.fillStyle = 'red';
+            ctx.fill();
+            ctx.strokeStyle = 'red';
+            ctx.stroke();
+        }
+
+        // Draw rotation thruster
+        if (this.angularAcceleration < 0) {
+            const thrusterWidth = 20;
+            const adjustedThrusterWidth = thrusterWidth * (this.angularAcceleration / maxRotationAccel);
+            ctx.beginPath();
+            ctx.moveTo(-25, 30); // Starting point is at the end of the left wing
+            ctx.lineTo(-25 + adjustedThrusterWidth, 25);
+            ctx.lineTo(-25, 20);
+            ctx.closePath();
+            ctx.fillStyle = 'red'; // Choose a different color to distinguish side thrusters
+            ctx.fill();
+            ctx.strokeStyle = 'red';
+            ctx.stroke();
+        } else if (this.angularAcceleration > 0) {
+            const thrusterWidth = 20;
+            const adjustedThrusterWidth = thrusterWidth * (this.angularAcceleration / maxRotationAccel);
+            ctx.beginPath();
+            ctx.moveTo(25, 30); // Starting point is at the end of the right wing
+            ctx.lineTo(25 + adjustedThrusterWidth, 25);
+            ctx.lineTo(25, 20);
+            ctx.closePath();
+            ctx.fillStyle = 'red'; // Choose a different color to distinguish side thrusters
+            ctx.fill();
+            ctx.strokeStyle = 'red';
+            ctx.stroke();
+        }
+
+
+        // Draw side thruster
+        if (this.sideThrust > 0) {
+            const thrusterWidth = 30;
+            const adjustedThrusterWidth = thrusterWidth * (this.sideThrust / maxThrustPower);
+            ctx.beginPath();
+            ctx.moveTo(-15, 15);
+            ctx.lineTo(-15 - adjustedThrusterWidth, 10);
+            ctx.lineTo(-15, 5);
+            ctx.closePath();
+            ctx.fillStyle = '#03C03C'; // Choose a different color to distinguish side thrusters
+            ctx.fill();
+            ctx.strokeStyle = '#03C03C';
+            ctx.stroke();
+        } else if (this.sideThrust < 0) {
+            const thrusterWidth = 30;
+            const adjustedThrusterWidth = thrusterWidth * (this.sideThrust / maxThrustPower);
+            ctx.beginPath();
+            ctx.moveTo(15, 15);
+            ctx.lineTo(15 - adjustedThrusterWidth, 10);
+            ctx.lineTo(15, 5);
+            ctx.closePath();
+            ctx.fillStyle = '#03C03C'; // Choose a different color to distinguish side thrusters
+            ctx.fill();
+            ctx.strokeStyle = '#03C03C';
+            ctx.stroke();
+        }
+
+        if (this.shieldActive) {
+            // Draw shield
+            ctx.beginPath();
+            ctx.arc(0, 0, 50, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'lightblue';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.closePath();
+        }
+
+        ctx.restore();
+
+        // Draw bars and lasers
+        this.drawBars();
+        this.drawLasers();
+    }
 
     isLanderOutOfScreen() {
         return false;
@@ -621,7 +774,7 @@ class Lander {
     harvestResource() {
         let closestResourceIndex = null;
         let minDistance = Number.MAX_SAFE_INTEGER;
-
+        let resetTarget = false;
         let nearestresourcesSpotIndex = this.getNearestResourceSpotIndex();
         let nearestresourcesSpot = resourcesSpots[nearestresourcesSpotIndex];
         if (!nearestresourcesSpot)
@@ -638,26 +791,48 @@ class Lander {
             let resources = this.harvestedResources[nearestresourcesSpotIndex];
 
             if (distance < nearestresourcesSpot.resourceRadius + 25) {
-                if (resources.length < this.harvestCapacity && !resources.includes(i)) {
+                if (this.harvestedCount < this.harvestCapacity && !resources.includes(i)) {
+                    this.harvestedCount++;
                     resources.push(i);
                     this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnResourceHarvested"]);
                     if (this.target && this.target.position == resource.position)
                         this.target = null;
                 }
+                if (this.harvestedCount == this.harvestCapacity) {
+
+                    if (nearestresourcesSpot.targetMode && this.chooseTargetMode != nearestresourcesSpot.targetMode) {
+                        this.chooseTargetMode = nearestresourcesSpot.targetMode;
+                        resetTarget = true;
+                    }
+                    if (nearestresourcesSpot.action && this.currentActionName != nearestresourcesSpot.action)
+                        this.setActiveNeuralNetwork(nearestresourcesSpot.action);
+
+                    if (resetTarget) {
+                        // Reset target
+                        this.targetIndex = -1;
+                        this.target = null;
+                        nearestresourcesSpot = null;
+                        closestResourceIndex = null;
+                        break;
+                    }
+                }
             }
 
             // If this resource is closer than the current closest resource, update closestResourceIndex and minDistance
-            if (distance < minDistance && !resources.includes(i)) {
+            if (!resetTarget && distance < minDistance && !resources.includes(i)) {
                 minDistance = distance;
                 closestResourceIndex = i;
                 this.nearestResource = resource;
             }
         }
-
-        return {
-            spot: nearestresourcesSpot,
-            resourceIndex: closestResourceIndex
-        };
+        if (!resetTarget) {
+            return {
+                spot: nearestresourcesSpot,
+                resourceIndex: closestResourceIndex
+            };
+        } else {
+            return null;
+        }
     }
 
     nextTarget() {
@@ -723,22 +898,28 @@ class Lander {
     }
 
     checkTargets() {
-        if (this.chooseTargetMode == "spaceStation")
-            this.target = spaceStation.dockPosition;
-        else if (this.chooseTargetMode == "nextTarget") {
+        if (this.chooseTargetMode == "spaceStation") {
+            let spaceStation = this.getNearestSpaceStation();
+            if (spaceStation)
+                this.setTargetSpaceStation(spaceStation);
+        } else if (this.chooseTargetMode == "nextTarget") {
             if (this.checkTargetReached()) {
                 this.nextTarget();
             }
         } else if (this.chooseTargetMode == "nearestEnemy") {
             if (!this.target) {
                 let enemy = this.getNearestEnemy();
-                this.target = enemy.rigidBody.position;
+                this.setTargetEnemy(enemy);
             }
         } else if (this.chooseTargetMode == "nearestResource") {
             let closestResource = this.harvestResource();
             if (closestResource) {
                 this.setTargetResource(closestResource)
             }
+            // } else {
+            //     // Target mode changed
+            //     this.checkTargets();
+            // }
         }
     }
 
@@ -748,25 +929,6 @@ class Lander {
         return angle;
     }
 
-    calculatePredictionError(predictionModel) {
-        // Get the model's prediction for the next state
-        let predictedNextState = predictionModel.predict(this.lastSpaceshipStates);
-
-        // Calculate the difference between the predicted and actual next states
-        let predictionError = [];
-        for (let i = 0; i < predictedNextState.length; i++) {
-            predictionError[i] = this.spaceshipStates[i] - predictedNextState[i];
-        }
-
-        // Calculate the mean squared error
-        let mse = 0;
-        for (let error of predictionError) {
-            mse += error * error;
-        }
-        mse /= predictionError.length;
-
-        return mse;
-    }
 
     // function that check if trajectory line is intersecting with target
     checkTrajectoryIntersectTarget(target) {
@@ -860,25 +1022,70 @@ class Lander {
         return numerator / denominator;
     }
 
+    stop() {
+        this.rigidBody.velocity.x = 0;
+        this.rigidBody.velocity.y = 0;
+        this.rigidBody.angularVelocity = 0;
+        this.sideThrust = 0;
+        this.angularAcceleration = 0;
+        this.thrust = 0;
+
+    }
 
     checkDocking() {
-        return false;
-        if (this.docked)
-            return;
-        // Calculate the angle of the spaceship's body
-        let bodyAngle = this.rigidBody.angle;
-        bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
+        let spaceStation = this.getNearestSpaceStation();
+        if (!spaceStation) return;
+        let distance = this.rigidBody.position.distanceTo(spaceStation.dockPosition)
 
-        // Calculate the facing direction of the spaceship
-        const facingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
-        let angleDelta = Vector.angleBetweenVectors(facingDirection, spaceStation.dockAlignment)
+        if (this.dockedSpaceStation) {
+            if (distance > this.dockedSpaceStation.activateRadius) {
+                this.dockedSpaceStation = null;
+                this.timeDocked = 0;
+            }
 
-        if (this.rigidBody.position.distanceTo(spaceStation.dockPosition) < 50 && angleDelta < 5 * (Math.PI / 180) && this.rigidBody.velocity.length() < 1) {
             this.rigidBody.position = spaceStation.dockPosition.add(spaceStation.dockAlignment.multiply(30));
             this.rigidBody.angle = spaceStation.dockAlignment.angle() + Math.PI;
-            this.docked = true;
-            this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnDocked"]);
-            this.die();
+            this.stop();
+
+            this.timeDocked++;
+            // Undock 
+            if (this.timeDocked == 100) {
+                this.harvestedResources = {};
+                this.harvestedCount = 0;
+                this.rigidBody.position = this.rigidBody.position.add(this.dockedSpaceStation.dockAlignment.multiply(50));
+                this.rigidBody.velocity = this.dockedSpaceStation.dockAlignment.multiply(10);
+                let resetTarget = false;
+                if (this.dockedSpaceStation.exitMode && this.chooseTargetMode != this.dockedSpaceStation.exitMode) {
+                    this.chooseTargetMode = this.dockedSpaceStation.exitMode;
+                    resetTarget = true;
+                }
+                if (this.dockedSpaceStation.exitAction && this.currentActionName != this.dockedSpaceStation.exitAction)
+                    this.setActiveNeuralNetwork(this.dockedSpaceStation.exitAction);
+
+                if (resetTarget) {
+                    // Reset target
+                    this.targetIndex = -1;
+                    this.target = null;
+                }
+                this.dockedSpaceStation = null;
+            }
+        } else {
+            // Calculate the angle of the spaceship's body
+            let bodyAngle = this.rigidBody.angle;
+            bodyAngle = this.wrapAroundAngle(bodyAngle) + Math.PI / 2 * 3;
+
+
+            // Calculate the facing direction of the spaceship
+            const facingDirection = new Vector(Math.cos(bodyAngle), Math.sin(bodyAngle));
+            let angleDelta = Vector.angleBetweenVectors(facingDirection, spaceStation.dockAlignment)
+
+            if (distance < 50 && angleDelta < spaceStation.maxDockingAngle && this.rigidBody.velocity.length() < spaceStation.maxDockingSpeed) {
+                this.dockedSpaceStation = spaceStation;
+                this.rigidBody.position = spaceStation.dockPosition.add(spaceStation.dockAlignment.multiply(30));
+                this.rigidBody.angle = spaceStation.dockAlignment.angle() + Math.PI;
+                this.stop();
+                this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnDocked"]);
+            }
         }
     }
 
@@ -982,7 +1189,7 @@ class Lander {
     }
 
     calculateFitness() {
-        if (enableManualControl)
+        if (enableManualControl || !isSimulationRunning)
             return;
 
         let fitness = 0;
@@ -1032,10 +1239,10 @@ class Lander {
                     value = 1 - Math.abs(this.thrust) / maxThrustPower;
                     break;
                 case 8:
-                    value = spaceStation.dockAlignment.dot(facingDirection);
+                    value = this.target.dockAlignment.dot(facingDirection);
                     break;
                 case 9:
-                    value = 1 - this.distanceFromLineToPoint(spaceStation.dockPosition, spaceStation.dockPosition.add(spaceStation.dockAlignment), this.rigidBody.position) / 1000;
+                    value = 1 - this.distanceFromLineToPoint(this.target.dockPosition, this.target.dockPosition.add(this.target.dockAlignment), this.rigidBody.position) / 1000;
                     break;
                 case 10:
                     value = this.rigidBody.velocity.length();
@@ -1244,10 +1451,25 @@ class Lander {
 
     }
 
+    getNearestSpaceStation() {
+        let nearestspaceStation = null;
+        let nearestDistance = Infinity;
+        for (let spaceStation of spaceStations) {
+            let dx = this.rigidBody.position.x - spaceStation.rigidBody.position.x;
+            let dy = this.rigidBody.position.y - spaceStation.rigidBody.position.y;
+            let distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestspaceStation = spaceStation;
+            }
+        }
+        return nearestspaceStation;
+    }
+
     getNearestEnemy() {
         let nearestEnemy = null;
         let nearestDistance = Infinity;
-        for (let enemy of enemies) {
+        for (let enemy of this.enemies) {
             if (enemy.isDead)
                 continue;
             let dx = this.rigidBody.position.x - enemy.rigidBody.position.x;
@@ -1270,12 +1492,12 @@ class Lander {
     }
 
     calculateStates(target, asteroids) {
-        if (this.neuralNetwork.isDead)
-            return;
+        // if (this.neuralNetwork.isDead)
+        //     return;
 
         const spaceshipStates = [];
 
-        if (enableManualControl)
+        if (enableManualControl || !isSimulationRunning)
             return spaceshipStates;
 
         const bodyAngle = this.wrapAroundAngle(this.rigidBody.angle) + Math.PI / 2 * 3;
@@ -1434,7 +1656,8 @@ class Lander {
                     break;
                 case 4:
                     // Assuming value is used to determine if fire is active
-                    this.isFireActive = value > 0; // threshold for activating fire can be adjusted
+                    if (value > 0) // threshold for activating fire can be adjusted
+                        this.fireLaser();
                     break;
                 case 5:
                     // Assuming value is used to determine if shield is active
@@ -1602,29 +1825,26 @@ class Lander {
     handleCollision() {
         // Get the polygons of the lander and asteroid
         const landerPolygons = this.getLanderPolygons();
-
+        let nearestPoint;
         for (let enemy of this.enemies) {
             for (let i = 0; i < enemy.lasers.length; i++) {
                 const laser = enemy.lasers[i];
 
-                nearestPoint = IntersectionUtil.lineCircleIntersection({
-                    start: laser.position,
-                    end: laser.end
-                }, this.rigidBody.position, 50);
+                nearestPoint = IntersectionUtil.lineCircleIntersection(laser.position, laser.end, this.rigidBody.position, 50);
 
                 if (nearestPoint) {
                     if (this.rigidBody.position == enemy.target.position)
                         enemy.target = null;
                     enemy.removeLaser(i);
-                    this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnGotShieldHit"]);
-                    enemy.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnHitEnemyShield"]);
+                    this.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnGotShieldHit"] || 0);
+                    enemy.neuralNetwork.currentFitness += Number(nnConfigs[this.currentActionName].fitnessOnEvents["OnHitEnemyShield"] || 0);
                     this.healthLevel -= this.laserDamage;
                 }
             }
         }
         // Check for intersection between each pair of polygons
         for (const landerPolygon of landerPolygons) {
-            let nearestPoint;
+
             for (let i = 0; i < asteroids.length; i++) {
                 let asteroid = asteroids[i];
                 const asteroidPolygon = asteroids[i].polygon;
@@ -1670,7 +1890,7 @@ class Lander {
                     //this.neuralNetwork.currentFitness -= 1000;
                 }
             }
-            if (useSpaceStation) {
+            for (let spaceStation of spaceStations) {
                 nearestPoint = spaceStation.polygon.getNearestIntersection(landerPolygon);
                 if (nearestPoint) {
                     this.rigidBody.resolveCollision(spaceStation.rigidBody);

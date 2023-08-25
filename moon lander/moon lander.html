@@ -39,7 +39,7 @@
 
         .flex-container {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
         }
 
         .switch {
@@ -120,206 +120,325 @@
             transform: translate(-50%, -50%);
             cursor: pointer;
         }
+
+        .button-full {
+            width: 100%;
+            display: block;
+        }
     </style>
 </head>
 
 <body>
     <div style="display: flex;">
-        <canvas id="gameCanvas"  style="width:1200px; height: 1000px;" width="1200" height="1000"></canvas>
         <div class="flex-container">
-            <div style="display: grid;">
-                <button id="saveGenerationBtn">Save Generation</button>
-                <button id="skipGenerationBtn">Skip Generation</button>
-                <button id="stopShipBtn">Stop Ship</button>
-                <button id="drawBtn">Draw Walls</button>
-                <button id="addTargetBtn">Add Target</button>
-                <button id="addAsteroidBtn">Add Asteroid</button>
-                <button id="addSpaceStationBtn">Add Space Station</button>
-                <button id="addResourcesSpotBtn">Add Resources Spot</button>
-            </div>
-            <br>
-            <input id="sceneName" type="text" placeholder="Scene Name">
-            <button id="addSceneBtn">Add Scene</button>
-            Scene:<select id="sceneSelect"></select>
+            <div style="display: block;">
+                <button class="button-full" id="resetSceneBtn">New/Reset Scene</button>
+                <button id="playButton" class="btn"><i class="fas fa-play"></i></button>
+                <button id="stopButton" class="btn" style="display: none;"><i class="fas fa-stop"></i></button>                                         
+                <button class="button-full" id="saveGenerationBtn">Save Generation</button>
+                <button class="button-full" id="skipGenerationBtn">Skip Generation</button>
+                <button class="button-full" id="stopShipBtn">Stop Ship</button>
+                <button class="button-full" id="drawBtn">Draw Walls</button>
+                <button class="button-full" id="addTargetBtn">Add Target</button>
+                <button class="button-full" id="addAsteroidBtn">Add Asteroid</button>
+                <button class="button-full" id="addSpaceStationBtn">Add Space Station</button>
+                <button class="button-full" id="addResourcesSpotBtn">Add Resources Spot</button>
+                <button class="button-full" id="addEnemyBtn">Add Enemy</button>
+                <br>
+                <label class="button-full">Show First N</label>
+                <input id="showfirstN" type="number">
+                <label class="button-full">Death Timeout (sec)</label>
+                <input type="number" id="deathTimeoutInput" />
+                <br>
+                <input id="sceneName" type="text" placeholder="Scene Name">
+                <button class="button-full" id="addSceneBtn">Add Scene</button>
+                Scene:<select class="button-full" id="sceneSelect"></select>
+                <button class="button-full" id="saveSceneBtn">Save Scene</button>
+                <button class="button-full" id="makeDefaultSceneBtn">Make Default Scene</button>
+                <br>
+                <input type="checkBox" id="enableManualControlChk" />
+                <label>Enable Manual Control</label>
+                <br>
+                <br>
+                <input checked type="checkBox" id="enableAutoTunePIDChk" />
+                <label>Enable Auto Tune PID</label>
+                <input id="IncreasePBtn" type="button" value="Increase P"/>
+                <input id="GetZieglerNicholsBtn" type="button" value="Get Ziegler-Nichols"/>
 
-            <!-- resourcesSpots -->
-            <table id="resourcesSpotProperties" style="display: none;">
-                <tr>
+            </div>
+
+            <canvas id="gameCanvas" style="width:1200px; height: 1000px;margin-left: 10px;" width="1200"
+                    height="1000"></canvas>
+
+            <div>
+
+                <!-- resourcesSpots -->
+                <table id="resourcesSpotProperties" style="display: none;">
                     <td colspan="2">
                         <h1 id="resourcesSpotName">resourcesSpot</h1>
-                </tr>                
-                <tr>
-                    <th>Property</th>
-                    <th>Value</th>
-                </tr>
-                <tr>
-                    <td>Spot Radius</td>
-                    <td><input type="number" id="resourcesSpotRadius"></td>
-                </tr>
-                <tr>
-                    <td>Number Of Resources</td>
-                    <td><input type="number" id="resourcesSpotNumResources"></td>
-                </tr>                                
-                <tr>
-                    <td>Resource Radius</td>
-                    <td><input type="number" id="resourcesSpotResourceRadius"></td>
-                </tr>                                
+                        </tr>
+                        <tr>
+                            <th>Property</th>
+                            <th>Value</th>
+                        </tr>
+                        <tr>
+                            <td>Spot Radius</td>
+                            <td><input type="number" id="resourcesSpotRadius"></td>
+                        </tr>
+                        <tr>
+                            <td>Number Of Resources</td>
+                            <td><input type="number" id="resourcesSpotNumResources"></td>
+                        </tr>
+                        <tr>
+                            <td>Resource Radius</td>
+                            <td><input type="number" id="resourcesSpotResourceRadius"></td>
+                        </tr>
 
-                <tr>
-                    <td>Full Target Mode</td>
-                    <td>
-                        <select id="resourcesSpotModeSelect" style="width: 100%;">
-                            <option value="nextresourcesSpot">Next resourcesSpot</option>
-                            <option value="nearestresourcesSpot">Nearest resourcesSpot</option>
-                            <option value="nearestEnemy">Nearest Enemy</option>
-                            <option value="nearestResource">Nearest Resource</option>
-                            <option value="nearestAsteroid">Nearest Asteroid</option>
-                            <option value="spaceStation">Space Station</option>
-                        </select>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Full Action Mode</td>
-                    <td>
-                        <select id="resourcesSpotAction" style="width: 100%;">
-                            <!-- Populate this select with options dynamically -->
-                        </select>
-                    </td>
-                </tr>              
-                <tr>
-                    <td colspan="2">
-                        <button id="removeresourcesSpotBtn">Remove resourcesSpot</button>
-                    </td>
-                </tr>
-            </table>
-            
-            <!-- Targets -->
-            <table id="targetProperties" style="display: none;">
-                <tr>
-                    <td colspan="2">
-                        <h1 id="targetName">Target</h1>
-                </tr>                
-                <tr>
-                    <th>Property</th>
-                    <th>Value</th>
-                </tr>
-                <tr>
-                    <td>Activate Radius</td>
-                    <td><input type="number" id="targetActivateRadius"></td>
-                </tr>
-                <tr>
-                    <td>Target Mode</td>
-                    <td>
-                        <select id="targetMode" style="width: 100%;">
-                            <option value="nextTarget">Next Target</option>
-                            <option value="nearestTarget">Nearest Target</option>
-                            <option value="nearestEnemy">Nearest Enemy</option>
-                            <option value="nearestResource">Nearest Resource</option>
-                            <option value="nearestAsteroid">Nearest Asteroid</option>
-                            <option value="spaceStation">Space Station</option>
-                        </select>
-                    </td>
-                </tr>
-                <tr>
-                    <td>Action Mode</td>
-                    <td>
-                        <select id="targetAction" style="width: 100%;">
-                            <!-- Populate this select with options dynamically -->
-                        </select>
-                    </td>
-                </tr>
-                <tr id="startAngleRow">
-                    <td>Angle</td>
-                    <td>
-                        <svg id="startSvg" width="200" height="200">
-                            <circle id="startMainCircle" cx="100" cy="100" r="80" stroke="black" fill="transparent" />
-                            <circle id="startKnob" cx="100" cy="20" r="10" fill="red" />
-                        </svg>
-                        <p><label>Snap angle: <input id="startSnapCheckbox" type="checkbox" /></label></p>
-                        <p>Angle: <span id="startAngleDisplay">0</span> degrees</p>                        
-                    </td>
-                </tr>                
-                <tr>
-                    <td colspan="2">
-                        <button id="removeTargetBtn">Remove Target</button>
-                    </td>
-                </tr>
-            </table>
+                        <tr>
+                            <td>Full Target Mode</td>
+                            <td>
+                                <select id="resourcesSpotModeSelect" style="width: 100%;">
+                                    <option value="nextresourcesSpot">Next resourcesSpot</option>
+                                    <option value="nearestresourcesSpot">Nearest resourcesSpot</option>
+                                    <option value="nearestEnemy">Nearest Enemy</option>
+                                    <option value="nearestResource">Nearest Resource</option>
+                                    <option value="nearestAsteroid">Nearest Asteroid</option>
+                                    <option value="spaceStation">Nearest Space Station</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Full Action Mode</td>
+                            <td>
+                                <select id="resourcesSpotAction" style="width: 100%;">
+                                    <!-- Populate this select with options dynamically -->
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">
+                                <button id="removeresourcesSpotBtn">Remove resourcesSpot</button>
+                            </td>
+                        </tr>
+                </table>
 
-            <!-- Asteroids -->
-            <table id="asteroidPropertiesTable" style="display: none;">
-                <tr>
-                    <td colspan="2">
-                        <h1>Asteroid</h1>
-                </tr>                
-                <tr>
-                    <th>Property</th>
-                    <th>Value</th>
-                </tr>
-                <tr>
-                    <td>Radius</td>
-                    <td><input type="number" id="asteroidRadiusInput"></td>
-                </tr>
-                <tr>
-                    <td>Num Subdivisions</td>
-                    <td><input type="number" id="asteroidNumSubdivisionsInput"></td>
-                </tr>
-                <tr>
-                    <td>Angle</td>
-                    <td>
-                        <svg id="asteroidSvg">
-                            <circle id="asteroidMainCircle" cx="100" cy="100" r="80" stroke="black" fill="transparent" />
-                            <circle id="asteroidKnob" cx="100" cy="20" r="10" fill="red" />
-                        </svg>
-                        <p><label>Snap angle: <input id="asteroidSnapCheckbox" type="checkbox" /></label></p>
-                        <p>Angle: <span id="asteroidAngleDisplay">0</span> degrees</p>                        
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="2">
-                        <button id="regenerateAsteroidBtn">Regenerate</button>
-                    </td>
-                </tr>
-            </table>
+                <!-- Targets -->
+                <table id="targetProperties" style="display: none;">
+                    <tr>
+                        <td colspan="2">
+                            <h1 id="targetName">Target</h1>
+                    </tr>
+                    <tr>
+                        <th>Property</th>
+                        <th>Value</th>
+                    </tr>
 
-            <!-- Space Stations -->
-            <table id="spaceStationPropertiesTable" style="display: none;">
-                <tr>
-                    <td colspan="2">
-                        <h1>Space Station</h1>
-                </tr>
-                <tr>
-                    <th>Property</th>
-                    <th>Value</th>
-                </tr>
-                <tr>
-                    <td>Width</td>
-                    <td><input type="number" id="spaceStationWidthInput"></td>
-                </tr>
-                <tr>
-                    <td>Height</td>
-                    <td><input type="number" id="spaceStationHeightInput"></td>
-                </tr>
-                <tr>
-                    <td>Angle</td>
-                    <td>
-                        <svg id="spaceStationSvg" width="200" height="200">
-                            <circle id="spaceStationMainCircle" cx="100" cy="100" r="80" stroke="black" fill="transparent" />
-                            <circle id="spaceStationKnob" cx="100" cy="20" r="10" fill="red" />
-                        </svg>
-                        <p><label>Snap angle: <input id="spaceStationSnapCheckbox" type="checkbox" /></label></p>
-                        <p>Angle: <span id="spaceStationAngleDisplay">0</span> degrees</p>                        
-                    </td>
-                </tr>
-            </table>
 
-            <button id="saveSceneBtn">Save Scene</button>
+                    <tr id="startAngleRow">
+                        <td>Angle</td>
+                        <td>
+                            <svg id="startSvg" width="200" height="200">
+                                <circle id="startMainCircle" cx="100" cy="100" r="80" stroke="black"
+                                        fill="transparent" />
+                                <circle id="startKnob" cx="100" cy="20" r="10" fill="red" />
+                            </svg>
+                            <p><label>Snap angle: <input id="startSnapCheckbox" type="checkbox" /></label></p>
+                            <p>Angle: <span id="startAngleDisplay">0</span> degrees</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Activate Radius</td>
+                        <td><input type="number" id="targetActivateRadius"></td>
+                    </tr>
+                    <tr>
+                        <td>Target Mode</td>
+                        <td>
+                            <select id="targetMode" style="width: 100%;">
+                                <option value="nextTarget">Next Target</option>
+                                <option value="nearestTarget">Nearest Target</option>
+                                <option value="nearestEnemy">Nearest Enemy</option>
+                                <option value="nearestResource">Nearest Resource</option>
+                                <option value="nearestAsteroid">Nearest Asteroid</option>
+                                <option value="spaceStation">Nearest Space Station</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Action Mode</td>
+                        <td>
+                            <select id="targetAction" style="width: 100%;">
+                                <!-- Populate this select with options dynamically -->
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">
+                            <button id="removeTargetBtn">Remove Target</button>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Asteroids -->
+                <table id="asteroidPropertiesTable" style="display: none;">
+                    <tr>
+                        <td colspan="2">
+                            <h1>Asteroid</h1>
+                    </tr>
+                    <tr>
+                        <th>Property</th>
+                        <th>Value</th>
+                    </tr>
+                    <tr>
+                        <td>Radius</td>
+                        <td><input type="number" id="asteroidRadiusInput"></td>
+                    </tr>
+                    <tr>
+                        <td>Num Subdivisions</td>
+                        <td><input type="number" id="asteroidNumSubdivisionsInput"></td>
+                    </tr>
+                    <tr>
+                        <td>Angle</td>
+                        <td>
+                            <svg id="asteroidSvg">
+                                <circle id="asteroidMainCircle" cx="100" cy="100" r="80" stroke="black"
+                                        fill="transparent" />
+                                <circle id="asteroidKnob" cx="100" cy="20" r="10" fill="red" />
+                            </svg>
+                            <p><label>Snap angle: <input id="asteroidSnapCheckbox" type="checkbox" /></label></p>
+                            <p>Angle: <span id="asteroidAngleDisplay">0</span> degrees</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">
+                            <button id="regenerateAsteroidBtn">Regenerate</button>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Space Stations -->
+                <table id="spaceStationPropertiesTable" style="display: none;">
+                    <tr>
+                        <td colspan="2">
+                            <h1>Space Station</h1>
+                    </tr>
+                    <tr>
+                        <th>Property</th>
+                        <th>Value</th>
+                    </tr>
+                    <tr>
+                        <td>Width</td>
+                        <td><input type="number" id="spaceStationWidthInput"></td>
+                    </tr>
+                    <tr>
+                        <td>Height</td>
+                        <td><input type="number" id="spaceStationHeightInput"></td>
+                    </tr>
+                    <tr>
+                        <td>Angle</td>
+                        <td>
+                            <svg id="spaceStationSvg" width="200" height="200">
+                                <circle id="spaceStationMainCircle" cx="100" cy="100" r="80" stroke="black"
+                                        fill="transparent" />
+                                <circle id="spaceStationKnob" cx="100" cy="20" r="10" fill="red" />
+                            </svg>
+                            <p><label>Snap angle: <input id="spaceStationSnapCheckbox" type="checkbox" /></label></p>
+                            <p>Angle: <span id="spaceStationAngleDisplay">0</span> degrees</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Activate Radius</td>
+                        <td><input type="number" id="spaceStationActivateRadius"></td>
+                    </tr>
+                    <tr>
+                        <td>Enter Target Mode</td>
+                        <td>
+                            <select id="spaceStationEnterMode" style="width: 100%;">
+                                <option value="nextTarget">Next Target</option>
+                                <option value="nearestTarget">Nearest Target</option>
+                                <option value="nearestEnemy">Nearest Enemy</option>
+                                <option value="nearestResource">Nearest Resource</option>
+                                <option value="nearestAsteroid">Nearest Asteroid</option>
+                                <option value="spaceStation">Nearest Space Station</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Enter Action Mode</td>
+                        <td>
+                            <select id="spaceStationEnterAction" style="width: 100%;">
+                                <!-- Populate this select with options dynamically -->
+                            </select>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>Exit Target Mode</td>
+                        <td>
+                            <select id="spaceStationExitMode" style="width: 100%;">
+                                <option value="nextTarget">Next Target</option>
+                                <option value="nearestTarget">Nearest Target</option>
+                                <option value="nearestEnemy">Nearest Enemy</option>
+                                <option value="nearestResource">Nearest Resource</option>
+                                <option value="nearestAsteroid">Nearest Asteroid</option>
+                                <option value="spaceStation">Nearest Space Station</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Exit Action Mode</td>
+                        <td>
+                            <select id="spaceStationExitAction" style="width: 100%;">
+                                <!-- Populate this select with options dynamically -->
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Max Docking Angle</td>
+                        <td>
+                            <svg id="spaceStationDockSvg" width="200" height="200">
+                                <circle id="spaceStationDockMainCircle" cx="100" cy="100" r="80" stroke="black"
+                                        fill="transparent" />
+                                <circle id="spaceStationDockKnob" cx="100" cy="20" r="10" fill="red" />
+                            </svg>
+                            <p><label>Snap angle: <input id="spaceStationDockSnapCheckbox" type="checkbox" /></label>
+                            </p>
+                            <p>Angle: <input id="spaceStationDockAngleDisplay"> degrees</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Max Docking Speed</td>
+                        <td><input type="number" id="spaceStationDockMaxSpeed"></td>
+                    </tr>
+                </table>
+            </div>
         </div>
     </div>
 
 
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            const playButton = document.querySelector("#playButton");
+            const stopButton = document.querySelector("#stopButton");
+    
+            playButton.addEventListener("click", function() {
+                // Put your play action here
+    
+                // Hide the play button and show the stop button
+                playButton.style.display = "none";
+                stopButton.style.display = "block";
+            });
+    
+            stopButton.addEventListener("click", function() {
+                // Put your stop action here
+    
+                // Hide the stop button and show the play button
+                stopButton.style.display = "none";
+                playButton.style.display = "block";
+            });
+        });
+    </script>
 
-
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <script src="classes/Explosion.js"></script>
     <script src="classes/Firework2.js"></script>
     <script src="classes/Terrain.js"></script>
@@ -334,6 +453,7 @@
     <script src="classes/Matrix.js"></script>
     <script src="classes/NeuralNetwork2.js"></script>
     <script src="classes/SpaceStation.js"></script>
+    <script src="classes/PID.js"></script>
     <script src="classes/enemy.js"></script>
     <script src="moon lander.js"></script>
 </body>

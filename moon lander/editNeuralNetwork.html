@@ -7,17 +7,33 @@
         .form-group {
             margin-bottom: 15px;
         }
+
+        fieldset {
+            padding: 10px;
+            border: 1px solid #ccc;
+            margin-bottom: 15px;
+            width: 800px;
+        }
+
+        .center {
+            /* border: 5px solid; */
+            margin: auto;
+            width: 800px;
+            padding: 10px;
+        }
     </style>
+
 </head>
 
 <body>
-    <div>
-        <h2>Neural Networks</h2>
-        <select id="networkSelect" onchange="changeNetwork()">
-            <option value="">Select a network</option>
-        </select>
-        <button onclick="addNetwork()">Add Network</button>
-
+    <div class="center">
+        <div style="margin-bottom: 20px;">
+            <label style="font-size: 25px;font-weight:700;display: block;">Neural Networks</label>
+            <select id="networkSelect" onchange="changeNetwork()">
+                <option value="">Select a network</option>
+            </select>
+            <button onclick="addNetwork()">Add Network</button>
+        </div>
         <div id="networkFields"></div>
     </div>
     <button onclick="saveConfiguration()">Save Configuration</button>
@@ -313,20 +329,18 @@
     function populateFields(network, targetId) {
         const container = document.getElementById(targetId);
         const networkId = network.id;
+        let legend;
 
         const networkContainer = document.createElement('div');
+
+        const networkHeaderContainer = document.createElement('fieldset');
         networkContainer.id = `networkContainer${networkId}`;
         networkContainer.style.display = 'none'; // hide all networks by default
-
-
-        let formGroup = document.createElement('div');
-        formGroup.className = "form-group";
-
-        // Append all the controls to the network container
-        networkContainer.appendChild(formGroup);
-
-        let nametitle = document.createElement('H1');
-        nametitle.innerHTML = `Network ${networkId}`;
+        legend = document.createElement('legend');
+        legend.style.fontSize = "32px"
+        legend.style.fontWeight = "700"
+        legend.innerHTML = `Network ${networkId}`;
+        networkHeaderContainer.appendChild(legend);
 
         let nameLabel = document.createElement('label');
         nameLabel.htmlFor = `${targetId}${networkId}`;
@@ -351,27 +365,36 @@
         defaultNetworkRadio.value = networkId;
         defaultNetworkRadio.checked = network.isDefault;
 
-        networkContainer.appendChild(nametitle);
-        networkContainer.appendChild(nameLabel);
-        networkContainer.appendChild(nameInput);
-        networkContainer.appendChild(breakLine);
-        networkContainer.appendChild(defaultNetworkLabel);
-        networkContainer.appendChild(defaultNetworkRadio);
-
+        networkHeaderContainer.appendChild(nameLabel);
+        networkHeaderContainer.appendChild(nameInput);
+        networkHeaderContainer.appendChild(breakLine);
+        networkHeaderContainer.appendChild(defaultNetworkLabel);
+        networkHeaderContainer.appendChild(defaultNetworkRadio);
+        networkContainer.appendChild(networkHeaderContainer);
         // Inputs
-        const inputsContainer = document.createElement('div');
-        inputsContainer.innerHTML = `<h2>Inputs</h2>`;
+        let inputsContainer = document.createElement('fieldset');
+        legend = document.createElement('legend');
+        legend.style.fontSize = "32px"
+        legend.style.fontWeight = "700"
+        legend.innerHTML = `Inputs`;
         const inputFieldsContainer = document.createElement('div');
         inputFieldsContainer.id = `inputFields${networkId}`;
+        inputsContainer.appendChild(legend);
         inputsContainer.appendChild(inputFieldsContainer);
         networkContainer.appendChild(inputsContainer);
 
         // Hidden Layers
+        inputsContainer = document.createElement('fieldset');
+        legend = document.createElement('legend');
+        legend.style.fontSize = "32px"
+        legend.style.fontWeight = "700"
+        legend.innerHTML = `Hidden Layers`;
         const hiddenLayersContainer = document.createElement('div');
-        hiddenLayersContainer.innerHTML = `<h2>Hidden Layers</h2>`;
         const hiddenLayerFieldsContainer = document.createElement('div');
         hiddenLayerFieldsContainer.id = `hiddenLayerFields${networkId}`;
-        hiddenLayersContainer.appendChild(hiddenLayerFieldsContainer);
+        inputsContainer.appendChild(legend);
+        inputsContainer.appendChild(hiddenLayerFieldsContainer);
+        //networkContainer.appendChild(inputsContainer);
 
         const addHiddenLayerButton = document.createElement('button');
         addHiddenLayerButton.innerHTML = 'Add Hidden Layer';
@@ -383,31 +406,43 @@
         removeHiddenLayerButton.onclick = handleRemoveHiddenLayerClick;
         removeHiddenLayerButton.dataset.networkId = network.id;
 
-        hiddenLayersContainer.appendChild(addHiddenLayerButton);
-        hiddenLayersContainer.appendChild(removeHiddenLayerButton);
-        networkContainer.appendChild(hiddenLayersContainer);
+        inputsContainer.appendChild(addHiddenLayerButton);
+        inputsContainer.appendChild(removeHiddenLayerButton);
+        networkContainer.appendChild(inputsContainer);
 
         // Outputs
-        const outputsContainer = document.createElement('div');
-        outputsContainer.innerHTML = `<h2>Outputs</h2>`;
+        const outputsContainer = document.createElement('fieldset');
+        legend = document.createElement('legend');
+        legend.style.fontSize = "32px"
+        legend.style.fontWeight = "700"
+        legend.innerHTML = `Outputs`;
         const outputFieldsContainer = document.createElement('div');
         outputFieldsContainer.id = `outputFields${networkId}`;
+        outputsContainer.appendChild(legend);
         outputsContainer.appendChild(outputFieldsContainer);
         networkContainer.appendChild(outputsContainer);
 
         // Fitness
-        const fitnessContainer = document.createElement('div');
-        fitnessContainer.innerHTML = `<h2>Fitness</h2>`;
+        const fitnessContainer = document.createElement('fieldset');
+        legend = document.createElement('legend');
+        legend.style.fontSize = "32px"
+        legend.style.fontWeight = "700"
+        legend.innerHTML = `Fitness`;
         const fitnessFieldsContainer = document.createElement('div');
         fitnessFieldsContainer.id = `fitnessFields${networkId}`;
+        fitnessContainer.appendChild(legend);
         fitnessContainer.appendChild(fitnessFieldsContainer);
         networkContainer.appendChild(fitnessContainer);
 
         // FitnessEvents
-        const fitnessEventsContainer = document.createElement('div');
-        fitnessEventsContainer.innerHTML = `<h2>Fitness On Events</h2>`;
+        const fitnessEventsContainer = document.createElement('fieldset');
+        legend = document.createElement('legend');
+        legend.style.fontSize = "32px"
+        legend.style.fontWeight = "700"
+        legend.innerHTML = `Fitness On Events`;
         const fitnessEventsFieldsContainer = document.createElement('div');
         fitnessEventsFieldsContainer.id = `fitnessEventsFields${networkId}`;
+        fitnessEventsContainer.appendChild(legend);
         fitnessEventsContainer.appendChild(fitnessEventsFieldsContainer);
         networkContainer.appendChild(fitnessEventsContainer);
 
@@ -531,6 +566,7 @@
         });
 
         localStorage.setItem('nnConfig', JSON.stringify(config));
+        alert("Configuration Saved")
     }
 
     function loadConfiguration() {

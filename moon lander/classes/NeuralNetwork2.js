@@ -18,74 +18,6 @@ class NeuralNetwork2 {
         this.currentFitness = 0;
         this.generationNumber = 1;
     }
-
-    // Fisher-Yates Shuffle Algorithm to shuffle indices
-    shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
-    }
-
-    trainBatch(inputArrays, targetArrays) {
-        // Randomly shuffle the data
-        let shuffledIndices = [...Array(inputArrays.length).keys()];
-        shuffledIndices = this.shuffleArray(shuffledIndices);
-
-        for (let i = 0; i < inputArrays.length; i++) {
-            // Select a random instance
-            let idx = shuffledIndices[i];
-            let inputArray = inputArrays[idx];
-            let targetArray = targetArrays[idx];
-
-            // Convert input and target arrays to matrices
-            let inputs = Matrix.fromArray(inputArray);
-            let targets = Matrix.fromArray(targetArray);
-
-            // Array to hold output of each layer
-            let layerOutputs = [inputs];
-            // Array to hold gradients of each layer
-            let gradients = [];
-
-            // Feed forward
-            for (let j = 0; j < this.numLayers - 1; j++) {
-                let layerInput = layerOutputs[j];
-                let layerOutput = Matrix.multiply(this.weights[j], layerInput);
-                layerOutput.add(this.biases[j]);
-                layerOutput.map(this.sigmoid);
-                layerOutputs.push(layerOutput);
-            }
-
-            // Calculate output layer errors
-            let outputErrors = Matrix.subtract(targets, layerOutputs[this.numLayers - 1]);
-
-            // Backpropagation
-            for (let j = this.numLayers - 2; j >= 0; j--) {
-                let layerOutputsTransposed = Matrix.transpose(layerOutputs[j]);
-                let layerWeightsDeltas = Matrix.multiply(outputErrors, layerOutputsTransposed);
-
-                // Adjust weights and biases
-                this.weights[j].add(layerWeightsDeltas);
-                this.biases[j].add(outputErrors);
-
-                // Calculate next layer errors if not at input layer
-                if (j > 0) {
-                    let weightsTransposed = Matrix.transpose(this.weights[j]);
-                    outputErrors = Matrix.multiply(weightsTransposed, outputErrors);
-
-                    // Calculate layer gradients
-                    let layerGradients = Matrix.map(layerOutputs[j], this.sigmoidDerivative);
-                    layerGradients.multiply(outputErrors);
-                    layerGradients.multiply(this.learningRate);
-                    gradients[j] = layerGradients;
-                }
-            }
-        }
-    }
-
-
-
     predict(inputArray) {
         let inputs = Matrix.fromArray(inputArray);
         let layerOutputs = [inputs];
@@ -108,11 +40,6 @@ class NeuralNetwork2 {
 
     sigmoid(x) {
         return 1 / (1 + Math.exp(-x));
-    }
-
-    sigmoidDerivative(y) {
-        // y is assumed to be the sigmoid function already applied to x
-        return y * (1 - y);
     }
 
     crossover(partner) {

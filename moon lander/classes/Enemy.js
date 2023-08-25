@@ -1,3 +1,29 @@
+class MaxSizeList {
+    constructor(maxSize) {
+        this.maxSize = maxSize;
+        this.data = [];
+    }
+
+    // Add an item to the list
+    add(item) {
+        if (this.data.length >= this.maxSize) {
+            this.data.shift();  // Remove the oldest item
+        }
+        this.data.push(item);
+    }
+
+    // Get the list items
+    getItems() {
+        return this.data;
+    }
+
+    // Get the size of the list
+    size() {
+        return this.data.length;
+    }
+}
+
+
 class Enemy extends Lander {
     constructor(x, y, angle, populationIndex) {
         super(x, y, populationIndex);
@@ -6,28 +32,88 @@ class Enemy extends Lander {
         this.isEnemy = true;
         this.fireTime = 200;
         this.fireTimer = 0;
-        this.neuralNetwork = {isDead : true};
+        this.neuralNetwork = {
+            isDead: true
+        };
         this.rigidBody.angle = angle;
+        this.startPosx = this.rigidBody.position.x;
+        this.pid = new PID(0.0025,0,0.1);
+        this.isTuning = false;
+        this.stepCount = 0;
+        this.checkOscillationInterval = 100;
+        this.pidTuned = false;
+        this.targetPosition = 0;
+        this.systemModel = null;
+
+        this.destinationPosition = this.rigidBody.position.x + this.targetPosition;
+        this.relativePosition = this.destinationPosition - this.rigidBody.position.x;
+        this.lastPositionList = new MaxSizeList(1000);
+        this.side = 1;  // Initialize side
+        this.previousSteady = false;  // To track the state in the previous frame
+        this.startPosx = this.rigidBody.position.x;
+        this.rigidBody.mass = 1;
     }
 
-    update(player){
-        if(!this.neuralNetwork.isDead)
-            this.superBasicAI(player.rigidBody.position);
+    isSteady(outputData, windowSize = 10, threshold = 0.01) {
+        if(outputData.length < windowSize)
+            return false;
+        // Get the most recent data based on windowSize
+        const recentData = outputData.slice(-windowSize);
+    
+        // Calculate the mean of the recent data
+        const mean = recentData.reduce((acc, val) => acc + val, 0) / windowSize;
+    
+        // Calculate the variance of the recent data
+        const variance = recentData.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / windowSize;
+    
+        // Check if the variance is below the threshold
+        return variance < threshold;
+    }
+
+
+    
+    checkAndToggleSide(outputData) {
+        const steady = this.isSteady(outputData);
+        let switchSide = false;
+        if (steady && !this.previousSteady) {
+            this.side *= -1;
+            switchSide = true;
+        }
+    
+        this.previousSteady = steady;
+        return switchSide;
+    }    
+
+    update(player) {
+        this.stepCount++;
+        this.targetPosition = this.side * 500;
+        let relativePosition = this.rigidBody.position.x - this.startPosx;
+        let output = this.pid.compute(relativePosition, this.targetPosition);
+        this.sideThrust = -output;
+        this.sideThrust = Math.max(-maxSideThrustPower, Math.min(maxSideThrustPower, this.sideThrust));
         this.updateLander();
+        relativePosition = this.rigidBody.position.x - this.startPosx;
+        this.lastPositionList.add(relativePosition);
+        if(this.checkAndToggleSide(this.lastPositionList.getItems())){
+            this.startPosx = this.rigidBody.position.x;
+        }
+        // if(this.stepCount == 500){
+        //     console.log(JSON.stringify(this.lastPositionList.getItems()))
+        // }
+    }
+
+
+    currentMicros() {
+        return performance.now() * 1000; // Convert milliseconds to microseconds
     }
 
     rotateToAngle(playerPosition) {
         let deltaPosition = playerPosition.subtract(this.rigidBody.position);
-        this.rigidBody.angle = Math.PI-deltaPosition.angle();
+        this.rigidBody.angle = Math.PI - deltaPosition.angle();
     }
 
     superBasicAI(playerPosition) {
-        this.rotateToAngle(playerPosition);
-        if (this.fireTimer >= this.fireTime) {
-            this.fireLaser();
-            this.fireTimer = 0;
-        }
-        this.fireTimer++;
+
     }
 
     circlePattern(deltaTime) {

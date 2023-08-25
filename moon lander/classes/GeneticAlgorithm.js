@@ -28,6 +28,11 @@ class GeneticAlgorithm {
             }
 
             const checkPopulation = () => {
+                if(!isSimulationRunning){
+                    requestAnimationFrame(checkPopulation);  
+                    return;
+                }          
+
                 let copyArray = [...this.population];
                 copyArray.sort((a, b) => b.currentFitness - a.currentFitness);
                 
