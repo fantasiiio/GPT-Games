@@ -1,5 +1,65 @@
 import tkinter as tk
 
+
+class CameraRectangle:
+    def __init__(self, canvas, x, y, width, height, color="red"):
+        self.canvas = canvas
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.color = color
+        self.line_ids = [None, None, None, None]  # left, top, right, bottom
+        self.update(self.x, self.y)
+
+    def id_exists(self, id):
+        return len(self.canvas.find_withtag(id)) > 0
+
+    def get_corners(self):
+        #self.update(self.x, self.y)
+        line1_coords = self.canvas.coords(self.line_ids[0])
+        line3_coords = self.canvas.coords(self.line_ids[2])
+        
+        # Upper-left corner
+        upper_left_x = line1_coords[0]
+        upper_left_y = line1_coords[1]
+        
+        # Lower-right corner
+        lower_right_x = line3_coords[2]
+        lower_right_y = line3_coords[3]
+        
+        return (upper_left_x, upper_left_y), (lower_right_x, lower_right_y)
+
+
+    def update(self, x, y):
+        self.x = x
+        self.y = y
+        x1, y1, x2, y2 = self.x + 50, self.y + 50, self.x + self.width - 50, self.y + self.height -50
+        # Coordinates for the four lines
+        lines = [
+            (x1, y1, x1, y2),  # Left
+            (x1, y1, x2, y1),  # Top
+            (x2, y1, x2, y2),  # Right
+            (x1, y2, x2, y2)   # Bottom
+        ]
+
+        for i in range(4):
+            if self.line_ids[i] is None or not self.id_exists(self.line_ids[i]):
+                self.line_ids[i] = self.canvas.create_line(*lines[i], fill=self.color, tags=("CameraRectangle","move"))
+            else:
+                self.canvas.coords(self.line_ids[i], *lines[i])
+
+class Vector2:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __sub__(self, other):
+        return Vector2(self.x - other.x, self.y - other.y)
+
+    def dot(self, other):
+        return self.x * other.x + self.y * other.y
+
 class TreeNode:
     def __init__(self, value):
         self.value = value
@@ -22,8 +82,10 @@ class TreeNode:
 
 class TreePlotter:
     def __init__(self, root, tk_root = None, zoom_level=1.0, canvas_width=600, canvas_height=400, label_func=None, color_func=None, select_node_func=None):
-
         self.zoom_level = zoom_level
+        self.pan_start_x = 0
+        self.pan_start_y = 0
+        self.pan_offset = {'x': 0, 'y': 0}
         self.initial_font_size = 10
         self.font_scale = zoom_level
         self.last_click_time = 0
@@ -35,16 +97,16 @@ class TreePlotter:
         self.canvas_width = canvas_width
         self.canvas_height = canvas_height
         self.node_width = 100
-        self.node_height = 70
+        self.node_height = 100
         self.vertical_spacing = 50
         self.horizontal_spacing = 20
         self.label_func = label_func if label_func is not None else (lambda node: str(node.value))
-        self.pan_offset = {'x': 0, 'y': 0}
+
         self.selected_node = None
         self.tk_root = tk_root if tk_root is not None else tk.Tk()
         self.canvas = tk.Canvas(self.tk_root, bg='white', width=self.canvas_width, height=self.canvas_height)
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.canvas.scale("all",0,0, 0.0001,0.0001)
+        self.canvas.scale("move",0,0, 0.0001,0.0001)
         self.canvas.bind("<MouseWheel>", self.zoom)
         self.canvas.bind("<Double-Button-1>", self.node_double_click)
         self.canvas.bind("<Button-1>", self.node_click)
@@ -52,16 +114,17 @@ class TreePlotter:
         self.canvas.bind("<ButtonPress-2>", self.start_pan) # Changed from ButtonPress-1
         self.canvas.bind("<B2-Motion>", self.pan) # Changed from B1-Motion
 
+        self.camera_rect = CameraRectangle(self.canvas, color="red", x = -self.canvas_width / 2, y = -self.canvas_width /2, width=self.canvas_width, height=self.canvas_height)
+
         self.mouse_position_label = tk.Label(self.tk_root, anchor='e', relief='solid', borderwidth=1, padx=5)
         self.mouse_position_label.pack(side='bottom', fill='x', anchor='e', padx=5, pady=5)
-        self.canvas.bind('<Motion>', self.update_mouse_position)
+        self.canvas.bind('<Motion>', self.update_info_bar)
         self.show_visible_var = tk.BooleanVar(value=False)
 
         self.show_visible_check = tk.Checkbutton(
         self.tk_root, text="Show Visible Nodes", variable=self.show_visible_var, command=self.toggle_visible_nodes)
         self.show_visible_check.pack(side='bottom', padx=5, pady=5)
-
-        #self.center_view(-self.canvas_width // 2, -self.canvas_height // 2)
+        self.center_view(-self.canvas_width // 2, -self.canvas_height // 2)
     
     def node_click(self, event):
         current_time = event.time
@@ -104,33 +167,48 @@ class TreePlotter:
             
 
         self.recursive_toggle_visibility(self.root)
-        self.canvas.delete("all")
-        self.canvas_nodes.clear()
+        self.canvas.delete("delete")
+        self.clear_canvas()
         self.draw_tree(self.root, 0, 0)    
 
         # Refresh the visuals
-        self.restore_view_scale()            
+        self.set_font_size()            
         root_id = self.find_canvas_id(self.root)
         new_position = self.canvas.coords(root_id) 
         dx = old_position[0] - new_position[0]
         dy = old_position[1] - new_position[1]
-        self.canvas.move("all", dx, dy)
+        self.canvas.move("move", dx, dy)
 
 
-    def refresh_tree(self):
-        item_id = self.find_canvas_id(self.root)
-        old_position = self.canvas.coords(item_id)         
-        self.canvas.delete("all")
-        self.canvas_nodes.clear()
+    def refresh_tree(self, event=None):
+        try:
+            item_id = self.find_canvas_id(self.root)
+            old_position = self.canvas.coords(item_id)         
+        except:
+            return
+
+        self.canvas.delete("delete")
+        self.clear_canvas()
 
         self.draw_tree(self.root, 0, 0)
 
-        self.restore_view_scale()  
+        self.set_font_size()  
+
         item_id = self.find_canvas_id(self.root)
         new_position = self.canvas.coords(item_id) 
         dx = old_position[0] - new_position[0]
         dy = old_position[1] - new_position[1]
-        self.canvas.move("all", dx, dy)
+        delta = Vector2(dx, dy)
+
+        dx = delta.x
+        dy = delta.y
+        # self.camera_rect.update(0,0)
+        self.canvas.move("move", dx + self.pan_offset["x"], dy + self.pan_offset["y"])
+
+        self.pan_offset['x'] -= dx
+        self.pan_offset['y'] -= dy
+        self.update_info_bar(event)
+        # self.canvas.move("move", dx, dy)
 
     def recursive_toggle_visibility(self, node):
         if not node.initial_visibility:  # Only change nodes that were initially not visible
@@ -138,31 +216,62 @@ class TreePlotter:
                
         for child in node.children:
             self.recursive_toggle_visibility(child)
-                
-    def get_view_position(self):
-        return self.canvas.canvasx(0), self.canvas.canvasy(0)
+
+    def clear_canvas(self):
+        self.canvas.delete("delete")
+
+        items_to_delete = []
+        for item_id, node in self.canvas_nodes.items():
+            tags = self.canvas.gettags(item_id)
+            if "delete" in tags:
+                self.canvas.delete(item_id)
+                items_to_delete.append(item_id)
+
+        for item_id in items_to_delete:
+            del self.canvas_nodes[item_id]
+
+
+
 
     def toggle_visible_nodes(self):
         item_id = self.find_canvas_id(self.root)
         old_position = self.canvas.coords(item_id) 
     
         self.recursive_toggle_visibility(self.root)
-        self.canvas.delete("all")
-        self.canvas_nodes.clear()
+        self.canvas.delete("delete")
+        self.clear_canvas()
         self.draw_tree(self.root, 0, 0)
 
-        self.restore_view_scale()            
+        self.set_font_size()            
         item_id = self.find_canvas_id(self.root)
         new_position = self.canvas.coords(item_id) 
         dx = old_position[0] - new_position[0]
         dy = old_position[1] - new_position[1]
-        self.canvas.move("all", dx, dy)
+        self.canvas.move("move", dx, dy)
 
-    def update_mouse_position(self, event):
-        canvas_x = self.canvas.canvasx(event.x)
-        canvas_y = self.canvas.canvasy(event.y)
-        self.mouse_position_label.config(text=f"X: {canvas_x}, Y: {canvas_y}")
+    
+    def screen_to_world(self, screen_x, screen_y):
+        # Reverse the pan offset
+        world_x = screen_x + self.pan_offset['x'] / self.zoom_level
+        world_y = screen_y + self.pan_offset['y'] / self.zoom_level
+        return world_x, world_y
 
+    def world_to_screen(self, world_x, world_y):
+        screen_x = world_x * self.zoom_level - self.pan_offset['x']
+        screen_y = world_y * self.zoom_level - self.pan_offset['y']
+        return screen_x, screen_y
+
+    def update_info_bar(self, event):
+        if not event:
+            return
+        world_x, world_y = self.screen_to_world(event.x, event.y)
+        cam_world_x, cam_world_y = self.screen_to_world(self.canvas_width/2, self.canvas_height/2)
+        cam_world_x2, cam_world_y2 = self.screen_to_world(self.canvas_width/2 + self.canvas_width, self.canvas_height/2 + self.canvas_height)
+        root_id = self.find_canvas_id(self.root)
+        old_position = self.canvas.coords(root_id)         
+        # self.camera_rect.update(0, 0)
+        (camera_x, camera_y), (camera_width, camera_height) = self.camera_rect.get_corners()        
+        self.mouse_position_label.config(text=f"X: {int(event.x)}, Y: {int(event.x)}\nWORLD X: {int(world_x)}, WORLD Y: {int(world_y)}\nCAMERA X: {int(camera_x)}, CAMERA Y: {int(camera_y)}\nCAMERA WIDTH: {int(camera_width)}, CAMERA HEIGHT: {int(camera_height)}\n CAM WORLD X: {int(cam_world_x)}, CAM WORLD Y: {int(cam_world_y)}\n CAM WORLD X2: {int(cam_world_x2)}, CAM WORLD Y2: {int(cam_world_y2)}")
 
 
     def find_closest(self, x, y):
@@ -172,6 +281,8 @@ class TreePlotter:
 
         for item_id in self.canvas_nodes.keys():
             bbox = self.canvas.bbox(item_id)
+            if bbox is None or len(bbox) < 4:
+                continue
             if bbox[0] <= canvas_x <= bbox[2] and bbox[1] <= canvas_y <= bbox[3]:
                 closest_item_id = item_id
                 break
@@ -187,24 +298,23 @@ class TreePlotter:
             
             # Check if Shift key was pressed
             if event.state & 0x1: 
-                x, y = self.pan_offset['x'], self.pan_offset['y']
                 self.expand_all_children(clicked_node, not clicked_node.expanded)
-                self.canvas.delete("all")
-                self.canvas_nodes.clear()
+                self.canvas.delete("delete")
+                self.clear_canvas()
                 self.draw_tree(self.root, 0, 0)
             else:
                 self.toggle_expand(clicked_node)
             
-            self.restore_view_scale()            
+            self.set_font_size()            
             # Find the new position of the clicked node
             for new_item_id, node in self.canvas_nodes.items():
                 if node == clicked_node:
                     new_position = self.canvas.coords(new_item_id)
                     break
-            
-            dx = old_position[0] - new_position[0]
-            dy = old_position[1] - new_position[1]
-            self.canvas.move("all", dx, dy)
+            if(new_position):
+                dx = old_position[0] - new_position[0]
+                dy = old_position[1] - new_position[1]
+                self.canvas.move("move", dx, dy)
             
     def find_canvas_id(self, target_node):
         for canvas_id, node in self.canvas_nodes.items():
@@ -220,32 +330,25 @@ class TreePlotter:
                 child.expanded = expanded
                 self.expand_all_children(child, expanded)
 
-    def get_view_position(self):
-        """Get the current horizontal and vertical scroll position."""
-        return self.canvas.xview()[0], self.canvas.yview()[0]
-
-    def set_view_position(self, x, y):
-        """Set the horizontal and vertical scroll position."""
-        self.canvas.xview_moveto(x)
-        self.canvas.yview_moveto(y)
-
-
-    def set_visibility(self, node, visibility):
-        for child in node.children:
-            child.expanded = visibility
-            self.set_visibility(child, visibility)
-
-
-    def is_in_visible_region(self, x, y):
-        x1, y1, x2, y2 = x - self.node_width // 2, y - self.node_height // 2, x + self.node_width // 2, y + self.node_height // 2
-        canvas_x1, canvas_y1 = self.canvas.canvasx(0), self.canvas.canvasy(0)
-        canvas_x2, canvas_y2 = self.canvas.canvasx(self.canvas.winfo_width()), self.canvas.canvasy(self.canvas.winfo_height())
-        return not (x2 < canvas_x1 or x1 > canvas_x2 or y2 < canvas_y1 or y1 > canvas_y2)
-
 
     def draw_node(self, node, x, y):
-        if not self.is_in_visible_region(x, y):
-            return None        
+        # self.camera_rect.update(0, 0)  
+        (camera_x, camera_y), (camera_x2, camera_y2) = self.camera_rect.get_corners()
+        camera_x, camera_y = self.screen_to_world(camera_x, camera_y)
+        camera_x2, camera_y2 = self.screen_to_world(camera_x2, camera_y2)
+
+        no_render = False
+
+        if (
+            (x + self.node_width < camera_x or
+            x - self.node_width > camera_x2 or
+            y + self.node_height < camera_y or
+            y - self.node_height > camera_y2) and
+            not node == self.root
+        ):
+            no_render = False
+
+        
         label = self.label_func(node)
         color = self.color_func(node)
         
@@ -256,41 +359,37 @@ class TreePlotter:
         end_y = y + self.node_height // 2
 
         outline_width = 3 if node.selected else 1
-        rect = self.canvas.create_rectangle(start_x, start_y, end_x, end_y, fill=color, width=outline_width)
-        text_id = self.canvas.create_text(x, y, text=label)  # Using the center x and y directly
+        if not no_render:
+            tag = ("move") if node == self.root else ("move","delete")
+                
+            rect = self.canvas.create_rectangle(start_x, start_y, end_x, end_y, fill=color, width=outline_width, tags=(tag,))
+            text_id = self.canvas.create_text(x, y, text=label, tags=(tag,))  # Using the center x and y directly
         
-        # Draw the up/down arrow for nodes with children
-        if node.children:
-            arrow_size = 20  # Adjust as needed
-            if not node.expanded:
-                # Draw the up arrow
-                self.canvas.create_polygon(x, end_y - arrow_size,
-                                        x - arrow_size / 2, end_y,
-                                        x + arrow_size / 2, end_y,
-                                        fill='black')
-            else:
-                # Draw the down arrow
-                self.canvas.create_polygon(x, end_y,
-                                        x - arrow_size / 2, end_y - arrow_size,
-                                        x + arrow_size / 2, end_y - arrow_size,
-                                        fill='black')
+            # Draw the up/down arrow for nodes with children
+            if node.children:
+                arrow_size = 20  # Adjust as needed
+                if not node.expanded:
+                    # Draw the up arrow
+                    self.canvas.create_polygon(x, end_y - arrow_size,
+                                            x - arrow_size / 2, end_y,
+                                            x + arrow_size / 2, end_y,
+                                            fill='black', tags=(tag,))
+                else:
+                    # Draw the down arrow
+                    self.canvas.create_polygon(x, end_y,
+                                            x - arrow_size / 2, end_y - arrow_size,
+                                            x + arrow_size / 2, end_y - arrow_size,
+                                            fill='black', tags=(tag,))
 
-        self.canvas_nodes[rect] = node
-        self.canvas_nodes[text_id] = node
+            self.canvas_nodes[rect] = node
+            self.canvas_nodes[text_id] = node
         return x, y
 
-
-
-    def restore_view_scale(self):
-        self.canvas.scale("all", 0, 0, self.zoom_level, self.zoom_level)
-        self.set_font_size()
 
     def toggle_expand(self, node):       
         # Toggle the node's visibility and redraw the tree
         node.expanded = not node.expanded
-        self.canvas.delete("all")
-        self.canvas_nodes.clear()
-        self.draw_tree(self.root, 0, 0)
+        self.refresh_tree()
     
         
     def get_children_width(self, node):
@@ -320,6 +419,7 @@ class TreePlotter:
         total_width += self.horizontal_spacing * (max(visible_children_count - 1, 0))
 
         return total_width
+
 
 
                     
@@ -364,11 +464,18 @@ class TreePlotter:
 
         if node.expanded:
             for child_center in children_positions:
-                self.canvas.create_line(parent_center[0], parent_center[1] + self.node_height // 2,
+                self.draw_line_culled(parent_center[0], parent_center[1] + self.node_height // 2,
                                         child_center[0], child_center[1] - self.node_height // 2)
 
         return parent_center
 
+    def draw_line_culled(self, x1, y1, x2, y2):
+        (camera_x, camera_y), (camera_x2, camera_y2) = self.camera_rect.get_corners()
+        x_view_start, y_view_start = self.world_to_screen(camera_x, camera_y)
+        x_view_end, y_view_end = self.world_to_screen(camera_x2, camera_y2)
+
+        #if self.line_intersects_rect(Vector2(x1, y1), Vector2(x2, y2), Vector2(x_view_start, y_view_start), Vector2(x_view_end, y_view_end)):
+        self.canvas.create_line(x1, y1, x2, y2, tags=("move",))
 
 
 
@@ -378,55 +485,26 @@ class TreePlotter:
         half_height = self.canvas.winfo_height() // 2
         dx = half_width - x
         dy = half_height - y
-        self.canvas.move("all", dx, dy)
+        self.canvas.move("move", dx, dy)
         
         # Adjust the pan_offset to reflect the new position
         self.pan_offset['x'] -= dx
         self.pan_offset['y'] -= dy
 
 
-
-
-
     def zoom(self, event):
         scale_factor = 1.1
         zoom_factor = 1 / scale_factor if -event.delta > 0 else scale_factor
-
-        # Step 1: Get the current canvas coordinates of the mouse pointer
+        self.zoom_level *= zoom_factor
+        # Get the current canvas coordinates of the mouse pointer
         mouseX = self.canvas.canvasx(event.x)
         mouseY = self.canvas.canvasy(event.y)
-
-        # Step 2: Scale all items
-        self.canvas.scale("all", 0, 0, zoom_factor, zoom_factor)
-
-        # Step 3: Get center of canvas view area
-        x_view_center = (self.canvas.canvasx(0) + self.canvas.canvasx(self.canvas.winfo_width())) / 2
-        y_view_center = (self.canvas.canvasy(0) + self.canvas.canvasy(self.canvas.winfo_height())) / 2
-
-        # Step 4: Calculate distance of mouse from center before scaling
-        dx = mouseX - x_view_center
-        dy = mouseY - y_view_center
-
-        # Step 5: Calculate new distance after scaling
-        new_dx = dx * zoom_factor
-        new_dy = dy * zoom_factor
-
-        # Step 6: Calculate new center based on new distance
-        new_x_center = mouseX - new_dx
-        new_y_center = mouseY - new_dy
-
-        # Step 7: Move canvas to new center
-        half_width = self.canvas.winfo_width() // 2
-        half_height = self.canvas.winfo_height() // 2
-
-        self.canvas.scan_mark(int(new_x_center), int(new_y_center))
-        self.canvas.scan_dragto(int(new_x_center - half_width), int(new_y_center - half_height), gain=1)
-             
         
+        # Adjust the coordinates of all items on the canvas
+        self.canvas.scale("move", mouseX, mouseY, zoom_factor, zoom_factor)
+        self.canvas.scale("CameraRectangle", mouseX, mouseY, 1/zoom_factor, 1/zoom_factor)
         # Update the running font scale
         self.font_scale *= zoom_factor
-
-        # Adjust font size for all text items
         self.set_font_size()
 
     def set_font_size(self):
@@ -439,21 +517,67 @@ class TreePlotter:
                 font_name = current_font[0]
                 self.canvas.itemconfig(item_id, font=(font_name, new_font_size))
 
+    def line_intersects_rect(self, line_start, line_end, rect_top_left, rect_bottom_right):
+        # Define the four edges of the rectangle as pairs of points
+        top_edge = (rect_top_left, Vector2(rect_bottom_right.x, rect_top_left.y))
+        bottom_edge = (Vector2(rect_top_left.x, rect_bottom_right.y), rect_bottom_right)
+        left_edge = (rect_top_left, Vector2(rect_top_left.x, rect_bottom_right.y))
+        right_edge = (Vector2(rect_bottom_right.x, rect_top_left.y), rect_bottom_right)
+
+        rect_edges = [top_edge, bottom_edge, left_edge, right_edge]
+
+        if rect_top_left.x <= line_start.x <= rect_bottom_right.x and \
+        rect_top_left.y <= line_start.y <= rect_bottom_right.y and \
+        rect_top_left.x <= line_end.x <= rect_bottom_right.x and \
+        rect_top_left.y <= line_end.y <= rect_bottom_right.y:
+            return True
+
+        for edge_start, edge_end in rect_edges:
+            # Calculate vectors
+            A = line_end - line_start
+            B = edge_end - edge_start
+            C = edge_start - line_start
+
+            # Calculate the determinant
+            det = A.x * B.y - A.y * B.x
+            if det == 0:
+                continue  # Lines are parallel, no intersection
+
+            # Calculate the lambda and gamma parameters for the intersection point
+            lam = (B.y * C.x - B.x * C.y) / det
+            gamma = (A.y * C.x - A.x * C.y) / det
+
+            # Check if the intersection point is within both the line segment and the edge of the rectangle
+            if 0 <= lam <= 1 and 0 <= gamma <= 1:
+                return True
+
+        return False
 
 
     def start_pan(self, event):
-        self.canvas.scan_mark(event.x, event.y)
+        self.last_x, self.last_y = event.x, event.y
+    
 
     def pan(self, event):
-        self.canvas.scan_dragto(event.x, event.y, gain=1)
+        dx = event.x - self.last_x
+        dy = event.y - self.last_y
+        self.canvas.move("move", dx, dy)
+        self.pan_offset['x'] += dx
+        self.pan_offset['y'] += dy
+        self.canvas.move("CameraRectangle", -dx, -dy)
         
+        self.last_x, self.last_y = event.x, event.y
+
     def start(self):
         self.draw_tree(self.root, 0, 0)
         self.canvas.update()
-        self.restore_view_scale()
-        self.center_view(0, 0)
-        # self.canvas.move("all", 100, 100)
+        self.set_font_size()
+        #self.center_view(0, 0)
+        # self.canvas.move("move", 100, 100)
         self.tk_root.mainloop()
+
+
+
 
 def generate_tree(depth, num_children):
     def create_node(level, path = []):

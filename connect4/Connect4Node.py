@@ -15,7 +15,7 @@ step = itertools.count(1)
 SHIFT_VALUES = [[2 * (row * 7 + col) for col in range(7)] for row in range(7)]
 
 class Connect4Node(Node):
-    def __init__(self, board = None, player = 1, is_terminal = False, reward = 0, last_move=None, history=[], winner=None, resnet = None):
+    def __init__(self, board = None, player = 1, is_terminal = False, last_move=None, history=[], winner=None, resnet = None):
         if board is not None:
             type = self.detect_board_type(board)
             if(type == "ndarray"):
@@ -24,19 +24,21 @@ class Connect4Node(Node):
                 self.board = board
         self.player = player
         self._is_terminal = is_terminal
-        self._reward = reward
+        self.reward = {1: 0, 2:0}
+        self.total_reward = {1: 0, 2:0}
         self.last_move = last_move
         self.history = history if history is not None else []  
         self.history = history.copy() 
         self.children = []
         self.winner = winner
-        self.Q = 0
-        self.N = 0
+        self.Q = {1: 0, 2:0}
+        self.N = {1: 0, 2:0}
         self.visited = False
         self.win_count = {1: 0, 2: 0}
         self.visit_count = 0
         self.depth = -1
-        self.simulation_paths = dict()
+        self.simulation_paths = []
+        self.simulated = False
 
     def update_node(self, board, last_move, new_player, winner=None):
         if board is not None:
@@ -81,20 +83,21 @@ class Connect4Node(Node):
         return board
 
     def board_to_int(self, board):
-        """Convert a board from numpy array format to integer format."""
         board_int = 0
-        for row in range(board.shape[0]):
-            for col in range(board.shape[1]):
-                value = board[row, col]
-                mask = value << (2 * (row * 7 + col))
+        for row in range(6):
+            for col in range(7):
+                value = int(board[row][col])
+                shift_value = 2 * (row * 7 + col)
+                mask = value << shift_value
                 board_int |= mask
-        return board_int            
+        return board_int          
 
 
     @lru_cache(maxsize=None)
     def get_cell(self, row, col):
-        mask = 0b11 << SHIFT_VALUES[row][col]
-        return (int(self.board) & int(mask)) >> SHIFT_VALUES[row][col]
+        shift_value = 2 * (row * 7 + col)
+        mask = 0b11 << shift_value
+        return (self.board & mask) >> shift_value
         
     def set_cell(self, row, col, value):
         mask = 0b11 << (2 * (row * 7 + col))
@@ -124,35 +127,35 @@ class Connect4Node(Node):
                         if(not hasattr(new_node, "board")):
                             new_node = Connect4Node(board=new_board, player=3 - self.player)
                         new_node.set_cell(row, col, self.player)
-                        is_terminal, player_win = new_node.check_terminal(row, col)
+                        is_terminal, player_win = new_node.check_terminal()
                         new_node.winner = self.player if is_terminal and player_win else None
                         new_node._is_terminal = is_terminal
                         self.children.append(new_node)
                         break
         return self.children
 
-    def check_terminal(self, row, col):
-        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
-        for dr, dc in directions:
-            count = 1
-            for i in range(1, 4):
-                r, c = row + dr * i, col + dc * i
-                if 0 <= r < 6 and 0 <= c < 7 and self.get_cell(r,c) == self.player:
-                    count += 1
-                else:
-                    break
-            for i in range(1, 4):
-                r, c = row - dr * i, col - dc * i
-                if 0 <= r < 6 and 0 <= c < 7 and self.get_cell(r,c) == self.player:
-                    count += 1
-                else:
-                    break
-            if count >= 4:
-                return True, True
-        if self.is_board_full():
-            return True, False
-        return False, False
 
+    def check_terminal(self):
+        directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
+        for row in range(6):
+            for col in range(7):
+                for dr, dc in directions:
+                    count = 0
+                    for i in range(-3, 4):  # Loop from -3 to +3 to check both directions from the cell
+                        r, c = row + dr * i, col + dc * i
+                        if 0 <= r < 6 and 0 <= c < 7 and self.get_cell(r, c) == self.player:
+                            count += 1
+                        else:
+                            count = 0  # Reset count if we hit a cell that doesn't belong to the player
+                        
+                        if count >= 4:
+                            return True, True  # Winning condition met
+                    
+        if self.is_board_full():
+            return True, False  # Draw condition
+        return False, False  # Game is not over
+
+    
     def is_board_full(self):
         mask = 0b11  # Binary mask for two bits
         for i in range(42):  # Total cells in a 6x7 board
@@ -163,9 +166,6 @@ class Connect4Node(Node):
     
     def is_terminal(self):
         return self._is_terminal
-
-    def reward(self):
-        return self._reward
 
     def __eq__(self, other):
         if isinstance(other, Connect4Node):
@@ -199,51 +199,62 @@ class Connect4Node(Node):
             return best_child
     
     def _uct_select(self, nodeList):
-        total_simulations = sum(child.N for child in nodeList) + 1e-6  # Avoid division by zero
-        total_score = sum(child.Q for child in nodeList)
-        total_score_avg = total_score / total_simulations
-
         def uct(n):
-            if n.N == 0:
+            N = n.N[n.player]
+            Q = n.Q[n.player]
+            total_simulations = n.N[1] + n.N[2]
+
+            if N == 0:
                 return float("inf")
-            Q = n.Q if n.player == 2 else -n.Q
-            exploitation_value = Q / n.N
-            if total_simulations > 0 and n.N > 0:
-                exploration_value = total_score_avg * math.sqrt(math.log(total_simulations) / n.N)
+
+            exploitation_value = Q / N
+
+            if total_simulations > 0:
+                exploration_value = math.sqrt(math.log(total_simulations) / N)
             else:
                 exploration_value = 0
                 
             return exploitation_value + exploration_value
-        scores = [uct(child) for child in nodeList]
+        
         return max(nodeList, key=uct)
 
-    #  function calculates the total of a player's specific sequences on a game board.
-    #  Valid patterns are considered if they are open-ended.
-    #  The result is the total count of such valid patterns.
-    def count_patterns(self, board_int, player, length, marked=None):
+    #  This function counts the number of potential patterns of a given length that could be extended to 4-in-a-line on a board.
+    def count_potential_patterns(self, player, length, debug=False):
         count = 0
         rows, cols = 6, 7
         directions = [(1, 0), (0, 1), (1, 1), (1, -1)]  # (dx, dy) for horizontal, vertical, and both diagonals
 
-        if marked is None:
-            marked = np.zeros((rows, cols), dtype=bool)
+        empty_spaces_needed = 4 - length
 
         for dx, dy in directions:
+            if debug:
+                print(f"Checking direction ({dx}, {dy})")  # Debug line
             for i in range(rows):
                 for j in range(cols):
-                    if marked[i, j] or i + (length - 1) * dx >= rows or j + (length - 1) * dy < 0 or j + (length - 1) * dy >= cols:
+                    if i + (4 - 1) * dx >= rows or j + (4 - 1) * dy < 0 or j + (4 - 1) * dy >= cols:
                         continue
 
-                    pattern = [self.get_cell(i + k * dx, j + k * dy) for k in range(length)]
-                    if all(p == player for p in pattern):
-                        start_x, start_y = i - dx, j - dy
-                        end_x, end_y = i + length * dx, j + length * dy
-                        if (0 <= start_x < rows and 0 <= start_y < cols and self.get_cell(start_x, start_y) == 0) or (0 <= end_x < rows and 0 <= end_y < cols and self.get_cell( end_x, end_y) == 0):
-                            count += 1
-                            for k in range(length):
-                                marked[i + k * dx, j + k * dy] = True
-            
-        return count, marked
+                    pattern = [self.get_cell(i + k * dx, j + k * dy) for k in range(4)]
+                    
+                    if pattern.count(player) == length and pattern.count(0) == empty_spaces_needed:
+                        if debug:
+                            # Generate board visualization for each potential pattern
+                            visual_board = [['.' for _ in range(cols)] for _ in range(rows)]
+                        for k in range(4):
+                            row, col = i + k * dx, j + k * dy
+                            cell_value = self.get_cell(row, col)
+                            if debug:
+                                visual_board[row][col] = str(cell_value) if cell_value == player else 'x'
+                        
+                        if debug:
+                            # Print the visual board
+                            print("Potential pattern found:")
+                            for row in visual_board:
+                                print(" ".join(row))
+                        
+                        count += 1
+                            
+        return count
 
 
     def evaluate_board(self):
@@ -255,19 +266,10 @@ class Connect4Node(Node):
             2: 10,    # Two in a line
         }
 
-        marked = np.zeros((6, 7), dtype=bool)
-
         # Check for the player's threats and add to score
         for pattern_len in range(4, 1, -1):
-            patterns_count, marked = self.count_patterns(self.board, 2, pattern_len, marked)
+            patterns_count = self.count_potential_patterns(self.player, pattern_len)
             score += PATTERN_SCORES[pattern_len] * patterns_count
-
-        # Now, check for opponent's threats and subtract from score
-        # opponent = 3 - self.player
-        marked = np.zeros((6, 7), dtype=bool)
-        for pattern_len in range(4, 1, -1):
-            patterns_count, marked = self.count_patterns(self.board, 1, pattern_len, marked)
-            score -= PATTERN_SCORES[pattern_len] * patterns_count
 
         return score
     

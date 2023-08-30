@@ -4,17 +4,12 @@ from igraph import Graph, plot
 from ete3 import TreeStyle
 from ete3 import Tree
 from total_size import total_size
-from tree import TreeNode, TreePlotter
+from tree3 import TreeNode
 import networkx as nx
 import matplotlib.pyplot as plt
 from mctsTree import MCTSTree
 
-"""
-A minimal implementation of Monte Carlo tree search (MCTS) in Python 3
-Luke Harold Miles, July 2019, Public Domain Dedication
-See also https://en.wikipedia.org/wiki/Monte_Carlo_tree_search
-https://gist.github.com/qpwo/c538c6f73727e254fdc7fab81024f6e1
-"""
+
 from abc import ABC, abstractmethod
 from collections import defaultdict
 import math
@@ -39,7 +34,7 @@ class MCTS:
         def score(n):
             if n.N == 0:
                 return float("-inf")  
-            return n.Q / n.N
+            return n.Q[n.player] / n.N[n.player]
 
         return max(node.children, key=score)
 
@@ -87,26 +82,60 @@ class MCTS:
         path = []
         starting_node = node
         while True:
+            node.simulated = True
             path.append(node.last_move)
+            is_terminal = node.check_terminal()
             if not node.visited:
-                node.reward = node.evaluate_board()
-            if node.is_terminal():
-                starting_node.simulation_paths[','.join(map(str, path))] = path
-                return node.reward, node.player
+                node.reward[node.player] = node.evaluate_board()
+                # is_terminal = node.check_terminal()
+            if is_terminal[0]:
+                starting_node.simulation_paths.append(path)
+                result_reward = self.back_propagate_simulation_reward(path)
+                return result_reward, node.player
             node = node.find_random_child()
 
-    def _backpropagate(self, path, reward, winner, gamma = 0.5):
+
+    def find_nodes_by_path(self, node, path):
+        result = []
+        
+        # Base case: if the path is empty, return the current node
+        if not path:
+            return [node]
+        
+        # Add the current node to the result list as it is part of the path being traversed
+        result.append(node)
+        
+        # Look for the first element of the path among the children of the current node
+        for child in node.children:
+            if len(path) > 1 and child.last_move == path[1]:
+                found_nodes = self.find_nodes_by_path(child, path[1:])
+                
+                if found_nodes:  # If a non-empty list is returned
+                    result.extend(found_nodes)
+                    break  # No need to look further since we found a matching path
+                    
+        return result
+
+
+    def back_propagate_simulation_reward(self, path, gamma=0.8):
+        total_reward = {1: 0, 2:0}
+        nodes = self.find_nodes_by_path(self.root_node, path)
+        for node in reversed(nodes):
+            total_reward[node.player] += node.reward[node.player]
+            node.total_reward = total_reward
+            total_reward[node.player] *= gamma
+        return total_reward
+
+    def _backpropagate(self, path, reward, winner, gamma = 0.8):
         "Send the reward back up to the ancestors of the leaf"
-        multiplicator = 1
-        total_reward = 0
+        total_reward = reward
         for node in reversed(path):
-            total_reward += node.reward
+            node.reward = total_reward
             node.update_win_count(winner)
-            node.N += 1
-            node.Q += total_reward * multiplicator
-            total_reward *= gamma
+            node.N[node.player] += 1
+            node.Q[node.player] += total_reward[node.player] 
+            total_reward[node.player] *= gamma
             node.visited = True
-            multiplicator = 1 - multiplicator  # Flip the multiplicator for the next player
 
         depth = 0
         for node in path:
@@ -135,7 +164,10 @@ class MCTS:
         tree_node = TreeNode(mcts_node)
         tree_node.data = mcts_node.simulation_paths
         tree_node.set_visible(mcts_node.visited)
+        tree_node.index = mcts_node.last_move
         for child in mcts_node.children:
+            if not child.visited and not child.simulated:
+                continue
             tree_node.add_child(self.mcts_to_tree_node(child))
         return tree_node
 
@@ -198,11 +230,6 @@ class Node(ABC):
     def is_terminal(self):
         "Returns True if the node has no children"
         return True
-
-    @abstractmethod
-    def reward(self):
-        "Assumes `self` is terminal node. 1=win, 0=loss, .5=tie, etc"
-        return 0
 
     @abstractmethod
     def __hash__(self):
