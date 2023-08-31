@@ -24,8 +24,10 @@ class TreeNode:
         self.children.append(child_node)
 
 class TreePlotter:
-    def __init__(self, root, zoom_level=1.0, canvas_width=1000, canvas_height=1000, label_func=None, color_func=None, select_node_func=None, update_view_func=None, on_event_func=None):
+    def __init__(self, root, zoom_level=1.0, canvas_width=1000, canvas_height=1000, clip_rect = None,label_func=None, color_func=None, select_node_func=None, update_view_func=None, on_event_func=None):
         pygame.init()
+        self.clip_rect = clip_rect if clip_rect is not None else pygame.Rect(0,0,canvas_width, canvas_height)
+
         self.show_hidden_nodes = False
         self.on_event_func = on_event_func
         self.update_view_func = update_view_func
@@ -48,9 +50,10 @@ class TreePlotter:
         self.label_func = label_func if label_func is not None else (lambda node: str(node.value))
         self.screen = pygame.display.set_mode((self.canvas_width, self.canvas_height))
         self.font = pygame.font.SysFont(None, self.initial_font_size)
-        self.pan_offset = {'x': 0, 'y': 0}
+        self.pan_offset = {'x': self.canvas_width / 2, 'y': self.canvas_height / 2}
         self.fonts = {}
-        self.update_view(None)
+        self.selected_node = None
+        #self.update_view(None)
         
 
     def recursive_toggle_visibility(self, node, visible):
@@ -104,6 +107,7 @@ class TreePlotter:
 
         # Unselect all nodes except the clicked node
         self.unselect_all_tree(self.root, exept_node=clicked_node)
+        self.screen.fill((255, 255, 255))
 
         if clicked_node is not None:
             clicked_node.selected = not clicked_node.selected
@@ -114,7 +118,11 @@ class TreePlotter:
         else:
             self.unselect_all_tree(self.root)
 
-        self.update_view(event)
+        if self.update_view_func:
+            self.update_view_func(event)
+        self.redraw_tree_from_cache(self.root)  # Draw the tree
+
+        pygame.display.flip()        # self.update_view(event)
 
 
     def get_font(self, size):
@@ -140,7 +148,7 @@ class TreePlotter:
         end_x = start_x + node_width
         end_y = start_y + node_height
         
-        if not node.visible or start_x > self.canvas_width or end_x < 0 or start_y > self.canvas_height or end_y < 0:
+        if not node.visible or start_x > self.clip_rect.bottomright[0] or end_x < self.clip_rect.x or start_y > self.clip_rect.bottomright[1] or end_y < self.clip_rect.y:
             return x, y  # Skip drawing if the node is outside of the screen
 
 
@@ -162,9 +170,9 @@ class TreePlotter:
         # Draw the rectangle outline with the appropriate color
         pygame.draw.rect(self.screen, outline_color, (start_x, start_y, node_width, node_height), int(outline_width))
         
-
-        text_surface = self.font.render(label, True, (0, 0, 0))
-        self.screen.blit(text_surface, (world_x - text_surface.get_width() // 2, world_y - text_surface.get_height() // 2))
+        if(5 * self.zoom_level) > 1:
+            text_surface = self.font.render(label, True, (0, 0, 0))
+            self.screen.blit(text_surface, (world_x - text_surface.get_width() // 2, world_y - text_surface.get_height() // 2))
 
         # Draw up/down arrow for nodes with children
         if node.children:
@@ -265,23 +273,41 @@ class TreePlotter:
     # else:
     #     print("Line is outside the clipping window.")
 
-
-    def draw_line_clipped(self, surface, color, start_pos, end_pos):
-        # Screen rectangle boundaries
-        rect_top_left_x, rect_top_left_y = (0, 0)
-        rect_bottom_right_x, rect_bottom_right_y = (self.canvas_width, self.canvas_height)
-
-        # Unpack the start and end positions
+    def draw_line_clipped(self, surface, color, start_pos, end_pos, arrow_length=10, arrow_width=5):
+        # Existing code for line clipping and drawing
+        rect_top_left_x, rect_top_left_y = self.clip_rect.x, self.clip_rect.y
+        rect_bottom_right_x, rect_bottom_right_y = self.clip_rect.bottomright[0], self.clip_rect.bottomright[1]
         start_x, start_y = start_pos
         end_x, end_y = end_pos
         screen_start_x, screen_start_y = self.world_to_screen(start_x, start_y)
         screen_end_x, screen_end_y = self.world_to_screen(end_x, end_y)
         visible_line = self.liang_barsky(screen_start_x, screen_start_y, screen_end_x, screen_end_y, rect_top_left_x, rect_top_left_y, rect_bottom_right_x, rect_bottom_right_y)
+        
         if visible_line:
-            clipped_x1, clipped_y1,clipped_x2, clipped_y2 = visible_line
-            # screen_clipped_x1, screen_clipped_y1 = self.world_to_screen(clipped_x1, clipped_y1)
-            # screen_clipped_x2, screen_clipped_y2 = self.world_to_screen(clipped_x2, clipped_y2)
+            clipped_x1, clipped_y1, clipped_x2, clipped_y2 = visible_line
             pygame.draw.line(surface, color, (clipped_x1, clipped_y1), (clipped_x2, clipped_y2))
+
+            # Calculate normalized direction vector
+            dx = clipped_x2 - clipped_x1
+            dy = clipped_y2 - clipped_y1
+            length = (dx ** 2 + dy ** 2) ** 0.5
+            if length == 0:
+                return  # Avoid division by zero
+
+            dx /= length
+            dy /= length
+
+            # Calculate arrowhead points
+            arrow_length *= self.zoom_level
+            arrow_width *= self.zoom_level
+            arrow_x1 = clipped_x2 - arrow_length * dx + arrow_width * dy
+            arrow_y1 = clipped_y2 - arrow_length * dy - arrow_width * dx
+            arrow_x2 = clipped_x2 - arrow_length * dx - arrow_width * dy
+            arrow_y2 = clipped_y2 - arrow_length * dy + arrow_width * dx
+
+            # Draw the arrowhead
+            pygame.draw.polygon(surface, color, [(clipped_x2, clipped_y2), (arrow_x1, arrow_y1), (arrow_x2, arrow_y2)])
+
 
 
     def redraw_tree_from_cache(self, node):
@@ -295,12 +321,18 @@ class TreePlotter:
         if node.expanded:
             for child in node.children:
                 if child.visible:
-                    # Draw a line from this node's position to each visible child's position
-                    self.draw_line_clipped(self.screen, (0,0,0), (node.pos[0], node.pos[1]),
-                                          (child.pos[0], child.pos[1]))
+                    # Adjust starting and ending points to consider the size of nodes
+                    start_x = node.pos[0]
+                    start_y = node.pos[1] + self.node_height // 2  # bottom center of the node
+                    end_x = child.pos[0]
+                    end_y = child.pos[1] - self.node_height // 2  # top center of the child node
+                    
+                    # Draw a line from this node's adjusted position to each visible child's adjusted position
+                    self.draw_line_clipped(self.screen, (0,0,0), (start_x, start_y), (end_x, end_y))
                     
                     # Recursively redraw the child
                     self.redraw_tree_from_cache(child)
+
 
     def draw_tree(self, node, x, y):
         current_y = y
@@ -440,7 +472,6 @@ class TreePlotter:
     def expand_all(self, expanded, node = None):
         if node.children:
             node.expanded = expanded
-            #self.update_tree()
 
         for child in node.children:
             self.expand_all(expanded, child)
@@ -448,57 +479,56 @@ class TreePlotter:
 
 
     def main_loop(self):
-        while True:
-            mouse_font = pygame.font.SysFont(None, 20)
-            mouse_position_surface = mouse_font.render("0,0", True, (0, 0, 0))
-            self.panning = False
-            running = True
-            while running:
+        mouse_font = pygame.font.SysFont(None, 20)
+        mouse_position_surface = mouse_font.render("0,0", True, (0, 0, 0))
+        self.panning = False
+        running = True
+        while running:
 
-                for event in pygame.event.get():           
+            for event in pygame.event.get():           
 
-                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left mouse button
-                        self.click_counter += 1
-                        if self.click_counter == 1:
-                            pygame.time.set_timer(pygame.USEREVENT, 300)
-                        elif self.click_counter == 2:
-                            self.node_double_click(event)
-                            self.click_counter = 0
-                            pygame.time.set_timer(pygame.USEREVENT, 0)  # Stop the timer
-
-                    if event.type == pygame.USEREVENT:
-                        if self.click_counter == 1:
-                            x, y = pygame.mouse.get_pos()
-                            event_data = {'button': 1,
-                                    'pos': (x, y)}
-                            event = pygame.event.Event(pygame.MOUSEBUTTONDOWN, event_data)
-                            self.process_single_click(event)
-                            pygame.time.set_timer(pygame.USEREVENT, 0)
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:  # Left mouse button
+                    self.click_counter += 1
+                    if self.click_counter == 1:
+                        pygame.time.set_timer(pygame.USEREVENT, 300)
+                    elif self.click_counter == 2:
+                        self.node_double_click(event)
                         self.click_counter = 0
+                        pygame.time.set_timer(pygame.USEREVENT, 0)  # Stop the timer
+
+                if event.type == pygame.USEREVENT:
+                    if self.click_counter == 1:
+                        x, y = pygame.mouse.get_pos()
+                        event_data = {'button': 1,
+                                'pos': (x, y)}
+                        event = pygame.event.Event(pygame.MOUSEBUTTONDOWN, event_data)
+                        self.process_single_click(event)
+                        pygame.time.set_timer(pygame.USEREVENT, 0)
+                    self.click_counter = 0
 
 
-                    if event.type == pygame.QUIT:
-                        running = False
-                        pygame.quit()
-                        sys.exit()
-                                    
-                    if event.type == pygame.MOUSEWHEEL:
-                        self.zoom(event)                    
-                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 2:  # Middle mouse button
-                        self.start_pan(event)
-                    elif event.type == pygame.MOUSEBUTTONUP and event.button == 2:  # Middle mouse button
-                        self.panning = False
-                    elif event.type == pygame.MOUSEMOTION:
-                        if self.panning:
-                            self.pan(event)
-                        mouse_x, mouse_y = event.pos
-                        world_mouse_x = (mouse_x - self.pan_offset['x']) / self.zoom_level
-                        world_mouse_y = (mouse_y - self.pan_offset['y']) / self.zoom_level
-                        mouse_position_text = f"X: {int(world_mouse_x)}, Y: {int(world_mouse_y)}"
-                        mouse_position_surface = mouse_font.render(mouse_position_text, True, (0, 0, 0))
-                    
-                    if self.on_event_func:
-                        self.on_event_func(event)
+                if event.type == pygame.QUIT:
+                    running = False
+                    pygame.quit()
+                    # sys.exit()
+                                
+                if event.type == pygame.MOUSEWHEEL:
+                    self.zoom(event)                    
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 2:  # Middle mouse button
+                    self.start_pan(event)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 2:  # Middle mouse button
+                    self.panning = False
+                elif event.type == pygame.MOUSEMOTION:
+                    if self.panning:
+                        self.pan(event)
+                    mouse_x, mouse_y = event.pos
+                    world_mouse_x = (mouse_x - self.pan_offset['x']) / self.zoom_level
+                    world_mouse_y = (mouse_y - self.pan_offset['y']) / self.zoom_level
+                    mouse_position_text = f"X: {int(world_mouse_x)}, Y: {int(world_mouse_y)}"
+                    mouse_position_surface = mouse_font.render(mouse_position_text, True, (0, 0, 0))
+                
+                if self.on_event_func:
+                    self.on_event_func(event)
 
 
                     
@@ -543,8 +573,8 @@ def generate_tree(depth, num_children):
 
     return create_node(1)
 
-root_node = generate_tree(13,2)
-mcts_tree = TreePlotter(root_node, canvas_width=1000, canvas_height=1000)
-# mcts_tree.expand_all(True, root_node)
-mcts_tree.update_view(None)
-mcts_tree.main_loop()
+# root_node = generate_tree(13,2)
+# mcts_tree = TreePlotter(root_node, canvas_width=1000, canvas_height=1000)
+# # mcts_tree.expand_all(True, root_node)
+# mcts_tree.update_view(None)
+# mcts_tree.main_loop()

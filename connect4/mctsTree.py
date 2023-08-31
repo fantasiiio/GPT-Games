@@ -1,3 +1,4 @@
+import numpy as np
 import random
 import pygame
 import pygame_gui
@@ -26,7 +27,7 @@ class MCTSTree:
         
 
         # Create list box
-        list_box_rect = pygame.Rect(self.WIDTH - self.PANEL_WIDTH + 10, 10, self.PANEL_WIDTH - 20, self.HEIGHT - 20)
+        list_box_rect = pygame.Rect(self.WIDTH - self.PANEL_WIDTH, 0, self.PANEL_WIDTH , self.HEIGHT)
         self.list_box = pygame_gui.elements.UISelectionList(relative_rect=list_box_rect,
                                                             item_list=[],
                                                             manager=self.manager)
@@ -38,12 +39,17 @@ class MCTSTree:
                                                         manager=self.manager)
 
         self.root_node = root_node
-        self.plotter = TreePlotter(self.root_node, 0.5, canvas_width=self.WIDTH, canvas_height=self.HEIGHT, 
+        self.plotter = TreePlotter(self.root_node, 0.5, canvas_width=self.WIDTH, canvas_height=self.HEIGHT, clip_rect=pygame.Rect(0,0,self.WIDTH - self.PANEL_WIDTH, self.HEIGHT)
+,
                                    label_func=self.custom_label, color_func=self.custom_color, select_node_func=self.node_selected, update_view_func=self.update_view, on_event_func=self.on_event)
         
         self.plotter.screen = self.screen  # pass the screen object to your TreePlotter
+        self.plotter.update_view(None)
 
     def on_event(self, event):
+        if event.type == pygame.QUIT:
+            return
+        
         self.manager.process_events(event)
         self.manager.update(0)
 
@@ -59,20 +65,37 @@ class MCTSTree:
                         self.on_select_list_item(selected_item)
 
     def update_view(self, event):
-        self.manager.draw_ui(self.screen)       
+
+        self.manager.draw_ui(self.screen)
+        if self.plotter.selected_node and hasattr(self.plotter.selected_node.value, 'int_to_board'):
+            board = self.plotter.selected_node.value.int_to_board()
+            self.draw_board(board)
+
+        color_mapping = {
+            'Terminal - Winner 1': (0, 0, 255),
+            'Terminal - Winner 2': (255, 0, 0),
+            'Terminal - Draw': (255, 0, 255),
+            'Simulation': (128, 128, 128),
+            'Has Path': (144, 238, 144),
+        }
+        self.draw_legend(color_mapping)                   
         pygame.display.update()
 
 
     def node_selected(self, node): 
-        if not node.data:
-            return
         
-        # Update the list box with new items.
-        self.list_box.set_item_list([str(item) for item in node.data])
-        
-        # Attach the node object as 'data' to each item.
-        for i, item in enumerate(self.list_box.item_list):
-            item['data'] = node.data[i]
+        if node.data:
+            # Update the list box with new items.
+            self.list_box.set_item_list([str(item) for item in node.data])
+            
+            # Attach the node object as 'data' to each item.
+            for i, item in enumerate(self.list_box.item_list):
+                item['data'] = node.data[i]
+
+        # Draw the board if the node has the 'int_to_board' method
+        if hasattr(node.value, 'int_to_board'):
+           board = node.value.int_to_board()
+           self.draw_board(board)
 
     testing = False
     if testing:
@@ -83,22 +106,54 @@ class MCTSTree:
             return 'white'
     else:
         def custom_label(self, node):
-            return f"c{node.value.last_move} W:{node.value.win_count[1]},{node.value.win_count[2]} t:{node.value.win_count[2]-node.value.win_count[1]} \nQ: {int(node.value.Q[1])},{int(node.value.Q[2])} N: {node.value.N[1]},{node.value.N[2]}\nD: {node.value.depth} P: {node.value.player}\nR: {node.value.reward[1]:.1f}, {node.value.reward[2]:.1f} RT: {node.value.total_reward[1]:.1f}, {node.value.total_reward[2]:.1f}"
+            return f"c{node.value.last_move} W:{node.value.win_count[1]},{node.value.win_count[2]} t:{node.value.win_count[2]-node.value.win_count[1]} \nQ: {int(node.value.Q[1])},{int(node.value.Q[2])} N: {node.value.N[1]},{node.value.N[2]} U:{node.value.uct_value[1]:.1f},{node.value.uct_value[2]:.1f} \nD: {node.value.depth} P: {node.value.player}\nR: {node.value.reward[1]:.1f}, {node.value.reward[2]:.1f} RT: {node.value.total_reward[1]:.1f}, {node.value.total_reward[2]:.1f}"
 
+        def custom_color(self, node):
+            
+            if node.value._is_terminal:
+                if node.value.winner == 1:
+                    return (0, 0, 255)  # Blue
+                elif node.value.winner == 2:
+                    return (255, 0, 0)  # Red
+                else:
+                    return (255, 0, 255)  # Magenta
+            elif not node.value.visited:
+                return (128, 128, 128)  # Gray
+            elif node.data:
+                return (144, 238, 144)  # Light green, equivalent to '#90EE90'
+            else:
+                return (255, 255, 255)  # White
 
-    def custom_color(self, node):
-        
-        if node.value._is_terminal:
-            if node.value.winner == 1:
-                return (0, 0, 255)  # Blue
-            elif node.value.winner == 2:
-                return (255, 0, 0)  # Red
-        elif not node.value.visited:
-            return (128, 128, 128)  # Gray
-        elif node.data:
-            return (144, 238, 144)  # Light green, equivalent to '#90EE90'
-        else:
-            return (255, 255, 255)  # White
+    def draw_board(self, board):
+            # rows, cols = 6, 7
+            # board = np.zeros((rows, cols), dtype=np.int8)            
+            # board[0, 0] = 1
+            rows, cols = board.shape
+            cell_size = 20  # Size for each cell in the board
+            board_x = self.WIDTH - self.PANEL_WIDTH + 20  # Starting x-coordinate to draw the board
+            board_y = 300  # Starting y-coordinate to draw the board
+
+            for row in range(rows):
+                for col in range(cols):
+                    rect_x = board_x + col * cell_size
+                    rect_y = board_y + row * cell_size
+                    pygame.draw.rect(self.screen, (100,100,100), (rect_x, rect_y, cell_size, cell_size), 1)  # Draw cell border
+                    
+                    if board[row, col] == 1:
+                        pygame.draw.circle(self.screen, (0, 0, 255), (rect_x + cell_size // 2, rect_y + cell_size // 2), cell_size // 3)  # Draw blue circle for player 1
+                    elif board[row, col] == 2:
+                        pygame.draw.circle(self.screen, (255, 0, 0), (rect_x + cell_size // 2, rect_y + cell_size // 2), cell_size // 3)  # Draw red circle for player 2
+
+    def draw_legend(self, color_mapping):
+        x, y = 20, self.HEIGHT - 20  # Start drawing the legend 20 pixels above the bottom left corner.
+        font = pygame.font.SysFont('Arial', 14)
+        offset = 0
+
+        for color_name, color_value in reversed(color_mapping.items()):
+            pygame.draw.rect(self.screen, color_value, (x, y - offset, 15, 15))
+            label_surface = font.render(color_name, True, (0,0,0))
+            self.screen.blit(label_surface, (x + 20, y - offset))
+            offset += 25  # Move 25 pixels up for the next entry
 
 
     def select_path(self, node, path):

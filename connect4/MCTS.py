@@ -8,7 +8,7 @@ from tree3 import TreeNode
 import networkx as nx
 import matplotlib.pyplot as plt
 from mctsTree import MCTSTree
-
+import random
 
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -32,9 +32,10 @@ class MCTS:
             return node.find_random_child()
 
         def score(n):
-            if n.N == 0:
-                return float("-inf")  
-            return n.Q[n.player] / n.N[n.player]
+            #if n.N[n.player] == 0:
+            #    return float("-inf")  
+            return (n.win_count[n.player] - n.win_count[3-n.player]) / n.N[n.player]
+            #return n.total_reward[n.player]
 
         return max(node.children, key=score)
 
@@ -68,6 +69,7 @@ class MCTS:
                 path.append(best_child)
                 return path
 
+            #node = random.choice(children)  # descend a layer deeper
             node = node._uct_select(node.children)  # descend a layer deeper
 
 
@@ -85,13 +87,13 @@ class MCTS:
             node.simulated = True
             path.append(node.last_move)
             is_terminal = node.check_terminal()
-            if not node.visited:
-                node.reward[node.player] = node.evaluate_board()
+            #if not node.visited:
+                # node.reward[node.player] = node.evaluate_board()
                 # is_terminal = node.check_terminal()
             if is_terminal[0]:
                 starting_node.simulation_paths.append(path)
-                result_reward = self.back_propagate_simulation_reward(path)
-                return result_reward, node.player
+                # result_reward = self.back_propagate_simulation_reward(path, starting_node)
+                return 0, node.player
             node = node.find_random_child()
 
 
@@ -117,20 +119,21 @@ class MCTS:
         return result
 
 
-    def back_propagate_simulation_reward(self, path, gamma=0.8):
+    def back_propagate_simulation_reward(self, path, starting_node, gamma=0.9):
         total_reward = {1: 0, 2:0}
-        nodes = self.find_nodes_by_path(self.root_node, path)
+        nodes = self.find_nodes_by_path(starting_node, path)
         for node in reversed(nodes):
             total_reward[node.player] += node.reward[node.player]
-            node.total_reward = total_reward
+            node.total_reward[1] = total_reward[1]
+            node.total_reward[2] = total_reward[2]
             total_reward[node.player] *= gamma
         return total_reward
 
-    def _backpropagate(self, path, reward, winner, gamma = 0.8):
+    def _backpropagate(self, path, reward, winner, gamma = 0.9):
         "Send the reward back up to the ancestors of the leaf"
-        total_reward = reward
+        total_reward = {1: 0, 2:0}# reward
         for node in reversed(path):
-            node.reward = total_reward
+            total_reward[node.player] += node.reward[node.player]
             node.update_win_count(winner)
             node.N[node.player] += 1
             node.Q[node.player] += total_reward[node.player] 
@@ -178,35 +181,35 @@ class MCTS:
         tree_plotter.start()    
     
 
-    def propagate_win_count(self, node):
-        if node.is_terminal():
-            node.win_count = {1: 0, 2: 0}
-            node.win_count[node.winner] = 1
-            node.win_delta = node.win_count[1] - node.win_count[2]
-            return node.win_count
+    # def propagate_win_count(self, node):
+    #     if node.is_terminal():
+    #         node.win_count = {1: 0, 2: 0}
+    #         node.win_count[node.winner] = 1
+    #         node.win_delta = node.win_count[1] - node.win_count[2]
+    #         return node.win_count
         
-        total_win_count = {1: 0, 2: 0}
-        total_win_delta = 0
-        for child in node.children:
-            child_win_count = self.propagate_win_count(child)
-            total_win_count[1] += child_win_count[1]
-            total_win_count[2] += child_win_count[2]
+    #     total_win_count = {1: 0, 2: 0}
+    #     total_win_delta = 0
+    #     for child in node.children:
+    #         child_win_count = self.propagate_win_count(child)
+    #         total_win_count[1] += child_win_count[1]
+    #         total_win_count[2] += child_win_count[2]
 
 
-        if not hasattr(node, 'win_count'):
-            node.win_count = {1: 0, 2: 0}
-        node.win_count[1] += total_win_count[1]
-        node.win_count[2] += total_win_count[2]
+    #     if not hasattr(node, 'win_count'):
+    #         node.win_count = {1: 0, 2: 0}
+    #     node.win_count[1] += total_win_count[1]
+    #     node.win_count[2] += total_win_count[2]
 
-        # Update and backpropagate the win_delta for this node
-        node.win_delta = node.win_count[1] - node.win_count[2]
+    #     # Update and backpropagate the win_delta for this node
+    #     node.win_delta = node.win_count[1] - node.win_count[2]
 
-        return node.win_count
+    #     return node.win_count
 
 
 
-    def propagate_win_count_root(self):
-        self.propagate_win_count(self.root_node)
+    # def propagate_win_count_root(self):
+    #     self.propagate_win_count(self.root_node)
 
 
 class Node(ABC):

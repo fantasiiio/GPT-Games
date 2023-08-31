@@ -166,7 +166,6 @@ class TreePlotter:
                 node.selected = False            
             
 
-        self.recursive_toggle_visibility(self.root)
         self.canvas.delete("delete")
         self.clear_canvas()
         self.draw_tree(self.root, 0, 0)    

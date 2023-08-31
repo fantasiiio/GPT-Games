@@ -43,6 +43,17 @@ class DefaultDictManager:
     def items(self):
         return self.manager_dict.items()
     
+
+SQUARESIZE = 100
+RADIUS = int(SQUARESIZE / 2 - 5)
+ROW_COUNT = 6
+COLUMN_COUNT = 7
+WIDTH = COLUMN_COUNT * SQUARESIZE
+HEIGHT = (ROW_COUNT+1) * SQUARESIZE
+BLUE = (9,113,188)
+RED = (243,53,40)
+YELLOW = (250,230,0)
+
 class Game:
     def __init__(self):
         self.ROW_COUNT = 6
@@ -50,12 +61,42 @@ class Game:
         self.PLAYER = 1
         self.AI = 2
         self.EMPTY = 0
-        self.board = self.create_board()
+        board = self.create_board()
         self.board_history = []
         self.game_over = False
-        self.node = Connect4Node(self.board, self.PLAYER, False, 0)
+        self.node = Connect4Node(board, self.AI, False, 0)
+        self.node.create_children()
         self.iterations = 100
         self.start_iterations = self.iterations
+        self.game_history = []
+        pygame.init()
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.update()
+
+        self.draw_board(board)
+
+    def draw_board(self, board, winning_pieces = []):
+        for c in range(COLUMN_COUNT):
+            for r in range(ROW_COUNT):
+                pygame.draw.rect(self.screen, BLUE, (c*SQUARESIZE, r*SQUARESIZE+SQUARESIZE, SQUARESIZE, SQUARESIZE))
+                pygame.draw.circle(self.screen, (0, 0, 0), (int(c*SQUARESIZE+SQUARESIZE/2), int(r*SQUARESIZE+SQUARESIZE+SQUARESIZE/2)), RADIUS)
+
+        for c in range(COLUMN_COUNT):
+            for r in range(ROW_COUNT):
+                if board[r][c] == 1:
+                    pygame.draw.circle(self.screen, RED, (int(c*SQUARESIZE+SQUARESIZE/2), int(HEIGHT-int(r*SQUARESIZE+SQUARESIZE/2))), RADIUS)
+                elif board[r][c] == 2:
+                    pygame.draw.circle(self.screen, YELLOW, (int(c*SQUARESIZE+SQUARESIZE/2), int(HEIGHT-int(r*SQUARESIZE+SQUARESIZE/2))), RADIUS)
+
+        for piece in winning_pieces:  # Separate loop for drawing the winning pieces
+            r, c = piece  # Unpack the row and column values
+            for i in range(1, 4):  # Draw a thicker border
+                pygame.gfxdraw.aacircle(self.screen, int(c*SQUARESIZE+SQUARESIZE/2), int(HEIGHT-int(r*SQUARESIZE+SQUARESIZE/2)), RADIUS-i, (0, 0, 139))
+                pygame.gfxdraw.circle(self.screen, int(c*SQUARESIZE+SQUARESIZE/2), int(HEIGHT-int(r*SQUARESIZE+SQUARESIZE/2)), RADIUS-i, (0, 0, 139))
+
+        pygame.display.update()
+
+
 
     def create_board(self):
         return np.zeros((self.ROW_COUNT, self.COLUMN_COUNT), int)
@@ -63,13 +104,10 @@ class Game:
     def drop_piece(self, board, row, col, piece):
         board[row][col] = piece
 
-    def is_valid_location(self, board, col):
-        return board[self.ROW_COUNT-1][col] == 0
-
-    def get_next_open_row(self, board, col):
-        for r in range(self.ROW_COUNT):
-            if board[r][col] == 0:
-                return r
+    # def get_next_open_row(self, board, col):
+    #     for r in range(self.ROW_COUNT):
+    #         if board[r][col] == 0:
+    #             return r
 
     def check_winner(self,board, piece):
         for c in range(self.COLUMN_COUNT - 3):
@@ -90,11 +128,8 @@ class Game:
                     return True
 
 
-    def get_available_moves(self, board):
-        return [c for c in range(self.COLUMN_COUNT) if self.is_valid_location(board, c)]
-
-    def is_terminal(self, valid_moves):
-        return len(valid_moves) == 0 or self.check_winner(self.board, self.PLAYER) or self.check_winner(self.board, self.AI)
+    # def get_available_moves(self, board):
+    #     return [c for c in range(self.COLUMN_COUNT) if self.is_valid_location(board, c)]
 
     def end_game(self, winner):
         if winner == self.PLAYER:
@@ -112,59 +147,82 @@ class Game:
         iterations = int(initial_iterations * (1 - fraction_filled))
         return iterations
     
+
+    def update_node_to_child(self, last_move):
+        for child in self.node.children:
+            if child.last_move == last_move:
+                self.node = child
+                break
+
     def run(self):
-        board = self.board
         game_over = False
         turn = self.PLAYER
 
         while not game_over:
-            if turn == self.PLAYER:
-                i = input(f"Enter your move (0-{self.COLUMN_COUNT-1} i): ")
-                if not (i.isdigit() and 0 <= int(i) <= 6 or i == "i"):
-                    print("Invalid input.")
-                    continue
-                if(i == 'i'):
-                    i = input(f"Iterations count: ")
-                    self.iterations = int(i)
-                    continue
-                else:
-                    col = int(i)
+            #if turn == self.PLAYER:
+                # i = input(f"Enter your move (0-{self.COLUMN_COUNT-1} i,u): ")
+                # if not (i.isdigit() and 0 <= int(i) <= 6 or i == "i" or i == "u"):
+                #     print("Invalid input.")
+                #     continue
+                # if i == "u":
+                #     if len(self.game_history) > 0:
+                #         self.board = self.game_history.pop()
+                #         draw_text_board(self.board)
+                #         self.node = Connect4Node(self.self.board, self.PLAYER, False, 0)
+                #         continue
+                #     else:
+                #         print("No moves to undo.")
+                #         continue                
+                # if(i == 'i'):
+                #     i = input(f"Iterations count: ")
+                #     self.iterations = int(i)
+                #     continue
+                # else:
+                #     col = int(i)
 
-                if self.is_valid_location(board, col):
-                    row = self.get_next_open_row(board, col)
-                    self.drop_piece(board, row, col, self.PLAYER)
-                    self.node.update_node(board, col, self.PLAYER)
-                    # Add the current board state to the history
-                    self.board_history.append(board.copy())
-
-                    if self.check_winner(board, self.PLAYER):
-                        self.end_game(self.PLAYER)
-                        game_over = True
-
-                turn = self.AI
-            else:
-                if turn == self.AI and not game_over:
-                    # self.iterations = self.calculate_iterations(board, self.start_iterations)
-                    col = self.get_mcts_move_single()
-                    if self.is_valid_location(board, col):
-                        row = self.get_next_open_row(board, col)
-                        self.drop_piece(board, row, col, self.AI)
-
-                        # Add the current board state to the history
-                        self.board_history.append(board.copy())
-
-                        if self.check_winner(board, self.AI):
-                            self.end_game(self.AI)
-                            game_over = True
+            if turn == self.AI and not game_over:
+                self.get_mcts_move_single()
+                terminal = self.node.check_terminal()
+                if terminal[0]:
+                    self.end_game(self.AI)
+                    game_over = True
 
                 turn = self.PLAYER
 
-            if len([c for c in range(self.COLUMN_COUNT) if self.is_valid_location(board, c)]) == 0:
+            if len([c for c in range(self.COLUMN_COUNT) if self.node.is_valid_location(c)]) == 0:
                 self.end_game(0)
                 game_over = True
 
-            draw_text_board(board)
 
+            for event in pygame.event.get():            
+                if event.type == pygame.QUIT:
+                    sys.exit()
+
+                if event.type == pygame.MOUSEMOTION:
+                    pygame.draw.rect(self.screen, (0, 0, 0), (0, 0, WIDTH, SQUARESIZE))
+                    posx = event.pos[0]
+                    if turn == self.PLAYER:
+                        pygame.draw.circle(self.screen, RED, (posx, int(SQUARESIZE/2)), RADIUS)
+                    else:
+                        pygame.draw.circle(self.screen, YELLOW, (posx, int(SQUARESIZE/2)), RADIUS)
+
+
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pygame.draw.rect(self.screen, (0, 0, 0), (0, 0, WIDTH, SQUARESIZE))                
+                    col = int(event.pos[0] // SQUARESIZE)
+
+                    if self.node.is_valid_location(col):
+                        self.update_node_to_child(col)
+                        terminal = self.node.check_terminal()
+                        if terminal[0]:
+                            self.end_game(self.PLAYER)
+                            game_over = True
+
+                    turn = self.AI
+        
+            #draw_text_board(self.node.int_to_board())
+            self.draw_board(self.node.int_to_board())
+            pygame.display.update()
         
             
     def get_mcts_move_single(self):
@@ -175,7 +233,7 @@ class Game:
             mcts.do_rollout(self.node)
 
         # mcts.propagate_win_count_root()
-        mcts.draw_tree(self.node)
+        # mcts.draw_tree(self.node)
 
         self.node = mcts.choose(self.node)
         column_number = self.node.last_move        
@@ -186,7 +244,7 @@ class Game:
         mcts = MCTS()
         
         node = self.node.create_from_existing(self.node)
-        row = self.get_next_open_row(self.board, column)
+        row = self.node.get_next_open_row(self.board, column)
         node.board[row][column] = self.AI  # Assuming self.AI is the AI player's piece
         node.history = node.history + [column]
         node.last_move = column
@@ -203,7 +261,7 @@ class Game:
         iterations_per_process = iterations
 
         mcts_results = []
-        valid_columns = self.get_available_moves(self.board)
+        #valid_columns = self.get_available_moves(self.board)
         process_count = len(valid_columns)
 
         with multiprocessing.Pool(process_count) as pool:
