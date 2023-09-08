@@ -2,7 +2,8 @@ import pygame
 import os
 
 class Animation:
-    def __init__(self, screen, base_folder, action_name, is_looping, offset):
+    def __init__(self, screen, base_folder, action_name, is_looping, offset, offset_angle):
+        self.offset_angle = offset_angle
         self.screen = screen
         self.images = []
         self.rects = []
@@ -18,29 +19,68 @@ class Animation:
     def get_current_rect(self):
         return self.rects[self.current_frame]
 
-    def rotate_image(self, image, angle):
+    def rotate_image(self, image, angle, rotation_center=None):
         original_rect = image.get_rect()
-        rotated_rect = original_rect.copy()
-
-        expanded_size = max(image.get_width(), image.get_height())
+        
+        # Create an expanded surface to ensure the entire image remains visible after rotation
+        expanded_size = int(max(image.get_width(), image.get_height()) * 1.414)  # 1.414 = sqrt(2) to handle diagonal size
         new_surface = pygame.Surface((expanded_size, expanded_size), pygame.SRCALPHA, 32)
         new_surface.blit(image, (expanded_size // 2 - image.get_width() // 2, 
                                 expanded_size // 2 - image.get_height() // 2))
         
         rotated_image = pygame.transform.rotate(new_surface, angle)
-        rotated_rect.topleft = (original_rect.centerx - rotated_image.get_width() // 2, original_rect.centery - rotated_image.get_height() // 2)
+        
+        # Get the rectangle of the rotated image
+        rotated_rect = rotated_image.get_rect()
+
+        # If no rotation center is provided, use the image's center
+        if rotation_center is None:
+            rotation_center = original_rect.center
+
+        # Adjust the position of the rotated image based on the specified rotation center
+        rotated_rect.center = (rotation_center[0] + original_rect.width // 2 - expanded_size // 2, 
+                            rotation_center[1] + original_rect.height // 2 - expanded_size // 2)
 
         return rotated_image, rotated_rect
 
-    def draw(self, x, y, angle=0):
+    def blitRotate(self, surf, image, pos, originPos, angle):
+        angle += self.offset_angle
+        # offset from pivot to center
+        image_rect = image.get_rect(topleft = (pos[0] - originPos[0], pos[1]-originPos[1]))
+        offset_center_to_pivot = pygame.math.Vector2(pos) - image_rect.center
+        
+        # roatated offset from pivot to center
+        rotated_offset = offset_center_to_pivot.rotate(-angle)
+
+        # rotated image center
+        rotated_image_center = (pos[0] - rotated_offset.x, pos[1] - rotated_offset.y)
+
+        # Create an expanded surface to ensure the entire image remains visible after rotation
+        expanded_size = int(max(image.get_width(), image.get_height()) * 1.414)  # 1.414 = sqrt(2) to handle diagonal size
+        new_surface = pygame.Surface((expanded_size, expanded_size), pygame.SRCALPHA, 32)
+        new_surface.blit(image, (expanded_size // 2 - image.get_width() // 2, 
+                                expanded_size // 2 - image.get_height() // 2))
+
+
+        # get a rotated image
+        rotated_image = pygame.transform.rotate(new_surface, angle)
+        rotated_image_rect = rotated_image.get_rect(center = rotated_image_center)
+
+        rotated_image_rect.x += self.offset[0]
+        rotated_image_rect.y += self.offset[1]
+        # rotate and blit the image
+        surf.blit(rotated_image, rotated_image_rect)
+
+
+
+
+    def draw(self, x, y, angle=0, rotation_center=None):
         image = self.images[self.current_frame]
-        rotated_image, rotated_rect = self.rotate_image(image, angle)
-        #outlined_sprite = self.get_outline(rotated_image, (255, 0, 0))  # Red outline, 2 pixels thick
-        rotated_rect.x += x + self.offset[0]
-        rotated_rect.y += y + self.offset[1]
-        self.screen.blit(rotated_image, rotated_rect.topleft)        
-        #self.screen.blit(outlined_sprite, (x, y))        
-        #self.screen.blit(self.images[self.current_frame], (x, y))
+        if rotation_center is None:
+            rotation_center = image.get_rect().center
+            
+        self.blitRotate(self.screen, image, (x,y), rotation_center, angle)
+    
 
     def get_outline(self, image,color=(0,0,0)):
         rect = image.get_rect()

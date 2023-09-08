@@ -60,8 +60,8 @@ def check_game_end():
     return None
 
 player_initial_pos = {1: (2, 2), 2: (4, 2)}
-players[1].add_unit(Unit(grid.tiles[player_initial_pos[1][0]][player_initial_pos[1][1]], 1, grid))
-players[2].add_unit(Unit(grid.tiles[player_initial_pos[2][0]][player_initial_pos[2][1]], 2, grid))
+players[1].add_unit(Unit(grid.tiles[player_initial_pos[1][0]][player_initial_pos[1][1]], 1, grid, screen=screen))
+players[2].add_unit(Unit(grid.tiles[player_initial_pos[2][0]][player_initial_pos[2][1]], 2, grid, screen=screen))
 
 unit_info_label = pygame_gui.elements.UILabel(
     relative_rect=pygame.Rect((10, 10), (200, 40)),
