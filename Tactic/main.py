@@ -8,7 +8,7 @@ from Unit import Unit
 
 WHITE = (255, 255, 255)
 GRAY = (200, 200, 200)
-TILE_SIZE = 40
+TILE_SIZE = 64
 TILES_X = 20
 TILES_Y = 20
 SCREEN_WIDTH = TILE_SIZE * TILES_X
@@ -43,9 +43,12 @@ def handle_right_click(pos):
             selected_tile.unit.attack(target_tile.unit)
         elif not target_tile.unit and not target_tile.structure:
             # Assume the player wants to build a farm for now
+            grid.selected_tile = target_tile
             selected_tile.unit.move(target_tile)
-        else:
-            selected_tile.unit.move(target_tile)
+        elif target_tile.unit:
+            if selected_tile.unit.player != target_tile.unit.player:
+                selected_tile.unit.fire(target_tile)
+            
 
 
 def check_game_end():
@@ -56,9 +59,9 @@ def check_game_end():
         return "Human Wins!"
     return None
 
-player_initial_pos = {1: (2, 2), 2: (TILES_X-3, TILES_Y-3)}
-players[1].add_unit(Unit(grid.tiles[player_initial_pos[1][0]][player_initial_pos[1][1]]))
-players[2].add_unit(Unit(grid.tiles[player_initial_pos[2][0]][player_initial_pos[2][1]]))
+player_initial_pos = {1: (2, 2), 2: (4, 2)}
+players[1].add_unit(Unit(grid.tiles[player_initial_pos[1][0]][player_initial_pos[1][1]], 1, grid))
+players[2].add_unit(Unit(grid.tiles[player_initial_pos[2][0]][player_initial_pos[2][1]], 2, grid))
 
 unit_info_label = pygame_gui.elements.UILabel(
     relative_rect=pygame.Rect((10, 10), (200, 40)),
@@ -86,6 +89,9 @@ def update_ui():
         unit_info_label.set_text(f"Health: 100  Points: {unit.action_points}")
 
 
+def mouse_move(event):
+    grid.mouse_over_tile = grid.get_tile_from_coords(event.pos[0], event.pos[1])
+
 # Main game loop
 running = True
 
@@ -94,6 +100,7 @@ def game_loop():
 
     # Main game loop
     running = True
+    mouse_pos = (0,0)
     while running:
         time_delta = pygame.time.Clock().tick(60) / 1000.0
         
@@ -112,7 +119,10 @@ def game_loop():
                     if event.ui_element == end_turn_button:
                         unit.action_points = 10
                         update_ui()
-            
+            if event.type == pygame.MOUSEMOTION:
+                mouse_pos = event.pos
+                mouse_move(event)
+
             manager.process_events(event)
 
         manager.update(time_delta)
@@ -120,7 +130,7 @@ def game_loop():
         grid.draw_grid()
         for player in players.values(): 
             for unit in player.units:
-                unit.update()
+                unit.update(mouse_pos[0], mouse_pos[1])
                 unit.draw()
             for structure in player.structures:
                 structure.draw()

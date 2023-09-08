@@ -2,37 +2,55 @@ import pygame
 import os
 
 class Animation:
-    def __init__(self, screen, base_folder, action_name, is_looping):
+    def __init__(self, screen, base_folder, action_name, is_looping, offset):
         self.screen = screen
         self.images = []
+        self.rects = []
         self.current_frame = 0
         self.frame_duration = 100  # in milliseconds, adjust as needed
         self.last_update = pygame.time.get_ticks()
         self.action_name = action_name
         self.is_looping = is_looping
-        self.is_playing = True
+        self.is_playing = False
         self.load_action(base_folder, action_name)
+        self.offset = offset
 
-    def rotate_image_without_black_border(self,image, angle_degrees):
-        # Create a new transparent surface larger than the original image
+    def get_current_rect(self):
+        return self.rects[self.current_frame]
+
+    def rotate_image(self, image, angle):
+        original_rect = image.get_rect()
+        rotated_rect = original_rect.copy()
+
         expanded_size = max(image.get_width(), image.get_height())
         new_surface = pygame.Surface((expanded_size, expanded_size), pygame.SRCALPHA, 32)
-        
-        # Blit the image to the center of the new surface
         new_surface.blit(image, (expanded_size // 2 - image.get_width() // 2, 
                                 expanded_size // 2 - image.get_height() // 2))
         
-        # Rotate the new surface
-        rotated_image = pygame.transform.rotate(new_surface, -angle_degrees)
-        
-        return rotated_image
+        rotated_image = pygame.transform.rotate(new_surface, angle)
+        rotated_rect.topleft = (original_rect.centerx - rotated_image.get_width() // 2, original_rect.centery - rotated_image.get_height() // 2)
 
+        return rotated_image, rotated_rect
 
     def draw(self, x, y, angle=0):
         image = self.images[self.current_frame]
-        rotated_image = self.rotate_image_without_black_border(image, -angle)
-        self.screen.blit(rotated_image, (x, y))        
+        rotated_image, rotated_rect = self.rotate_image(image, angle)
+        #outlined_sprite = self.get_outline(rotated_image, (255, 0, 0))  # Red outline, 2 pixels thick
+        rotated_rect.x += x + self.offset[0]
+        rotated_rect.y += y + self.offset[1]
+        self.screen.blit(rotated_image, rotated_rect.topleft)        
+        #self.screen.blit(outlined_sprite, (x, y))        
         #self.screen.blit(self.images[self.current_frame], (x, y))
+
+    def get_outline(self, image,color=(0,0,0)):
+        rect = image.get_rect()
+        mask = pygame.mask.from_surface(image)
+        outline = mask.outline(2)
+        outline_image = pygame.Surface(rect.size).convert_alpha()
+        outline_image.fill((0,0,0,0))
+        for point in outline:
+            outline_image.set_at(point,color)
+        return outline_image
 
     def is_finished(self):
         return self.current_frame == len(self.images) - 1
@@ -52,6 +70,7 @@ class Animation:
             img = pygame.image.load(base_folder + f'\\{action}\\Gunner{action}_' + str(formatted_number) + '.png')
             img.convert_alpha()
             img.set_colorkey((0, 0, 0))
+            self.rects.append(img.get_rect())
             self.images.append(img)
 
     def reset(self):
