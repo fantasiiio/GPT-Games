@@ -8,7 +8,7 @@ TILES_X = 14
 TILES_Y = 14
 GRID_WIDTH = TILE_SIZE * TILES_X
 GRID_HEIGHT = TILE_SIZE * TILES_Y
-SCREEN_HEIGHT = GRID_HEIGHT
+GRID_HEIGHT = GRID_HEIGHT
 
 LEFT_PANEL_WIDTH = 340
 RIGHT_PANEL_WIDTH = 340
@@ -123,7 +123,7 @@ class DirectoryBrowser:
                 self.selected_thumbnail = thumbnail
 
     def highlight_selected_thumbnail(self):
-        from main import screen
+        from config import screen
         if self.selected_thumbnail:
             pygame.draw.rect(screen, pygame.Color('red'), self.selected_thumbnail.rect, 5)
 

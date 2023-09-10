@@ -2,7 +2,7 @@ import pygame
 import os
 
 class Animation:
-    def __init__(self, screen, base_folder, action_name, is_looping, offset, offset_angle):
+    def __init__(self, screen, base_folder, prefix, action_name, is_looping, offset, offset_angle):
         self.offset_angle = offset_angle
         self.screen = screen
         self.images = []
@@ -11,9 +11,10 @@ class Animation:
         self.frame_duration = 100  # in milliseconds, adjust as needed
         self.last_update = pygame.time.get_ticks()
         self.action_name = action_name
-        self.is_looping = is_looping
+        self.is_looping = is_looping # -1 = always, 0 = never, > 0 = number of times
+        self.loop_count = 0
         self.is_playing = False
-        self.load_action(base_folder, action_name)
+        self.load_action(base_folder, prefix ,action_name)
         self.offset = offset
 
     def get_current_rect(self):
@@ -70,6 +71,7 @@ class Animation:
         rotated_image_rect.y += self.offset[1]
         # rotate and blit the image
         surf.blit(rotated_image, rotated_image_rect)
+        return rotated_image, rotated_image_rect
 
 
 
@@ -79,7 +81,7 @@ class Animation:
         if rotation_center is None:
             rotation_center = image.get_rect().center
             
-        self.blitRotate(self.screen, image, (x,y), rotation_center, angle)
+        return self.blitRotate(self.screen, image, (x,y), rotation_center, angle)        
     
 
     def get_outline(self, image,color=(0,0,0)):
@@ -92,35 +94,49 @@ class Animation:
             outline_image.set_at(point,color)
         return outline_image
 
-    def is_finished(self):
+    def is_finished(self):        
+        if self.is_looping == -1:
+            return False
+        if self.is_looping > 0 and self.loop_count >= self.is_looping:
+            return True
+            
         return self.current_frame == len(self.images) - 1
 
     def stop(self):
         self.is_playing = False
 
     def play(self):
+        self.reset()
         self.is_playing = True
         self.current_frame = 0
 
-    def load_action(self, base_folder, action):
+    def load_action(self, base_folder, prefix, action):
         # count number of files in folder
         file_count = len([f for f in os.listdir(base_folder + f'\\{action}\\') if os.path.isfile(os.path.join(base_folder + f'\\{action}\\', f))])
         for i in range(1, file_count+1):
             formatted_number = str(i).zfill(2)
-            img = pygame.image.load(base_folder + f'\\{action}\\Gunner{action}_' + str(formatted_number) + '.png')
+            file_name = base_folder + f'\\{action}\\{prefix}{action}_' + str(formatted_number) + '.png'
+            # check if file exists
+            if not os.path.isfile(file_name):
+                continue
+            img = pygame.image.load(file_name)
             img.convert_alpha()
             img.set_colorkey((0, 0, 0))
             self.rects.append(img.get_rect())
             self.images.append(img)
 
     def reset(self):
+        self.loop_count = 0
         self.current_frame = 0
         self.last_update = pygame.time.get_ticks()
 
     def update(self, x, y):
         now = pygame.time.get_ticks()
         if self.is_playing and now - self.last_update > self.frame_duration:
-            if self.current_frame == len(self.images) - 1 and not self.is_looping:
+            if self.is_looping > 0 and self.loop_count >= self.is_looping:
                 return
+            if self.current_frame == len(self.images) - 1 and self.is_looping == 0:
+                return
+            self.loop_count += 1
             self.last_update = now
             self.current_frame = (self.current_frame + 1) % len(self.images)

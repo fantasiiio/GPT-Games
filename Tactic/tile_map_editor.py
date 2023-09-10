@@ -9,7 +9,7 @@ TILES_X = 14
 TILES_Y = 14
 GRID_WIDTH = TILE_SIZE * TILES_X
 GRID_HEIGHT = TILE_SIZE * TILES_Y
-SCREEN_HEIGHT = GRID_HEIGHT
+GRID_HEIGHT = GRID_HEIGHT
 
 LEFT_PANEL_WIDTH = 340
 RIGHT_PANEL_WIDTH = 340
@@ -104,12 +104,12 @@ current_selected_image = None
 
 class TileMapEditor:
     def __init__(self):
-        self.screen = pygame.display.set_mode((LEFT_PANEL_WIDTH + GRID_WIDTH + RIGHT_PANEL_WIDTH, SCREEN_HEIGHT))
+        self.screen = pygame.display.set_mode((LEFT_PANEL_WIDTH + GRID_WIDTH + RIGHT_PANEL_WIDTH, GRID_HEIGHT))
         pygame.display.set_caption('Tile Map Editor with Directory Tree Browser')
-        self.manager = pygame_gui.UIManager((LEFT_PANEL_WIDTH + GRID_WIDTH + RIGHT_PANEL_WIDTH, SCREEN_HEIGHT))
+        self.manager = pygame_gui.UIManager((LEFT_PANEL_WIDTH + GRID_WIDTH + RIGHT_PANEL_WIDTH, GRID_HEIGHT))
         
         # Directory Browser on the left
-        self.directory_browser = DirectoryBrowser(self.manager, (0, 0), (LEFT_PANEL_WIDTH, SCREEN_HEIGHT))
+        self.directory_browser = DirectoryBrowser(self.manager, (0, 0), (LEFT_PANEL_WIDTH, GRID_HEIGHT))
         
 
     def draw_grid(self):
@@ -126,8 +126,8 @@ class TileMapEditor:
         # Draw grid lines
         GRID_COLOR = (200, 200, 200)
         for x in range(0, GRID_WIDTH, TILE_SIZE):
-            pygame.draw.line(screen, GRID_COLOR, (x + LEFT_PANEL_WIDTH, 0), (x + LEFT_PANEL_WIDTH, SCREEN_HEIGHT))
-        for y in range(0, SCREEN_HEIGHT, TILE_SIZE):
+            pygame.draw.line(screen, GRID_COLOR, (x + LEFT_PANEL_WIDTH, 0), (x + LEFT_PANEL_WIDTH, GRID_HEIGHT))
+        for y in range(0, GRID_HEIGHT, TILE_SIZE):
             pygame.draw.line(screen, GRID_COLOR, (LEFT_PANEL_WIDTH, y), (GRID_WIDTH + LEFT_PANEL_WIDTH, y))
 
         if self.directory_browser.selected_thumbnail:

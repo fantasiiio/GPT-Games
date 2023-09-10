@@ -2,6 +2,7 @@
 import pygame
 import pytmx
 from pytmx.util_pygame import load_pygame
+from config import TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY
 
 class Tile:
     def __init__(self, x, y):
@@ -11,7 +12,7 @@ class Tile:
         self.structure = None
         self.image = None
         self.no_walk = False
-
+        self.rect = pygame.Rect(x * 64, y * 64, 64, 64)
         #self.image = pygame.image.load("path_to_tile_image.png")
         # width = self.image.get_width
         # height = self.image.get_height
@@ -44,7 +45,6 @@ class Tile:
 
 class Grid:
     def __init__(self, pygame, screen, file_name):
-        from main import pygame,screen, TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT, TILES_X, TILES_Y, GRAY
         self.pygame = pygame
         self.screen = screen
         self.tiles = None
@@ -52,6 +52,7 @@ class Grid:
         self.tile_width = 0
         self.load_tmx_map(file_name)
         self.mouse_over_tile = None
+        self.highlighted_tiles = []
 
     def load_tmx_map(self, filename):
         tmx_data = load_pygame(filename)
@@ -72,8 +73,10 @@ class Grid:
                     self.tiles[x][y].x = x
                     self.tiles[x][y].y = y
 
+    def update(self):
+        self.highlight_tiles = []
+
     def get_tile_from_coords(self,x, y):
-        from main import pygame,screen, TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT, TILES_X, TILES_Y, GRAY
         tile_x = x // TILE_SIZE
         tile_y = y // TILE_SIZE
         # Return the corresponding tile object (this assumes you have a 2D list of tiles representing your map)
@@ -81,7 +84,6 @@ class Grid:
 
     def tiles_in_range_manhattan(self, x, y, r):
         r = int(r)
-        from main import pygame,screen, TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT, TILES_X, TILES_Y, GRAY        
         max_x = TILES_X * TILE_SIZE
         max_y = TILES_Y * TILE_SIZE
         tiles = []
@@ -92,8 +94,15 @@ class Grid:
                     tiles.append((new_x, new_y))
         return tiles
 
-    def highlight_tiles(self, unit_position, range, color):
-        from main import pygame,screen, TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT, TILES_X, TILES_Y, GRAY    
+    def posision_is_in_grid(self, x, y):
+        if x < 0 or y < 0:
+            return False
+        if x >= TILES_X or y >= TILES_Y:
+            return False
+        return True
+
+    def highlight_tiles(self, unit_position, range, color, select_units = False):
+        self.highlighted_tiles = []
         TILE_SIZE = 64  # assuming each tile is 32x32 pixels
         highlight_surface = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
         highlight_surface.fill(color)
@@ -101,11 +110,13 @@ class Grid:
 
         tiles = self.tiles_in_range_manhattan(unit_position[0], unit_position[1], range)
         for tile_pos in tiles:
-            tile = self.tiles[int(tile_pos[0])][int(tile_pos[1])]
-            if self.is_passable(tile.x, tile.y):
-                screen.blit(highlight_surface, (tile.x * TILE_SIZE, tile.y * TILE_SIZE), special_flags=pygame.BLEND_RGB_SUB)
+            if self.posision_is_in_grid(tile_pos[0], tile_pos[1]):
+                tile = self.tiles[int(tile_pos[0])][int(tile_pos[1])]
+                if self.is_passable(tile.x, tile.y, select_units):
+                    self.highlighted_tiles.append(tile)
+                    self.screen.blit(highlight_surface, (tile.x * TILE_SIZE, tile.y * TILE_SIZE), special_flags=pygame.BLEND_RGB_SUB)
 
-    def is_passable(self, x, y):
+    def is_passable(self, x, y, select_units):
 
         tile = self.tiles[x][y]
 
@@ -114,7 +125,7 @@ class Grid:
             return False
 
         # Check for other units
-        if tile.unit is not None:
+        if not select_units and tile.unit is not None:
             return False
 
         # Check for structures
@@ -125,21 +136,20 @@ class Grid:
 
 
     def draw_grid(self):
-        from main import pygame,screen, TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT, TILES_X, TILES_Y, GRAY
         """Draw a simple grid on the screen."""
         for x in range(0, TILES_X):
             for y in range(0, TILES_Y):
                 image = self.tiles[x][y].image
                 if self.tiles[x][y].image:
-                    screen.blit(image, (x * image.get_width(), y * image.get_height()))
+                    self.screen.blit(image, (x * image.get_width(), y * image.get_height()))
+                
                 self.pygame.draw.rect(self.screen, GRAY, (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 1)
                 if self.mouse_over_tile and self.mouse_over_tile.x == x and self.mouse_over_tile.y == y:
                     self.pygame.draw.rect(self.screen, (255, 255, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
                 if self.selected_tile and self.selected_tile.x == x and self.selected_tile.y == y:
-                    self.pygame.draw.rect(self.screen, (255, 0, 0), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
+                    self.pygame.draw.rect(self.screen, (0, 0, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
 
     def get_adjacent_tile(self, unit, direction):
-        from main import pygame,screen, TILE_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT, TILES_X, TILES_Y, GRAY
         """
         Return the tile adjacent to the given unit in the specified direction.
         """
@@ -155,7 +165,48 @@ class Grid:
             x += TILE_SIZE
 
         # Ensure the coordinates are within the map boundaries
-        if 0 <= x < SCREEN_WIDTH and 0 <= y < SCREEN_HEIGHT:
+        if 0 <= x < GRID_WIDTH and 0 <= y < GRID_HEIGHT:
             return self.tiles[x // TILE_SIZE][y // TILE_SIZE]
         else:
             return None                    
+
+    def draw_selected_perimeter(self):
+        line_width = 5
+        #transformed_shape = piece_cache[piece.shape_id][piece.orientation][piece.mirror]['transformed_shape']
+        
+        # Draw perimeter line for the transformed shape
+        for i, row in enumerate(self.tiles):
+            for j, cell in enumerate(row):
+                if cell:
+                    for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                        neighbor_x, neighbor_y = j + dx, i + dy
+                        
+                        # Check if the neighboring cell is outside the piece
+                        if 0 <= neighbor_x < len(row) and 0 <= neighbor_y < GRID_WIDTH:
+                            if self.tiles[neighbor_y][neighbor_x].unit is not None:
+                                is_empty_inside = False
+                            is_empty_inside = self.tiles[neighbor_y][neighbor_x] == 0
+                        else:
+                            is_empty_inside = True  # Treat cells outside the shape boundary as empty
+                        
+                        if is_empty_inside:
+                            if dx == -1:
+                                pygame.draw.line(self.screen, color,
+                                                [(x + j) * self.cell_size, (y + i) * self.cell_size],
+                                                [(x + j) * self.cell_size, (y + i + 1) * self.cell_size],
+                                                line_width)
+                            elif dx == 1:
+                                pygame.draw.line(self.screen, color,
+                                                [(x + j + 1) * self.cell_size, (y + i) * self.cell_size],
+                                                [(x + j + 1) * self.cell_size, (y + i + 1) * self.cell_size],
+                                                line_width)
+                            elif dy == -1:
+                                pygame.draw.line(self.screen, color,
+                                                [(x + j) * self.cell_size, (y + i) * self.cell_size],
+                                                [(x + j + 1) * self.cell_size, (y + i) * self.cell_size],
+                                                line_width)
+                            elif dy == 1:
+                                pygame.draw.line(self.screen, color,
+                                                [(x + j) * self.cell_size, (y + i + 1) * self.cell_size],
+                                                [(x + j + 1) * self.cell_size, (y + i + 1) * self.cell_size],
+                                                line_width)            

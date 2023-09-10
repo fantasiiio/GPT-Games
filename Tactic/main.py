@@ -4,22 +4,21 @@ import pygame_gui
 import sys
 from grid import Grid 
 from Player import Player 
-from Unit import Unit
+from Soldier import Soldier
+from BTR import BTR
+import pygame.mixer
+from config import screen, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY
 
-WHITE = (255, 255, 255)
-GRAY = (200, 200, 200)
-TILE_SIZE = 64
-TILES_X = 20
-TILES_Y = 20
-SCREEN_WIDTH = TILE_SIZE * TILES_X
-SCREEN_HEIGHT = TILE_SIZE * TILES_Y
+pygame.mixer.init()
+
+
 
 # Initialize pygame
 pygame.init()
 # Set up the display
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+screen = pygame.display.set_mode((GRID_WIDTH, GRID_HEIGHT))
 pygame.display.set_caption('Strategy Game')
-manager = pygame_gui.UIManager((SCREEN_WIDTH, SCREEN_HEIGHT))
+manager = pygame_gui.UIManager((GRID_WIDTH, GRID_HEIGHT))
 
 grid = Grid(pygame, screen, "C:\\dev-fg\\tiled-test\\terrain1.tmx")
 players = {1: Player(1, True), 2: Player(2, False)}
@@ -30,24 +29,27 @@ def handle_mouse_click(pos):
     clicked_tile = grid.get_tile_from_coords(x, y)
     
     if clicked_tile != selected_tile:
-        grid.selected_tile = clicked_tile
+        # If the clicked tile has a unit and he is doing an action, don't change the selected tile
+        if not (grid.selected_tile and grid.selected_tile.unit and grid.selected_tile.unit.current_action != None):
+            grid.selected_tile = clicked_tile
     else:
-        grid.selected_tile = None  # Deselect if the same tile is clicked again
+        if not (grid.selected_tile and grid.selected_tile.unit):
+            grid.selected_tile = None  # Deselect if the same tile is clicked again
 
 def handle_right_click(pos):
     selected_tile = grid.selected_tile
     if selected_tile and selected_tile.unit:
         x, y = pos
         target_tile = grid.get_tile_from_coords(x, y)
-        if target_tile.unit and selected_tile.unit.can_attack(target_tile):
-            selected_tile.unit.attack(target_tile.unit)
-        elif not target_tile.unit and not target_tile.structure:
-            # Assume the player wants to build a farm for now
-            grid.selected_tile = target_tile
-            selected_tile.unit.move(target_tile)
-        elif target_tile.unit:
-            if selected_tile.unit.player != target_tile.unit.player:
-                selected_tile.unit.fire(target_tile)
+        # if target_tile.unit and selected_tile.unit.can_attack(target_tile):
+        #     selected_tile.unit.attack(target_tile.unit)
+        # elif not target_tile.unit and not target_tile.structure:
+        #     # Assume the player wants to build a farm for now
+        #     grid.selected_tile = target_tile
+        #     selected_tile.unit.move(target_tile)
+        # elif target_tile.unit:
+        #     if selected_tile.unit.player != target_tile.unit.player:
+        #         selected_tile.unit.fire(target_tile)
             
 
 
@@ -60,8 +62,10 @@ def check_game_end():
     return None
 
 player_initial_pos = {1: (2, 2), 2: (4, 2)}
-players[1].add_unit(Unit(grid.tiles[player_initial_pos[1][0]][player_initial_pos[1][1]], 1, grid, screen=screen))
-players[2].add_unit(Unit(grid.tiles[player_initial_pos[2][0]][player_initial_pos[2][1]], 2, grid, screen=screen))
+players[1].add_unit(Soldier(grid.tiles[player_initial_pos[1][0]][player_initial_pos[1][1]], 1, grid, screen=screen, gun_sound_file="assets\\sounds\\pistol.wav"))
+players[1].add_unit(BTR(grid.tiles[6][6], 1, grid, screen=screen, gun_sound_file="assets\\sounds\\machinegun.wav"))
+
+players[2].add_unit(Soldier(grid.tiles[player_initial_pos[2][0]][player_initial_pos[2][1]], 2, grid, screen=screen, gun_sound_file="assets\\sounds\\pistol.wav"))
 
 unit_info_label = pygame_gui.elements.UILabel(
     relative_rect=pygame.Rect((10, 10), (200, 40)),
@@ -70,13 +74,13 @@ unit_info_label = pygame_gui.elements.UILabel(
 )
 
 end_turn_button = pygame_gui.elements.UIButton(
-    relative_rect=pygame.Rect((SCREEN_WIDTH - 110, 10), (100, 30)),
+    relative_rect=pygame.Rect((GRID_WIDTH - 110, 10), (100, 30)),
     text='End Turn',
     manager=manager
 )
 
 action_info_label = pygame_gui.elements.UILabel(
-    relative_rect=pygame.Rect((SCREEN_WIDTH - 310, 10), (200, 40)),
+    relative_rect=pygame.Rect((GRID_WIDTH - 310, 10), (200, 40)),
     text="Actions: Move (1), Attack (2)",
     manager=manager
 )
@@ -124,13 +128,16 @@ def game_loop():
                 mouse_move(event)
 
             manager.process_events(event)
+            for player in players.values(): 
+                for unit in player.units:
+                    unit.process_events(event)
 
         manager.update(time_delta)
 
         grid.draw_grid()
         for player in players.values(): 
             for unit in player.units:
-                unit.update(mouse_pos[0], mouse_pos[1])
+                unit.update(mouse_pos)
                 unit.draw()
             for structure in player.structures:
                 structure.draw()

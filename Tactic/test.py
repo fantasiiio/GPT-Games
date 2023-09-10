@@ -4,8 +4,8 @@ import pygame_gui
 import random
 import os
 # Constants
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 600
+GRID_WIDTH = 800
+GRID_HEIGHT = 600
 PANEL_WIDTH = 70
 PANEL_HEIGHT = 400
 # Define some constants for displaying the images
