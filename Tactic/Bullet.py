@@ -4,7 +4,7 @@ from Animation import Animation
 from config import TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY
 
 class Bullet:
-    def __init__(self, x, y, angle, screen, speed=5, target_tile = None, base_folder = "", filename="bullet.png"):
+    def __init__(self, x, y, angle, screen, speed=5, target_tile = None, base_folder = "", filename="bullet.png", damage = 1):
         self.screen = screen
         self.target_tile = target_tile
         self.offset = (0,0)
@@ -12,16 +12,17 @@ class Bullet:
         self.y = y
         self.angle = angle
         self.speed = speed
+        self.damage = damage
         #self.animation = Animation(screen, base_folder, filename, False, (32,32))
-        self.offset = (32, 32)
+        #self.offset = (32, 32)
         self.target_reached = False
 
     def update(self):
         # Update bullet position based on angle and speed
         self.x += self.speed * math.cos(math.radians(self.angle))
         self.y += self.speed * math.sin(math.radians(self.angle))
-        target_x = self.target_tile.x * TILE_SIZE
-        target_y = self.target_tile.y * TILE_SIZE
+        target_x = self.target_tile.x * TILE_SIZE + 32
+        target_y = self.target_tile.y * TILE_SIZE + 32
         delta_x, delta_y = target_x - self.x, target_y - self.y
         distance = math.sqrt((delta_x)**2 + (delta_y)**2)
         if distance < self.speed:
@@ -29,5 +30,5 @@ class Bullet:
             
 
     def draw(self):
-        pygame.draw.circle(self.screen, (0,0,0), (self.x + self.offset[0], self.y + self.offset[1]), 2)
+        pygame.draw.circle(self.screen, (0,0,0), (self.x , self.y ), 2)
         #self.animation.draw(self.x, self.y, self.angle)

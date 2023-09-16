@@ -10,7 +10,8 @@ import pygame.mixer
 class Unit:
 
     
-    def __init__(self, target_tile, player, grid, unit_type='soldier', action_points=30, base_folder='assets\\images\\Gunner', screen=None, gun_sound_file=None):
+    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Gunner', screen=None):
+        gun_sound_file="assets\\sounds\\machinegun.wav"
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
         self.screen = screen
         self.max_move = 5
@@ -19,12 +20,7 @@ class Unit:
         self.is_alive = True
         self.base_folder = base_folder
         self.player = player
-        self.health = 100
-        self.max_health = self.health
-        from config import TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y
-        self.unit_type = unit_type
-        self.action_points = action_points
-        self.max_action_points = action_points        
+        from config import TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y    
         self.target_screen_x = None  # Target position for movement
         self.target_screen_y = None
         self.x, self.y = self.calc_screen_pos(target_tile.x, target_tile.y)  
@@ -40,6 +36,7 @@ class Unit:
         self.bullets = []
         self.action_rects = []
         self.action_menu_rect = None
+        pass
 
     @abstractmethod
     def draw_actions_menu(self):

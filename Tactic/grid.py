@@ -1,4 +1,4 @@
-
+from collections import deque
 import pygame
 import pytmx
 from pytmx.util_pygame import load_pygame
@@ -12,6 +12,7 @@ class Tile:
         self.structure = None
         self.image = None
         self.no_walk = False
+        self.properties = []
         self.rect = pygame.Rect(x * 64, y * 64, 64, 64)
         #self.image = pygame.image.load("path_to_tile_image.png")
         # width = self.image.get_width
@@ -54,6 +55,15 @@ class Grid:
         self.mouse_over_tile = None
         self.highlighted_tiles = []
 
+    def get_tiles_with_property(self, property_name, property_value):
+        tiles = []
+        for x in range(TILES_X):
+            for y in range(TILES_Y):
+                tile = self.tiles[x][y]
+                if tile.properties and tile.properties.get(property_name):
+                    tiles.append(tile)
+        return tiles
+
     def load_tmx_map(self, filename):
         tmx_data = load_pygame(filename)
         self.tile_width = tmx_data.tilewidth
@@ -68,7 +78,8 @@ class Grid:
                     if properties is not None:
                         no_walk = properties.get('no_walk', "False")
                         if no_walk == "True":
-                            self.tiles[x][y].no_walk = True                    
+                            self.tiles[x][y].no_walk = True
+                            self.tiles[x][y].properties = properties                    
                     self.tiles[x][y].image = tile
                     self.tiles[x][y].x = x
                     self.tiles[x][y].y = y
@@ -94,48 +105,170 @@ class Grid:
                     tiles.append((new_x, new_y))
         return tiles
 
-    def posision_is_in_grid(self, x, y):
+    def position_is_in_grid(self, x, y):
         if x < 0 or y < 0:
             return False
         if x >= TILES_X or y >= TILES_Y:
             return False
         return True
 
-    def highlight_tiles(self, unit_position, range, color, select_units = False):
-        self.highlighted_tiles = []
-        TILE_SIZE = 64  # assuming each tile is 32x32 pixels
-        highlight_surface = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
-        highlight_surface.fill(color)
+    def manhattan_path(self, start, end):
+        x1, y1 = start
+        x2, y2 = end
+        path = []
 
+        # Move in the x direction
+        while x1 < x2:
+            path.append((x1, y1))
+            x1 += 1
+        while x1 > x2:
+            path.append((x1, y1))
+            x1 -= 1
+
+        # Move in the y direction
+        while y1 < y2:
+            path.append((x1, y1))
+            y1 += 1
+        while y1 > y2:
+            path.append((x1, y1))
+            y1 -= 1
+
+        # Add the end point
+        path.append(end)
+
+        return path
+
+    def draw_text_with_border(self, screen, text, font, x, y, text_color, border_color, border_thickness=1):
+        # Render and draw the border
+        for offset_x in range(-border_thickness, border_thickness + 1):
+            for offset_y in range(-border_thickness, border_thickness + 1):
+                border_text = font.render(text, True, border_color)
+                screen.blit(border_text, (x + offset_x, y + offset_y))
+        
+        # Render and draw the main text
+        main_text = font.render(text, True, text_color)
+        screen.blit(main_text, (x, y))
+
+    def draw_path(self, path, color):
+        if not self.selected_tile.unit:
+            return        
+        
+        for index, tile in enumerate(path):
+            if index > self.selected_tile.unit.fire_range+1:
+                return
+            
+            if index == 0:
+                continue
+            # Create a fresh surface for this tile
+            highlight_surface = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+            
+            highlight_color = (color[0], color[1], color[2], 110)  # Example: more opaque color for tiles with units
+            
+            # Fill the surface with the determined color
+            highlight_surface.fill(highlight_color)
+            
+            # Draw the tile with the chosen color
+            self.screen.blit(highlight_surface, (tile[0] * TILE_SIZE, tile[1] * TILE_SIZE))            
+            #self.pygame.draw.rect(self.screen, (255, 0, 0), (tile[0]*TILE_SIZE, tile[1]*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
+
+            # decide if the text will be dra on top or below the tile
+            start = path[0]
+            action_pos = None
+            if len(path) > 1:
+                if start[1] - path[1][1] > 0:
+                    action_pos = (start[0]* TILE_SIZE, start[1] * TILE_SIZE + TILE_SIZE)
+                else:
+                    action_pos = (start[0]* TILE_SIZE, start[1] * TILE_SIZE - TILE_SIZE)
+
+            if action_pos:
+                font = pygame.font.SysFont(None, 25)
+                action_cost = self.selected_tile.unit.move_cost * min(len(path)-1, self.selected_tile.unit.max_move)
+                self.draw_text_with_border(self.screen, f"Cost: {action_cost}", font, action_pos[0], action_pos[1], (255, 255, 255), (0, 0, 0), 2)
+
+    def update(self, inputs):
+        selected_tile = self.selected_tile
+        x, y = inputs.mouse.pos
+        clicked_tile = self.get_tile_from_coords(x, y)
+        self.mouse_over_tile = self.get_tile_from_coords(x, y)
+        if inputs.mouse.clicked[0]:
+            if clicked_tile != selected_tile:
+                if selected_tile and selected_tile.unit and selected_tile.unit.current_action is not None:
+                    return
+                if not (clicked_tile.unit and clicked_tile.unit.current_action != None):
+                    self.selected_tile = clicked_tile
+            else:
+                if not (self.selected_tile and self.selected_tile.unit):
+                    self.selected_tile = None  
+
+
+
+    def highlight_tiles(self, unit_position, range, color, action):
+        self.highlighted_tiles = []
+        TILE_SIZE = 64  # assuming each tile is 64x64 pixels
 
         tiles = self.tiles_in_range_manhattan(unit_position[0], unit_position[1], range)
         for tile_pos in tiles:
-            if self.posision_is_in_grid(tile_pos[0], tile_pos[1]):
+            if self.position_is_in_grid(tile_pos[0], tile_pos[1]):  # corrected typo: posision -> position
                 tile = self.tiles[int(tile_pos[0])][int(tile_pos[1])]
-                if self.is_passable(tile.x, tile.y, select_units):
+                if self.is_passable(tile.x, tile.y, action):
                     self.highlighted_tiles.append(tile)
-                    self.screen.blit(highlight_surface, (tile.x * TILE_SIZE, tile.y * TILE_SIZE), special_flags=pygame.BLEND_RGB_SUB)
+                    
+                    # Create a fresh surface for this tile
+                    highlight_surface = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+                    
+                    # Check conditions to determine the color of the tile
+                    if tile.unit is not None:
+                        highlight_color = (color[0], color[1], color[2], 200)  # Example: more opaque color for tiles with units
+                    else:
+                        highlight_color = color  # Default color
+                    
+                    # Fill the surface with the determined color
+                    highlight_surface.fill(highlight_color)
+                    
+                    # Draw the tile with the chosen color
+                    self.screen.blit(highlight_surface, (tile.x * TILE_SIZE, tile.y * TILE_SIZE))
+       
 
-    def is_passable(self, x, y, select_units):
+
+
+    def is_passable(self, x, y, action):
 
         tile = self.tiles[x][y]
 
-        # Check for impassable terrain
-        if tile.no_walk:
+        # Check for other units
+        if tile == self.selected_tile:
             return False
 
-        # Check for other units
-        if not select_units and tile.unit is not None:
+        if action == "choosing_move_target" and tile.unit is not None:
+            if tile.unit and tile.unit.player == self.selected_tile.unit.player:
+                if (tile.unit.type == "Tank" and tile.unit.seat_left >  0) or (tile.unit.type == "Boat" and tile.unit.seat_left >  0):
+                    return True
             return False
+        
+        if action == "choosing_move_target" and self.selected_tile.unit and self.selected_tile.unit.type == "Boat":
+            if not tile.properties or not tile.properties["type"] == "water":
+                return False
+
+        if action == "choosing_fire_target" and self.selected_tile.unit and tile.unit is not None and tile.unit.player == self.selected_tile.unit.player:
+            return False
+
+        # if action == "choosing_fire_target" and tile.unit is not None and tile.unit.type == "Tank" and tile.unit.driver:
+        #     return False
 
         # Check for structures
         if tile.structure is not None:
             return False
 
+        # Check for impassable terrain
+        if not self.selected_tile.unit or self.selected_tile.unit.type != "Boat":
+            if tile.no_walk:
+                return False
+
+
         return True
 
 
-    def draw_grid(self):
+    def draw_grid(self, inputs):
         """Draw a simple grid on the screen."""
         for x in range(0, TILES_X):
             for y in range(0, TILES_Y):
@@ -148,6 +281,18 @@ class Grid:
                     self.pygame.draw.rect(self.screen, (255, 255, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
                 if self.selected_tile and self.selected_tile.x == x and self.selected_tile.y == y:
                     self.pygame.draw.rect(self.screen, (0, 0, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
+        
+        selected_tile = self.selected_tile
+        x, y = inputs.mouse.pos
+        clicked_tile = self.get_tile_from_coords(x, y)        
+        if selected_tile and selected_tile.unit and selected_tile.unit.current_action == "choosing_move_target":
+            path = self.manhattan_path((selected_tile.x, selected_tile.y), (clicked_tile.x, clicked_tile.y))
+            touching = False
+            for tile in self.highlighted_tiles:
+                if tile.x == path[-1][0] and tile.y == path[-1][1]:
+                    touching = True
+            if touching:
+                self.draw_path(path, (0, 100, 0, 150))                    
 
     def get_adjacent_tile(self, unit, direction):
         """

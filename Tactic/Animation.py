@@ -2,13 +2,13 @@ import pygame
 import os
 
 class Animation:
-    def __init__(self, screen, base_folder, prefix, action_name, is_looping, offset, offset_angle):
+    def __init__(self, screen, base_folder, prefix, action_name, is_looping, offset, offset_angle, total_loop_time=None, frame_duration = 100):
         self.offset_angle = offset_angle
         self.screen = screen
         self.images = []
         self.rects = []
         self.current_frame = 0
-        self.frame_duration = 100  # in milliseconds, adjust as needed
+        self.frame_duration = frame_duration  # in milliseconds, adjust as needed
         self.last_update = pygame.time.get_ticks()
         self.action_name = action_name
         self.is_looping = is_looping # -1 = always, 0 = never, > 0 = number of times
@@ -16,6 +16,15 @@ class Animation:
         self.is_playing = False
         self.load_action(base_folder, prefix ,action_name)
         self.offset = offset
+        self.frames_count = 0
+
+        if total_loop_time:
+            self.frames_required = total_loop_time // self.frame_duration
+        else:
+            self.frames_required = None
+
+        
+        self.time_played = 0  # Initialize the time_played to zero
 
     def get_current_rect(self):
         return self.rects[self.current_frame]
@@ -44,7 +53,8 @@ class Animation:
 
         return rotated_image, rotated_rect
 
-    def blitRotate(self, surf, image, pos, originPos, angle):
+    def blitRotate(self, surf, image, pos, originPos, angle, offset = None):
+        offset = self.offset if offset is None else offset
         angle += self.offset_angle
         # offset from pivot to center
         image_rect = image.get_rect(topleft = (pos[0] - originPos[0], pos[1]-originPos[1]))
@@ -67,8 +77,8 @@ class Animation:
         rotated_image = pygame.transform.rotate(new_surface, angle)
         rotated_image_rect = rotated_image.get_rect(center = rotated_image_center)
 
-        rotated_image_rect.x += self.offset[0]
-        rotated_image_rect.y += self.offset[1]
+        rotated_image_rect.x += offset[0]
+        rotated_image_rect.y += offset[1]
         # rotate and blit the image
         surf.blit(rotated_image, rotated_image_rect)
         return rotated_image, rotated_image_rect
@@ -76,12 +86,12 @@ class Animation:
 
 
 
-    def draw(self, x, y, angle=0, rotation_center=None):
+    def draw(self, x, y, angle=0, rotation_center=None, offset=None):
         image = self.images[self.current_frame]
         if rotation_center is None:
             rotation_center = image.get_rect().center
             
-        return self.blitRotate(self.screen, image, (x,y), rotation_center, angle)        
+        return self.blitRotate(self.screen, image, (x,y), rotation_center, angle, offset)        
     
 
     def get_outline(self, image,color=(0,0,0)):
@@ -96,11 +106,23 @@ class Animation:
 
     def is_finished(self):        
         if self.is_looping == -1:
+            print("Looping indefinitely.")
             return False
+        
         if self.is_looping > 0 and self.loop_count >= self.is_looping:
+            print("Finished based on loop count.")
             return True
-            
-        return self.current_frame == len(self.images) - 1
+
+        if self.current_frame and self.current_frame >= self.frames_required:
+            print(f"Finished based on current_frame. Current Frame: {self.current_frame}, Frames Required: {self.frames_required}")
+            return True
+        
+        if self.current_frame == len(self.images) - 1:
+            print("Finished animation sequence.")
+            return True
+
+        print("Animation not finished yet.")
+        return False          
 
     def stop(self):
         self.is_playing = False
@@ -121,22 +143,40 @@ class Animation:
                 continue
             img = pygame.image.load(file_name)
             img.convert_alpha()
-            img.set_colorkey((0, 0, 0))
+            # img.set_colorkey((0, 0, 0))
             self.rects.append(img.get_rect())
             self.images.append(img)
+        if not self.images:
+            raise ValueError(f"No images loaded for {base_folder}, {prefix}, {action}")
+            return
 
     def reset(self):
         self.loop_count = 0
         self.current_frame = 0
+        self.time_played = 0
         self.last_update = pygame.time.get_ticks()
+        self.frames_count = 0
 
     def update(self, x, y):
         now = pygame.time.get_ticks()
         if self.is_playing and now - self.last_update > self.frame_duration:
             if self.is_looping > 0 and self.loop_count >= self.is_looping:
+                print("Stopped based on loop count.")
+                self.stop()
                 return
-            if self.current_frame == len(self.images) - 1 and self.is_looping == 0:
+            
+            if self.frames_required and self.frames_count >= self.frames_required:
+                print(f"Stopped based on frames_required. {self.frames_count}/{self.frames_required}")
+                self.stop()
                 return
+            
+            if not self.frames_required and self.frames_count == len(self.images) - 1 and self.is_looping == 0:
+                print("Stopped based on animation sequence.")
+                self.stop()
+                return
+            
+            self.time_played += now - self.last_update
             self.loop_count += 1
             self.last_update = now
             self.current_frame = (self.current_frame + 1) % len(self.images)
+            self.frames_count += 1
