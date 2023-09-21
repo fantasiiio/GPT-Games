@@ -1,3 +1,4 @@
+#from SpriteLayer import SpriteLayers
 from Helicopter import Helicopter
 import random
 import pygame
@@ -42,10 +43,12 @@ def check_game_end():
         return "Human Wins!"
     return None
 
+#SpriteLayers.add_layer("top")
+
 player_initial_pos = {1: (2, 2), 2: (4, 2)}
-players[1].add_unit(Soldier(grid.tiles[4][15], 1, grid, screen=screen))
+players[1].add_unit(Soldier(grid.tiles[5][16], 1, grid, screen=screen))
 players[1].add_unit(Soldier(grid.tiles[14][15], 1, grid, screen=screen))
-players[1].add_unit(Tank(grid.tiles[6][14], 1, grid, screen=screen))
+players[1].add_unit(Tank(grid.tiles[6][16], 1, grid, screen=screen))
 players[1].add_unit(Helicopter(grid.tiles[17][15], 1, grid, screen=screen))
 
 for i in range(1):
@@ -126,12 +129,25 @@ def game_loop():
 
         grid.update(inputs)
         grid.draw_grid(inputs)
-        for player in players.values(): 
+        for player in players.values():             
             for unit in player.units:
+                if grid.selected_tile and unit == grid.selected_tile.unit:
+                    continue
                 unit.update(inputs)
                 unit.draw()
             for structure in player.structures:
                 structure.draw()
+
+        
+        if grid.selected_tile:
+            unit = grid.selected_tile.unit
+            if unit:
+                unit.update(inputs)
+                unit.draw()
+
+
+        #SpriteLayers.draw(screen)
+
         manager.draw_ui(screen)
 
         pygame.display.flip()

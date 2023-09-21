@@ -53,7 +53,7 @@ class Animation:
 
         return rotated_image, rotated_rect
 
-    def blitRotate(self, surf, image, pos, originPos, angle, offset = None):
+    def blitRotate(self, image, pos, originPos, angle, offset = None):
         offset = self.offset if offset is None else offset
         angle += self.offset_angle
         # offset from pivot to center
@@ -79,19 +79,25 @@ class Animation:
 
         rotated_image_rect.x += offset[0]
         rotated_image_rect.y += offset[1]
-        # rotate and blit the image
-        surf.blit(rotated_image, rotated_image_rect)
         return rotated_image, rotated_image_rect
 
 
 
 
-    def draw(self, x, y, angle=0, rotation_center=None, offset=None):
+    def draw(self, x, y, angle=0, rotation_center=None, offset=None, outline_color=None, outline_thickness=None):
         image = self.images[self.current_frame]
         if rotation_center is None:
             rotation_center = image.get_rect().center
             
-        return self.blitRotate(self.screen, image, (x,y), rotation_center, angle, offset)        
+        rotated_image, rotated_image_rect = self.blitRotate(image, (x,y), rotation_center, angle, offset)
+        if outline_color and outline_thickness:            
+            outlined = self.draw_outline(rotated_image, outline_color, outline_thickness)
+            self.screen.blit(outlined, rotated_image_rect)
+        else:
+            self.screen.blit(rotated_image, rotated_image_rect)
+
+        #pygame.draw.rect(self.screen, (255,0,0), rotated_image_rect, 1)
+                    
     
 
     def get_outline(self, image,color=(0,0,0)):
@@ -104,24 +110,46 @@ class Animation:
             outline_image.set_at(point,color)
         return outline_image
 
+    def draw_outline(self, image, outline_color, outline_thickness):
+        
+        # Create a mask from the sprite
+        mask = pygame.mask.from_surface(image)
+        
+        # Get the outline points from the mask
+        outline_points = mask.outline()
+        
+        # Create a new surface to draw the outlined sprite
+        outlined_surface = pygame.Surface((image.get_width() + 2 * outline_thickness,
+                                        image.get_height() + 2 * outline_thickness),
+                                        pygame.SRCALPHA)
+        
+        # Draw the outline
+        for point in outline_points:
+            pygame.draw.circle(outlined_surface, outline_color, (point[0] + outline_thickness, point[1] + outline_thickness), outline_thickness)
+        
+        # Draw the sprite over the outline
+        outlined_surface.blit(image, (outline_thickness, outline_thickness))
+        
+        return outlined_surface
+
     def is_finished(self):        
         if self.is_looping == -1:
-            print("Looping indefinitely.")
+            #print("Looping indefinitely.")
             return False
         
         if self.is_looping > 0 and self.loop_count >= self.is_looping:
-            print("Finished based on loop count.")
+            #print("Finished based on loop count.")
             return True
 
-        if self.current_frame and self.current_frame >= self.frames_required:
-            print(f"Finished based on current_frame. Current Frame: {self.current_frame}, Frames Required: {self.frames_required}")
+        if self.current_frame and self.frames_required and self.current_frame >= self.frames_required:
+            #print(f"Finished based on current_frame. Current Frame: {self.current_frame}, Frames Required: {self.frames_required}")
             return True
         
         if self.current_frame == len(self.images) - 1:
-            print("Finished animation sequence.")
+            #print("Finished animation sequence.")
             return True
 
-        print("Animation not finished yet.")
+        #print("Animation not finished yet.")
         return False          
 
     def stop(self):
@@ -161,17 +189,17 @@ class Animation:
         now = pygame.time.get_ticks()
         if self.is_playing and now - self.last_update > self.frame_duration:
             if self.is_looping > 0 and self.loop_count >= self.is_looping:
-                print("Stopped based on loop count.")
+                #print("Stopped based on loop count.")
                 self.stop()
                 return
             
             if self.frames_required and self.frames_count >= self.frames_required:
-                print(f"Stopped based on frames_required. {self.frames_count}/{self.frames_required}")
+                #print(f"Stopped based on frames_required. {self.frames_count}/{self.frames_required}")
                 self.stop()
                 return
             
             if not self.frames_required and self.frames_count == len(self.images) - 1 and self.is_looping == 0:
-                print("Stopped based on animation sequence.")
+                #print("Stopped based on animation sequence.")
                 self.stop()
                 return
             

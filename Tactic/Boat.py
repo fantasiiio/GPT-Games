@@ -35,11 +35,17 @@ class BoatCanon:
         # Convert list back to tuple
         center = tuple(lst)
 
+        outline_color=None
+        outline_thickness=None
+        if self.parent.player != self.parent.grid.current_player:
+            outline_color = (255,0,0)
+            outline_thickness = 2
+
         if self.current_animation == "Fire":
-            self.animations["Shot"].draw(self.x, self.y, -self.angle, (46, 32))
-            self.animations["Fire"].draw(self.x, self.y, -self.angle, (46,-10))
+            self.animations["Shot"].draw(self.x, self.y, -self.angle, (46, 32), outline_color ,outline_thickness)
+            self.animations["Fire"].draw(self.x, self.y, -self.angle, (46,-10), outline_color ,outline_thickness)
         else:
-            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, center)
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, center,(0,0), outline_color ,outline_thickness)
 
 
     def rotate_rect(self, rect, angle_degrees):
@@ -268,7 +274,11 @@ class Boat(Unit):
 
     
     def draw(self):
-        self.animations[self.current_animation].draw(self.x, self.y, -self.angle)
+        if self.player != self.grid.current_player:
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None, (255,0,0), 2)
+        else:
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None)
+        
         self.tower.draw()
         if self.seat_taken == 0:
             self_selected = False
@@ -277,7 +287,6 @@ class Boat(Unit):
             if self_selected:
                 bar_width = (SQUARE_SIZE+SQUARE_SPACING) * self.seats
                 self.draw_points_as_squares(self.x + 64 - bar_width, self.y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)                            
-            return
         
         rect = self.animations[self.current_animation].get_current_rect()
 
@@ -294,7 +303,7 @@ class Boat(Unit):
         self.draw_status_bar(status_bar_x, status_bar_y, self.health, self.max_health, HEALTH_COLOR)
         self.draw_status_bar(status_bar_x, status_bar_y + STATUS_BAR_HEIGHT, self.action_points, self.max_action_points, POINTS_COLOR) 
 
-        self.draw_points_left()
+        #self.draw_points_left()
 
         bar_width = (SQUARE_SIZE+SQUARE_SPACING) * self.seats
         self.draw_points_as_squares(self.x + 64 - bar_width, self.y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)

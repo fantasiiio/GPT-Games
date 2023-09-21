@@ -17,7 +17,7 @@ class Soldier(Unit):
 
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
         self.screen = screen
-        self.type = "Soldier"
+        self.type = "Soldier-Pistol"
         self.settings = get_unit_settings(self.type)
 
         self.MOVE_SPEED = self.settings["Speed"]
@@ -27,17 +27,17 @@ class Soldier(Unit):
         self.action_points = self.max_action_points  
         self.max_health = self.settings["Max HP"]
         self.health = self.max_health
-        self.NUM_BULLETS = self.settings["Pistol"]["Num Bullet Per Shot"]
-        self.BULLET_SPEED = self.settings["Pistol"]["Bullet Speed"]
-        self.FIRING_RATE = self.settings["Pistol"]["Firing Rate"]
-        self.fire_range = self.settings["Pistol"]["Max Attack Range"]
-        self.attack_damage = self.settings["Pistol"]["Damage"]
+        self.NUM_BULLETS = self.settings["Num Bullet Per Shot"]
+        self.BULLET_SPEED = self.settings["Bullet Speed"]
+        self.FIRING_RATE = self.settings["Firing Rate"]
+        self.fire_range = self.settings["Max Attack Range"]
+        self.attack_damage = self.settings["Damage"]
 
         self.name = pick_random_name()
         self.grid = grid
         self.is_alive = True
         self.move_cost = self.settings["Move Cost"]
-        self.fire_cost = self.settings["Pistol"]["Fire Cost"]
+        self.fire_cost = self.settings["Fire Cost"]
         self.actions = {"Move To":self.move_cost, "Fire":self}
 
         self.x, self.y = self.calc_screen_pos(target_tile.x, target_tile.y)  
@@ -183,7 +183,11 @@ class Soldier(Unit):
     def draw(self):
         if self.is_driver:
             return
-        self.animations[self.current_animation].draw(self.x, self.y, -self.angle)
+        if self.player != self.grid.current_player:
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None, (255,0,0), 2)
+        else:
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None)
+        # self.animations[self.current_animation].draw(self.x, self.y, -self.angle)
         if self.current_animation == "Fire":
             self.animations["GunEffect"].draw(self.x, self.y, -self.angle, (14,-15))
 
@@ -209,6 +213,8 @@ class Soldier(Unit):
 
         if self.current_action == "choosing_action":
             self.draw_actions_menu()
+
+        
         
 
     def draw_status_bar(self, x, y, current_value, max_value, color):

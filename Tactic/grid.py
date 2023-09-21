@@ -46,6 +46,8 @@ class Tile:
 
 class Grid:
     def __init__(self, pygame, screen, file_name):
+        self.offset = (0,0)
+        self.current_player = 2
         self.pygame = pygame
         self.screen = screen
         self.tiles = None
@@ -57,8 +59,8 @@ class Grid:
 
     def get_tiles_with_property(self, property_name, property_value):
         tiles = []
-        for x in range(TILES_X):
-            for y in range(TILES_Y):
+        for x in range(self.tiles_x):
+            for y in range(self.tiles_y):
                 tile = self.tiles[x][y]
                 if tile.properties and tile.properties.get(property_name):
                     tiles.append(tile)
@@ -68,6 +70,8 @@ class Grid:
         tmx_data = load_pygame(filename)
         self.tile_width = tmx_data.tilewidth
         self.tile_height = tmx_data.tileheight          
+        self.tiles_x = tmx_data.width
+        self.tiles_y = tmx_data.height
         self.tiles = [[Tile(x, y) for y in range(tmx_data.height)] for x in range(tmx_data.width)]
         for layer in tmx_data.visible_layers:
             for x, y, gid in layer:
@@ -88,15 +92,15 @@ class Grid:
         self.highlight_tiles = []
 
     def get_tile_from_coords(self,x, y):
-        tile_x = x // TILE_SIZE
-        tile_y = y // TILE_SIZE
+        tile_x = (x-self.offset[0]) // TILE_SIZE
+        tile_y = (y-self.offset[1]) // TILE_SIZE
         # Return the corresponding tile object (this assumes you have a 2D list of tiles representing your map)
-        return self.tiles[tile_x][tile_y]
+        return self.tiles[int(tile_x)][int(tile_y)]
 
     def tiles_in_range_manhattan(self, x, y, r):
         r = int(r)
-        max_x = TILES_X * TILE_SIZE
-        max_y = TILES_Y * TILE_SIZE
+        max_x = self.tiles_x * TILE_SIZE
+        max_y = self.tiles_y * TILE_SIZE
         tiles = []
         for i in range(-r, r + 1):
             for j in range(-r + abs(i), r - abs(i) + 1):
@@ -108,7 +112,7 @@ class Grid:
     def position_is_in_grid(self, x, y):
         if x < 0 or y < 0:
             return False
-        if x >= TILES_X or y >= TILES_Y:
+        if x >= self.tiles_x or y >= self.tiles_y:
             return False
         return True
 
@@ -260,27 +264,29 @@ class Grid:
             return False
 
         # Check for impassable terrain
-        if not self.selected_tile.unit or self.selected_tile.unit.type != "Boat":
+        if action == "choosing_move_target" and (not self.selected_tile.unit or self.selected_tile.unit.type != "Boat"):
             if tile.no_walk:
                 return False
 
 
         return True
 
-
+    def move(self, x, y):
+        self.offset = (x, y)
+        
     def draw_grid(self, inputs):
         """Draw a simple grid on the screen."""
-        for x in range(0, TILES_X):
-            for y in range(0, TILES_Y):
+        for x in range(0, self.tiles_x):
+            for y in range(0, self.tiles_y):
                 image = self.tiles[x][y].image
                 if self.tiles[x][y].image:
-                    self.screen.blit(image, (x * image.get_width(), y * image.get_height()))
+                    self.screen.blit(image, (x * image.get_width() + self.offset[0], y * image.get_height() + self.offset[1]))
                 
-                self.pygame.draw.rect(self.screen, GRAY, (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 1)
-                if self.mouse_over_tile and self.mouse_over_tile.x == x and self.mouse_over_tile.y == y:
-                    self.pygame.draw.rect(self.screen, (255, 255, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
-                if self.selected_tile and self.selected_tile.x == x and self.selected_tile.y == y:
-                    self.pygame.draw.rect(self.screen, (0, 0, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
+                # self.pygame.draw.rect(self.screen, GRAY, (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 1)
+                # if self.mouse_over_tile and self.mouse_over_tile.x == x and self.mouse_over_tile.y == y:
+                #     self.pygame.draw.rect(self.screen, (255, 255, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
+                # if self.selected_tile and self.selected_tile.x == x and self.selected_tile.y == y:
+                #     self.pygame.draw.rect(self.screen, (0, 0, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
         
         selected_tile = self.selected_tile
         x, y = inputs.mouse.pos

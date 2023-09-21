@@ -1,11 +1,13 @@
 from collections import deque
 from Bullet import Bullet
 from Animation import Animation
+from SpriteLayer import SpriteLayer
 from Unit import Unit
 import math
 from config import get_unit_settings, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY, MAX_SQUARES_PER_ROW, SQUARE_SPACING, SQUARE_SIZE, BACKGROUND_COLOR, POINTS_COLOR, HEALTH_COLOR, STATUS_BAR_HEIGHT, STATUS_BAR_WIDTH
 import pygame
 import random
+#from SpriteLayer import SpriteLayers
 
 class TankTower:
     def __init__(self, base_folder, screen, parent):
@@ -19,9 +21,9 @@ class TankTower:
         #self.parent_angle = 0
         self.angle = 0
         self.animations["Idle"] = Animation(self.screen,base_folder,"Tank_tower_", "Idle", 0, (0,0), 90)
-        self.animations["Fire"] = Animation(self.screen,base_folder,"Tank_tower_", "Fire", 0, (0,0), 90, 1400)
-        self.animations["Shot"] = Animation(self.screen,base_folder,"Tank_tower_", "Shot", 0, (0,0), 90, 1400)
-        self.animations["Broken"] = Animation(self.screen,base_folder,"Tank_tower_", "Broken", 0, (0,0), 90)
+        self.animations["Fire"] = Animation(self.screen,base_folder,"Tank_tower_", "Fire", 0, (0,0), 90)
+        #self.animations["Shot"] = Animation(self.screen,base_folder,"Tank_tower_", "Shot", 0, (0,0), 90, 1400)
+        #self.animations["Broken"] = Animation(self.screen,base_folder,"Tank_tower_", "Broken", 0, (0,0), 90)
         #self.current_animation = "Fire"
         # self.animations["Fire"].play()
         #self.rotated_image_rect = self.animations[self.current_animation].get_current_rect()
@@ -29,18 +31,20 @@ class TankTower:
 
     def draw(self):
         center = self.animations["Idle"].get_current_rect().center
-        lst = list(center)
-        # Modify the list
-        lst[1] -= 10
-        # Convert list back to tuple
-        center = tuple(lst)
 
+        outline_color=None
+        outline_thickness=None
+        if self.parent.player != self.parent.grid.current_player:
+            outline_color = (255,0,0)
+            outline_thickness = 2
+
+        center = center[0], center[1] - 20
         if self.current_animation == "Fire":
-            self.animations["Shot"].draw(self.x, self.y, -self.angle, (46, 32))
-            self.animations["Fire"].draw(self.x, self.y, -self.angle, (46,-10))
-        else:
-            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, center)
+            self.animations["Fire"].draw(self.x, self.y, -self.angle+180, (20,120), None, outline_color ,outline_thickness)
 
+        self.animations["Idle"].draw(self.x, self.y, -self.angle, center, (0,0), outline_color ,outline_thickness)
+
+        #self.animations["Fire"].draw(self.x, self.y, -self.angle, (50,0),None,  outline_color ,outline_thickness)
 
     def rotate_rect(self, rect, angle_degrees):
         cx, cy = rect.center  # Center point of the rectangle
@@ -58,7 +62,7 @@ class TankTower:
         return rotated_corners
     
 
-    def get_shoot_positions(self, rotated_corners, distance_from_center=20, distance_from_axis=20):
+    def get_shoot_positions_2(self, rotated_corners, distance_from_center=20, distance_from_axis=20):
 
         # Top side is defined by the first two points in the rotated_corners
         top_left = rotated_corners[0]
@@ -90,20 +94,48 @@ class TankTower:
         
         return light1_position, light2_position
 
-    
+    def get_shoot_positions(self, rotated_corners, distance_from_center=0, distance_from_axis=0):
+        #pygame.draw.polygon(self.screen, (0, 0, 255), rotated_corners, 2)
+
+        # Top side is defined by the first two points in the rotated_corners
+        top_left = rotated_corners[0]
+        top_right = rotated_corners[1]
+        
+        # Calculate the center of the top side
+        center_x = (top_left[0] + top_right[0]) / 2
+        center_y = (top_left[1] + top_right[1]) / 2
+        
+        # Determine the direction vector of the top side
+        dx = top_right[0] - top_left[0]
+        dy = top_right[1] - top_left[1]
+        
+        # Normalize the direction vector
+        length = math.sqrt(dx*dx + dy*dy)
+        dx /= length
+        dy /= length
+        
+        # Determine the perpendicular vector to the direction vector
+        perp_dx = -dy
+        perp_dy = dx
+
+        # Calculate the positions for the lights adjusting in both directions
+        position = (center_x - dx * distance_from_center + perp_dx * distance_from_axis, 
+                        center_y - dy * distance_from_center + perp_dy * distance_from_axis)
+
+        return position    
 
     def update(self, parent_pos, angle):
 
         rect =self.animations["Idle"].get_current_rect().copy()
-        rect.x = parent_pos[0] - self.parent.offset[0]
-        rect.y = parent_pos[1] - self.parent.offset[1]
+        rect.center = (parent_pos[0] + self.parent.offset[0], parent_pos[1] + self.parent.offset[1])
+        #rect.y = 
 
         self.angle = angle
 
         rotated_corners  = self.rotate_rect(rect, self.angle + 90)
         #pygame.draw.polygon(self.screen, (0, 0, 255), rotated_corners, 2)
-        self.shoot_positions = self.get_shoot_positions(rotated_corners, 5, 10)
-        # pygame.draw.circle(self.screen, (0,0,0), self.shoot_positions[0], 2)
+        self.shoot_position = self.get_shoot_positions(rotated_corners, 0, 10)
+        pygame.draw.circle(self.screen, (0,0,0), self.shoot_position, 2)
         # pygame.draw.circle(self.screen, (0,0,0), self.shoot_positions[1], 2)
         self.x = parent_pos[0] + self.offset[0]
         self.y = parent_pos[1] + self.offset[1]
@@ -122,9 +154,10 @@ class TankTower:
 
 
 class Tank(Unit):
-    def __init__(self, target_tile, player, grid,  base_folder='assets\\images\\Tank', screen=None, gun_sound_file="assets\\sounds\\machinegun.wav"):
+    def __init__(self, target_tile, player, grid,  base_folder='assets\\images\\Tank', screen=None, gun_sound_file="assets\\sounds\\tank shots.wav"):
         super().__init__(target_tile, player, grid, base_folder, screen)
         self.engine_sound = pygame.mixer.Sound("assets\\sounds\\tankEngine.wav")
+        self.explosion_sound = pygame.mixer.Sound("assets\\sounds\\explosion 1.wav")
         self.type = "Tank"
         self.settings = get_unit_settings(self.type)
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
@@ -152,6 +185,7 @@ class Tank(Unit):
         self.animations = {}
         self.current_animation = "Idle"
         self.current_action = None
+
 
         self.offset = (32,32)
         self.tower.offset = tuple(a + b for a, b in zip(self.tower.offset, self.offset))
@@ -259,18 +293,25 @@ class Tank(Unit):
 
     def load_animations(self, base_folder):
         self.animations["Idle"] = Animation(self.screen,base_folder,"Tank_base_", "Idle", -1, self.offset, 90)
-        self.animations["Move"] = Animation(self.screen,base_folder,"Tank_base_", "Move", -1, self.offset, 90)
-        self.animations["Broken"] = Animation(self.screen,base_folder,"Tank_base_", "Broken", 0, self.offset, 90)
+        self.bullet_image = Animation(self.screen,base_folder,"", "Bullet", -1, self.offset, 90) 
+        self.explosion_animation = Animation(self.screen, "assets\\images\\Effects","", "Explosion", 0, self.offset, 0, frame_duration=25) 
+        #SpriteLayers.add_animation("top", self.explosion_animation) 
+        #self.animations["Move"] = Animation(self.screen,base_folder,"Tank_base_", "Move", -1, self.offset, 90)
+        #self.animations["Broken"] = Animation(self.screen,base_folder,"Tank_base_", "Broken", 0, self.offset, 90)
 
     
     def calc_screen_pos(self,tile_x, tile_y):
-        screen_x = tile_x * TILE_SIZE
-        screen_y = tile_y * TILE_SIZE
+        screen_x = tile_x * TILE_SIZE + self.grid.offset[0]
+        screen_y = tile_y * TILE_SIZE + self.grid.offset[1]
         return screen_x, screen_y
 
     
     def draw(self):
-        self.animations[self.current_animation].draw(self.x, self.y, -self.angle)
+        if self.player != self.grid.current_player:
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None, (255,0,0), 2)
+        else:
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None)
+        
         self.tower.draw()
         if self.seat_taken == 0:
             self_selected = False
@@ -285,6 +326,12 @@ class Tank(Unit):
 
         for bullet in self.bullets:
             bullet.draw()
+
+        
+        if not self.explosion_animation.is_finished():
+            center = self.explosion_animation.get_current_rect().center
+            center = center[0] - 80, center[1]      
+            self.explosion_animation.draw(self.target_x, self.target_y, -self.tower.angle, center)
         # Assuming soldier_rect is the rectangle of the soldier sprite
         status_bar_x = self.x + rect.left
         status_bar_y = rect.bottom + 32+ 2
@@ -296,7 +343,7 @@ class Tank(Unit):
         self.draw_status_bar(status_bar_x, status_bar_y, self.health, self.max_health, HEALTH_COLOR)
         self.draw_status_bar(status_bar_x, status_bar_y + STATUS_BAR_HEIGHT, self.action_points, self.max_action_points, POINTS_COLOR) 
 
-        self.draw_points_left()
+        # self.draw_points_left()
 
         bar_width = (SQUARE_SIZE+SQUARE_SPACING) * self.seats
         self.draw_points_as_squares(self.x + 64 - bar_width, self.y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)
@@ -348,7 +395,7 @@ class Tank(Unit):
             self.target_tile = target_tile
             self.action_points -= movement_cost
             self.target_x, self.target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
-            self.current_animation = "Move"
+            #self.current_animation = "Move"
             self.engine_sound.play(loops=-1)
             self.animations[self.current_animation].play()
             self.distance_to_target = math.sqrt((self.target_x - self.x)**2 + (self.target_y - self.y)**2)
@@ -381,12 +428,12 @@ class Tank(Unit):
             self.gun_sound_playing = True
 
             self.target_tile = target_tile
-            self.attack_damage
+            #self.attack_damage
             self.target_point = (target_x + self.offset[0], target_y + self.offset[1])
             self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
             self.angle = math.atan2(self.target_point[1] - self.origin_point[1] ,  self.target_point[0] - self.origin_point[0] ) * 180 / math.pi
             self.action_points -= fire_cost
-            self.tower.animations["Shot"].play()
+            #self.tower.animations["Shot"].play()
             self.tower.animations["Fire"].play() 
             self.target_x, self.target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
             self.tower.current_animation = "Fire"
@@ -469,21 +516,37 @@ class Tank(Unit):
         current_time = pygame.time.get_ticks()
 
         # Check if the shooting action is finished.
-        finished_shooting = True
-        if self.current_action == "fire_to_target":
-            finished_shooting = self.bullets_fired == self.NUM_BULLETS
+        # finished_shooting = True
+        # if self.current_action == "fire_to_target":
+        #     finished_shooting = self.bullets_fired == self.NUM_BULLETS
+
+        # Update bullet positions and check for hits.
+        all_reached_target = True
+        finished_shooting = False
+        for bullet in self.bullets:
+            bullet.update()
+            if bullet.target_reached:
+                self.bullets.remove(bullet)
+                if bullet.target_tile.unit:
+                    bullet.target_tile.unit.take_damage(self.attack_damage / self.NUM_BULLETS)
+            else:
+                all_reached_target = False
+        if all_reached_target and self.current_action == "fire_to_target" and self.bullets_fired == self.NUM_BULLETS:
+            finished_shooting = True
 
         # Shoot bullets at a specific firing rate.
         point_x = self.target_tile.x*TILE_SIZE
         point_y = self.target_tile.y*TILE_SIZE        
-        if not finished_shooting and  current_time - self.last_fired > self.FIRING_RATE:
-            shoot_positions = self.tower.shoot_positions
-            shoot_position = shoot_positions[self.canon_number]
+        if self.current_action == "fire_to_target" and not finished_shooting and self.bullets_fired < self.NUM_BULLETS and current_time - self.last_fired > self.FIRING_RATE:
+            #shoot_positions = self.tower.shoot_positions
+            shoot_position = self.tower.shoot_position
+            shoot_position = shoot_position[0] - self.tower.offset[0], shoot_position[1] - self.tower.offset[1]
+            #shoot_position = self.x, self.y
             self.canon_number += 1
             self.canon_number %= 2
-            angle = math.atan2(self.target_tile.y*TILE_SIZE - shoot_position[1] + self.offset[1], self.target_tile.x*TILE_SIZE - shoot_position[0] + self.offset[0]) * 180 / math.pi
+            angle = math.atan2((self.target_tile.y*TILE_SIZE) - shoot_position[1] , (self.target_tile.x*TILE_SIZE) - shoot_position[0]) * 180 / math.pi
 
-            self.bullets.append(Bullet(shoot_position[0], shoot_position[1],  angle, self.screen ,self.BULLET_SPEED, self.target_tile, self.base_folder, damage=self.attack_damage / self.NUM_BULLETS))
+            self.bullets.append(Bullet(shoot_position[0], shoot_position[1],  angle, self.screen ,self.BULLET_SPEED, self.target_tile, self.base_folder, image=self.bullet_image))
             self.bullets_fired += 1
             self.last_fired = current_time
 
@@ -493,7 +556,7 @@ class Tank(Unit):
         if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive:
             self_selected = True
             if self.current_action == "choosing_fire_target":
-                self.target_point = (inputs.mouse.pos[0], inputs.mouse.pos[1])
+                self.target_point = (inputs.mouse.pos[0]-32, inputs.mouse.pos[1]-32)
                 self.tower.angle = -self.angle + math.atan2(self.target_point[1] - self.origin_point[1], self.target_point[0] - self.origin_point[0]) * 180 / math.pi
             elif self.current_action == "fire_to_target" or self.current_action == "move_to_target":
                 self.target_point = (point_x, point_y)
@@ -527,18 +590,17 @@ class Tank(Unit):
                 self.current_animation = "Idle"
                 self.current_action = None
         
-        # Update bullet positions and check for hits.
-        for bullet in self.bullets:
-            bullet.update()
-            if bullet.target_reached:
-                self.bullets.remove(bullet)
-                if bullet.target_tile.unit:
-                    bullet.target_tile.unit.take_damage(10)
+
                     
-        if finished_shooting and self.current_action == "fire_to_target":            
+        if finished_shooting and self.current_action == "fire_to_target":
+            self.explosion_animation.play()
+            self.explosion_sound.play()
             self.current_action = None
             self.current_animation = "Idle"
+            self.tower.current_animation = "Idle"
 
+        self.explosion_animation.update(self.x, self.y)
+        #self.explosion_animation.current_frame = 20
         # if self_selected:
         #     self.draw_points_left()
 

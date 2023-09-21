@@ -18,9 +18,9 @@ class HelicopterBlades():
         self.y = 0
         #self.parent_angle = 0
         self.angle = 0
-        self.animations["Idle"] = Animation(self.screen,base_folder,"Helicopter_blades_", "Idle", 0, (0,-10),0)
-        self.animations["Slow"] = Animation(self.screen,base_folder,"blades_", "Move_slow", -1, (0,-10),0, frame_duration=50)
-        self.animations["Fast"] = Animation(self.screen,base_folder,"blades_", "Move_fast", -1, (0,-10),0, frame_duration=50)
+        self.animations["Idle"] = Animation(self.screen,base_folder,"Helicopter_blades_", "Idle", 0, (0,-10),90)
+        self.animations["Slow"] = Animation(self.screen,base_folder,"blades_", "Move_slow", -1, (0,-10),90, frame_duration=50)
+        self.animations["Fast"] = Animation(self.screen,base_folder,"blades_", "Move_fast", -1, (0,-10),90, frame_duration=50)
         self.animations["Fast"].play()
 
 
@@ -32,11 +32,17 @@ class HelicopterBlades():
         # Convert list back to tuple
         center = tuple(lst)
 
+        outline_color=None
+        outline_thickness=None
+        if self.parent.player != self.parent.grid.current_player:
+            outline_color = (255,0,0)
+            outline_thickness = 2
+
         if self.current_animation == "Fire":
-            self.animations["Shot"].draw(self.x, self.y, -self.angle, (46, 32))
-            self.animations["Fire"].draw(self.x, self.y, -self.angle, (46,-10))
+            self.animations["Shot"].draw(self.x, self.y, -self.angle, (46, 32), outline_color ,outline_thickness)
+            self.animations["Fire"].draw(self.x, self.y, -self.angle, (46,-10), outline_color ,outline_thickness)
         else:
-            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, center)
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, center, (0,0), outline_color ,outline_thickness)
 
 
     def rotate_rect(self, rect, angle_degrees):
@@ -266,11 +272,11 @@ class Helicopter(Unit):
 
     
     def draw(self):
-        self.animations["Idle_shadow"].draw(self.x, self.y, -self.angle,None, (200, 0))
-        self.animations[self.current_animation].draw(self.x, self.y, -self.angle)
-#        if self.current_animation == "Idle":
-
-
+        if self.player != self.grid.current_player:
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None, (255,0,0), 2)
+        else:
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None)
+        
         self.tower.draw()
         if self.seat_taken == 0:
             self_selected = False

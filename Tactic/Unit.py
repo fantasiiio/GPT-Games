@@ -36,7 +36,7 @@ class Unit:
         self.bullets = []
         self.action_rects = []
         self.action_menu_rect = None
-        pass
+
 
     @abstractmethod
     def draw_actions_menu(self):
@@ -54,9 +54,8 @@ class Unit:
     def calc_screen_pos(self,tile_x, tile_y):
         pass
 
-    @abstractmethod
-    def draw(self):
-        pass        
+    def draw_flag(self):
+        pass                
 
     @abstractmethod
     def draw_status_bar(self, x, y, current_value, max_value, color):

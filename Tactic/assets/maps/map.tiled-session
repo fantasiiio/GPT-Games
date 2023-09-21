@@ -1,8 +1,17 @@
 {
+    "Map/SizeTest": {
+        "height": 4300,
+        "width": 2
+    },
     "activeFile": "",
     "expandedProjectPaths": [
     ],
     "fileStates": {
+        "ACS_move._01.tsx": {
+            "dynamicWrapping": true,
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
         "grass.tsx": {
             "dynamicWrapping": false,
             "scaleInDock": 1,
@@ -19,6 +28,7 @@
             "dynamicWrapping": false
         },
         "small_house3_color1.tsx": {
+            "dynamicWrapping": false,
             "scaleInDock": 1,
             "scaleInEditor": 1
         },
@@ -33,17 +43,25 @@
         "tree1.tsx": {
             "dynamicWrapping": false
         },
+        "tree3.tsx": {
+            "dynamicWrapping": false
+        },
         "trees.tsx": {
             "dynamicWrapping": true,
             "scaleInEditor": 1
         }
     },
-    "last.imagePath": "C:/dev-fg/GPT-Games/Tactic/assets/maps/Trees Bushes",
+    "last.imagePath": "C:/Users/Ryzen/Downloads/tds-modern-pixel-game-kit/tds-modern-soldiers-and-vehicles-sprites-2/ACS/Move",
+    "map.lastUsedFormat": "tmx",
+    "map.tileHeight": 64,
+    "map.tileWidth": 64,
+    "map.width": 20,
     "openFiles": [
     ],
     "project": "map.tiled-project",
     "property.type": "string",
     "recentFiles": [
+        "ACS_move._01.tsx",
         "trees.tsx",
         "terrain1.tmx",
         "grass.tsx",
@@ -55,5 +73,5 @@
         "height": 64,
         "width": 64
     },
-    "tileset.type": 0
+    "tileset.type": 1
 }
