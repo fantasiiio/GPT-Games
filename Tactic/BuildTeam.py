@@ -111,9 +111,9 @@ text_offsets = {
 
 border_size = 12
 units_panel_height = 400
-units_panel_width = 650
+units_panel_width = 800
 units_panel = UIPanel(20, 20, units_panel_width, units_panel_height, image="panel.png", border_size=border_size)
-team_panel = UIPanel(20, units_panel.rect.bottom, units_panel_width+350, 350, image="panel.png", border_size=border_size)
+team_panel = UIPanel(20, units_panel.rect.bottom, units_panel_width, 350, image="panel.png", border_size=border_size)
 info_panel = UIPanel(units_panel_width+15, 20, MAIN_WIDTH-units_panel_width - 40, units_panel_height, image="panel.png", border_size=border_size)
 unit_preperties_panel = UIPanel(team_panel.rect.right, team_panel.rect.top, MAIN_WIDTH - team_panel.rect.right - 25, team_panel.rect.height, image="panel.png", border_size=border_size)
 

@@ -47,7 +47,7 @@ class Tile:
 class Grid:
     def __init__(self, pygame, screen, file_name):
         self.offset = (0,0)
-        self.current_player = 2
+        self.current_player = 1
         self.pygame = pygame
         self.screen = screen
         self.tiles = None
@@ -158,8 +158,12 @@ class Grid:
             return        
         
         for index, tile in enumerate(path):
-            if index > self.selected_tile.unit.fire_range+1:
-                return
+            if self.selected_tile.unit.current_action == "choosing_move_target":
+                if index > self.selected_tile.unit.max_move+1:
+                    return
+            elif self.selected_tile.unit.current_action == "choosing_fire_target":
+                if index > self.selected_tile.unit.fire_range+1:
+                    return
             
             if index == 0:
                 continue
@@ -176,18 +180,18 @@ class Grid:
             #self.pygame.draw.rect(self.screen, (255, 0, 0), (tile[0]*TILE_SIZE, tile[1]*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
 
             # decide if the text will be dra on top or below the tile
-            start = path[0]
-            action_pos = None
-            if len(path) > 1:
-                if start[1] - path[1][1] > 0:
-                    action_pos = (start[0]* TILE_SIZE, start[1] * TILE_SIZE + TILE_SIZE)
-                else:
-                    action_pos = (start[0]* TILE_SIZE, start[1] * TILE_SIZE - TILE_SIZE)
+            # start = path[0]
+            # action_pos = None
+            # if len(path) > 1:
+            #     if start[1] - path[1][1] > 0:
+            #         action_pos = (start[0]* TILE_SIZE, start[1] * TILE_SIZE + TILE_SIZE)
+            #     else:
+            #         action_pos = (start[0]* TILE_SIZE, start[1] * TILE_SIZE - TILE_SIZE)
 
-            if action_pos:
-                font = pygame.font.SysFont(None, 25)
-                action_cost = self.selected_tile.unit.move_cost * min(len(path)-1, self.selected_tile.unit.max_move)
-                self.draw_text_with_border(self.screen, f"Cost: {action_cost}", font, action_pos[0], action_pos[1], (255, 255, 255), (0, 0, 0), 2)
+            #if action_pos:
+                #font = pygame.font.SysFont(None, 25)
+                #action_cost = self.selected_tile.unit.move_cost
+                #self.draw_text_with_border(self.screen, f"Cost: {action_cost}", font, action_pos[0], action_pos[1], (255, 255, 255), (0, 0, 0), 2)
 
     def update(self, inputs):
         selected_tile = self.selected_tile
@@ -244,9 +248,10 @@ class Grid:
             return False
 
         if action == "choosing_move_target" and tile.unit is not None:
-            if tile.unit and tile.unit.player == self.selected_tile.unit.player:
-                if (tile.unit.type == "Tank" and tile.unit.seat_left >  0) or (tile.unit.type == "Boat" and tile.unit.seat_left >  0):
-                    return True
+            if tile.unit and self.selected_tile.unit and tile.unit.player == self.selected_tile.unit.player:
+                if (tile.unit.type == "Tank" and tile.unit.seat_left >  0) or (tile.unit.type == "Boat" and tile.unit.seat_left >  0) or (tile.unit.type == "Helicopter" and tile.unit.seat_left >  0):
+                    if tile.unit.is_alive:
+                        return True
             return False
         
         if action == "choosing_move_target" and self.selected_tile.unit and self.selected_tile.unit.type == "Boat":
@@ -286,11 +291,11 @@ class Grid:
                 if self.tiles[x][y].image:
                     self.screen.blit(image, (x * image.get_width() + self.offset[0], y * image.get_height() + self.offset[1]))
                 
-                # self.pygame.draw.rect(self.screen, GRAY, (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 1)
-                # if self.mouse_over_tile and self.mouse_over_tile.x == x and self.mouse_over_tile.y == y:
-                #     self.pygame.draw.rect(self.screen, (255, 255, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
-                # if self.selected_tile and self.selected_tile.x == x and self.selected_tile.y == y:
-                #     self.pygame.draw.rect(self.screen, (0, 0, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
+                self.pygame.draw.rect(self.screen, GRAY, (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 1)
+                if self.mouse_over_tile and self.mouse_over_tile.x == x and self.mouse_over_tile.y == y:
+                    self.pygame.draw.rect(self.screen, (255, 255, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
+                if self.selected_tile and self.selected_tile.x == x and self.selected_tile.y == y:
+                    self.pygame.draw.rect(self.screen, (0, 0, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
         
         selected_tile = self.selected_tile
         x, y = inputs.mouse.pos

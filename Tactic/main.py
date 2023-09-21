@@ -45,21 +45,35 @@ def check_game_end():
 
 #SpriteLayers.add_layer("top")
 
+def get_unit_index(unit):
+    for i, u in enumerate(players[unit.player].units):
+        if u == unit:
+            return i
+    return -1
+
+def choosing_action_finished(unit):
+    index = get_unit_index(unit)
+    if index >= 0 and index < len(players[unit.player].units) - 1:
+        players[unit.player].units[index + 1].current_action = "choosing_action"
+
+
 player_initial_pos = {1: (2, 2), 2: (4, 2)}
-players[1].add_unit(Soldier(grid.tiles[5][16], 1, grid, screen=screen))
-players[1].add_unit(Soldier(grid.tiles[14][15], 1, grid, screen=screen))
-players[1].add_unit(Tank(grid.tiles[6][16], 1, grid, screen=screen))
-players[1].add_unit(Helicopter(grid.tiles[17][15], 1, grid, screen=screen))
+players[1].add_unit(Soldier(grid.tiles[5][16], 1, grid, screen=screen, choosing_action_finished=choosing_action_finished))
+players[1].add_unit(Soldier(grid.tiles[14][15], 1, grid, screen=screen, choosing_action_finished=choosing_action_finished))
+players[1].add_unit(Tank(grid.tiles[6][16], 1, grid, screen=screen, choosing_action_finished=choosing_action_finished))
+players[1].add_unit(Helicopter(grid.tiles[17][15], 1, grid, screen=screen, choosing_action_finished=choosing_action_finished))
+
+#players[1].units[0].current_action = "choosing_action"
 
 for i in range(1):
     x = i + 6
     y = 17
     if not grid.tiles[x][y].unit and not grid.tiles[x][y].structure:
-        players[2].add_unit(Soldier(grid.tiles[x][y], 2, grid, screen=screen))
+        players[2].add_unit(Soldier(grid.tiles[x][y], 2, grid, screen=screen, choosing_action_finished=choosing_action_finished))
 
 #boat_tile = grid.get_tiles_with_property("heli_start","True")
 #if boat_tile:
-players[2].add_unit(Boat(grid.tiles[8][17], 2, grid, screen=screen))
+players[2].add_unit(Boat(grid.tiles[8][17], 2, grid, screen=screen, choosing_action_finished=choosing_action_finished))
 
 # players[2].add_unit(Soldier(grid.tiles[4][2], 2, grid, screen=screen))
 # players[2].add_unit(Soldier(grid.tiles[5][2], 2, grid, screen=screen))
@@ -104,9 +118,7 @@ def game_loop():
         time_delta = pygame.time.Clock().tick(60) / 1000.0
         inputs.update()
 
-        for event in pygame.event.get():
-            if event.type == pygame.USEREVENT + 1:  # A track has ended
-                music_player.play_next_track()            
+        for event in pygame.event.get():           
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left click
                     handle_mouse_click(event.pos)
@@ -117,8 +129,9 @@ def game_loop():
             if event.type == pygame.USEREVENT:
                 if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
                     if event.ui_element == end_turn_button:
-                        unit.action_points = 10
-                        update_ui()
+                        pass
+                        #unit.action_points = 10
+                        #update_ui()
 
             manager.process_events(event)
             # for player in players.values(): 

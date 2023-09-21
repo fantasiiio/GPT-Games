@@ -42,8 +42,8 @@ class BoatCanon:
             outline_thickness = 2
 
         if self.current_animation == "Fire":
-            self.animations["Shot"].draw(self.x, self.y, -self.angle, (46, 32), outline_color ,outline_thickness)
-            self.animations["Fire"].draw(self.x, self.y, -self.angle, (46,-10), outline_color ,outline_thickness)
+            self.animations["Shot"].draw(self.x, self.y, -self.angle, center,(0,0), outline_color ,outline_thickness)
+            self.animations["Fire"].draw(self.x, self.y, -self.angle, None,(46,-10), outline_color ,outline_thickness)
         else:
             self.animations[self.current_animation].draw(self.x, self.y, -self.angle, center,(0,0), outline_color ,outline_thickness)
 
@@ -101,8 +101,7 @@ class BoatCanon:
     def update(self, parent_pos, angle):
 
         rect =self.animations["Idle"].get_current_rect().copy()
-        rect.x = parent_pos[0] - self.parent.offset[0]
-        rect.y = parent_pos[1] - self.parent.offset[1]
+        rect.center = (parent_pos[0] + self.parent.offset[0], parent_pos[1] + self.parent.offset[1])
 
         self.angle = angle
 
@@ -116,7 +115,7 @@ class BoatCanon:
         #self.parent_angle = -parent_angle
 
         for animation in self.animations.values():
-            animation.update(self.x, self.y) 
+            animation.update() 
 
         # if self.current_animation == "Fire":
         #     finished = self.animations["Fire"].is_finished() and self.animations["Shot"].is_finished()
@@ -128,12 +127,13 @@ class BoatCanon:
 
 
 class Boat(Unit):
-    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Boat', screen=None, gun_sound_file="assets\\sounds\\machinegun.wav"):
+    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Boat', screen=None, gun_sound_file="assets\\sounds\\machinegun2.wav", choosing_action_finished=None):
         super().__init__(target_tile, player, grid, base_folder, screen)
         self.engine_sound = pygame.mixer.Sound("assets\\sounds\\BoatEngine.wav")
+        self.explosion_sound = pygame.mixer.Sound("assets\\sounds\\explosion 2.wav")
+        self.gun_sound = pygame.mixer.Sound(gun_sound_file)
         self.type = "Boat"
         self.settings = get_unit_settings(self.type)
-        self.gun_sound = pygame.mixer.Sound(gun_sound_file)
 
         self.MOVE_SPEED = self.settings["Speed"]
         self.grid = grid
@@ -188,7 +188,7 @@ class Boat(Unit):
 
         unit.is_driver = True
         unit.current_action = None
-        self.grid.selected_tile = unit.tile
+
 
         return True        
 
@@ -260,12 +260,13 @@ class Boat(Unit):
     def load_animations(self, base_folder):
         self.animations["Idle"] = Animation(self.screen,base_folder,"Boat_base_", "Idle", -1, self.offset, 90, frame_duration = 300)
         self.animations["Broken"] = Animation(self.screen,base_folder,"Boat", "Broken", -1, self.offset, 90)
+        self.explosion_animation = Animation(self.screen, "assets\\images\\Effects","Explosion_", "1", 0, self.offset, 0, frame_duration=25) 
         self.animations["Idle"].play()
 
     
     def calc_screen_pos(self,tile_x, tile_y):
-        screen_x = tile_x * TILE_SIZE
-        screen_y = tile_y * TILE_SIZE
+        screen_x = tile_x * TILE_SIZE + self.grid.offset[0]
+        screen_y = tile_y * TILE_SIZE + self.grid.offset[1]
         return screen_x, screen_y
 
     
@@ -275,6 +276,9 @@ class Boat(Unit):
         else:
             self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None)
         
+        if self.explosion_animation.is_playing:
+            self.explosion_animation.draw(self.x, self.y, 0, None, None)
+
         if not self.is_alive:
             return
         
@@ -303,7 +307,6 @@ class Boat(Unit):
         self.draw_status_bar(status_bar_x, status_bar_y, self.health, self.max_health, HEALTH_COLOR)
         self.draw_status_bar(status_bar_x, status_bar_y + STATUS_BAR_HEIGHT, self.action_points, self.max_action_points, POINTS_COLOR) 
 
-        #self.draw_points_left()
 
         bar_width = (SQUARE_SIZE+SQUARE_SPACING) * self.seats
         self.draw_points_as_squares(self.x + 64 - bar_width, self.y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)
@@ -341,7 +344,7 @@ class Boat(Unit):
         # Calculate the distance to the target
         target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
         squares_to_target = (target_x - self.x) / TILE_SIZE, (target_y - self.y) / TILE_SIZE
-        movement_cost = (abs(squares_to_target[0]) + abs(squares_to_target[1])) * self.settings["Move Cost"]
+        movement_cost = self.settings["Move Cost"]
         if movement_cost <= self.action_points:
             self.target_point = (target_x + self.offset[0], target_y + self.offset[1])
             self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
@@ -383,10 +386,8 @@ class Boat(Unit):
             #self.tower.angle = self.angle
             self.bullets_fired = 0
             self.gun_sound_channel  = self.gun_sound.play()
-            self.gun_sound_playing = True
 
             self.target_tile = target_tile
-            self.attack_damage
             self.target_point = (target_x + self.offset[0], target_y + self.offset[1])
             self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
             self.angle = math.atan2(self.target_point[1] - self.origin_point[1] ,  self.target_point[0] - self.origin_point[0] ) * 180 / math.pi
@@ -397,13 +398,16 @@ class Boat(Unit):
             self.tower.current_animation = "Fire"
             self.distance_to_target = math.sqrt((self.target_x - self.x)**2 + (self.target_y - self.y)**2)
 
-        
+    def bullet_reach_target(self, bullet):
+        pass
 
     def update(self, inputs):
 
         # Update animations.
         for animation in self.animations.values():
-            animation.update(self.x, self.y)       
+            animation.update()       
+
+        self.explosion_animation.update()
 
         # If there's no driver, just update the tower's position and angle and exit.
         if self.seat_taken == 0:
@@ -460,40 +464,37 @@ class Boat(Unit):
         elif inputs.keyboard.clicked[pygame.K_ESCAPE]:
                 self.current_action = None
 
-        # if self.gun_sound_channel and not self.gun_sound_channel.get_busy():
-        #     if self.gun_sound_playing:
-        #         self.tower.animations["Shot"].stop()
-        #         self.tower.animations["Fire"].stop()  
-        #         self.tower.current_animation = "Idle"              
-        #     self.gun_sound_playing = False
-
-
- 
 
         # Update the tower's position and angle.
         current_time = pygame.time.get_ticks()
 
-        # Check if the shooting action is finished.
-        finished_shooting = True
-        if self.current_action == "fire_to_target":
-            finished_shooting = self.bullets_fired == self.NUM_BULLETS
+
+        # Update bullet positions and check for hits.
+        all_reached_target = True
+        finished_shooting = False
+        for bullet in self.bullets:
+            bullet.update()
+            if not bullet.target_reached:
+                all_reached_target = False
+
+        if all_reached_target and self.current_action == "fire_to_target" and self.bullets_fired == self.NUM_BULLETS:
+            finished_shooting = True
 
         # Shoot bullets at a specific firing rate.
-        point_x = self.target_tile.x*TILE_SIZE
-        point_y = self.target_tile.y*TILE_SIZE        
-        if not finished_shooting and  current_time - self.last_fired > self.FIRING_RATE:
+        point_x = self.target_tile.x*TILE_SIZE + self.offset[0]
+        point_y = self.target_tile.y*TILE_SIZE + self.offset[1]
+        if self.current_action == "fire_to_target" and not finished_shooting and self.bullets_fired < self.NUM_BULLETS and current_time - self.last_fired > self.FIRING_RATE:
             shoot_positions = self.tower.shoot_positions
             shoot_position = shoot_positions[self.canon_number]
+            shoot_position = shoot_position[0] - self.tower.offset[0], shoot_position[1] - self.tower.offset[1]
             self.canon_number += 1
             self.canon_number %= 2
-            angle = math.atan2(self.target_tile.y*TILE_SIZE - shoot_position[1] + self.offset[1], self.target_tile.x*TILE_SIZE - shoot_position[0] + self.offset[0]) * 180 / math.pi
+            angle = math.atan2((self.target_tile.y * TILE_SIZE) - shoot_position[1], (self.target_tile.x * TILE_SIZE) - shoot_position[0]) * 180 / math.pi
 
-            self.bullets.append(Bullet(shoot_position[0], shoot_position[1],  angle, self.screen ,self.BULLET_SPEED, self.target_tile, self.base_folder, damage=self.attack_damage / self.NUM_BULLETS))
+            self.bullets.append(Bullet(shoot_position[0], shoot_position[1], angle, self.screen, self.BULLET_SPEED, self.target_tile, self.base_folder, damage=self.attack_damage / self.NUM_BULLETS))
             self.bullets_fired += 1
             self.last_fired = current_time
-
-
-        self.origin_point = (self.x , self.y)
+        self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
         self_selected = False
         if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive:
             self_selected = True
@@ -509,15 +510,13 @@ class Boat(Unit):
             self.tower.angle = 0
 
         self.tower.update((self.x, self.y), self.tower.angle + self.angle) 
-        #self.tower.update(self.origin_point , self.tower.angle)
 
-        # If choosing a fire target, adjust the tower's angle towards the mouse.
         # if inputs.mouse.button[1]:
         #     self.angle = math.atan2(inputs.mouse.pos[1] - self.origin_point[1], inputs.mouse.pos[0] - self.origin_point[0]) * 180 / math.pi
 
         # If moving to a target, update the unit's position.
         if self.current_action == "move_to_target":
-            self.target_point = (point_x + self.offset[0], point_y + self.offset[1])
+            self.target_point = (point_x, point_y)
             self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
             self.distance_to_target = math.sqrt((self.target_point[0] - self.origin_point[0])**2 + (self.target_point[1] - self.origin_point[1])**2)
             self.current_animation == "Walk"
@@ -532,20 +531,13 @@ class Boat(Unit):
                 self.current_animation = "Idle"
                 self.current_action = None
         
-        # Update bullet positions and check for hits.
-        for bullet in self.bullets:
-            bullet.update()
-            if bullet.target_reached:
-                self.bullets.remove(bullet)
-                if bullet.target_tile.unit:
-                    bullet.target_tile.unit.take_damage(10)
+
                     
-        if finished_shooting and self.current_action == "fire_to_target":            
+        if finished_shooting and self.current_action == "fire_to_target":
             self.current_action = None
             self.current_animation = "Idle"
+            self.tower.current_animation = "Idle"
 
-        # if self_selected:
-        #     self.draw_points_left()
 
     def draw_points_left(self):
         # Draw each action text with appropriate color based on hover state
@@ -601,6 +593,8 @@ class Boat(Unit):
     def die(self):
         self.is_alive = False
         self.current_animation = "Broken"
+        self.explosion_animation.play()
+        self.explosion_sound.play()
 
     def draw_points_as_squares(self, x, y, current_points, max_points, color1, color2, max_squares_per_row):
         for i in range(max_points):

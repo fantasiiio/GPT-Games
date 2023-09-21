@@ -33,8 +33,16 @@ def speed_to_number(speed_str):
     }
     return mapping.get(speed_str, 0)
 
+def is_number(s):
+    try:
+        int(s)  # Try converting the string to int (this will work for integers too)
+        return True
+    except ValueError:
+        return False
+
 def get_unit_settings(unit_type): 
-    unitSettings[unit_type]["Speed"] = speed_to_number(unitSettings[unit_type]["Speed"])
+    if not is_number(unitSettings[unit_type]["Speed"]):
+        unitSettings[unit_type]["Speed"] = speed_to_number(unitSettings[unit_type]["Speed"])
     return unitSettings[unit_type]
 
 maleNames = None

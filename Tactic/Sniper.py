@@ -161,7 +161,7 @@ class Sniper(Unit):
         # Calculate the distance to the target
         target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
         squares_to_target = (target_x - self.x) / TILE_SIZE, (target_y - self.y) / TILE_SIZE
-        movement_cost = abs(squares_to_target[0]) + abs(squares_to_target[1])
+        movement_cost = self.settings["Move Cost"]
         self.angle = math.atan2(target_y - self.y, target_x - self.x) * 180 / math.pi
         if movement_cost <= self.action_points:
             self.tile.unit = None
@@ -266,7 +266,7 @@ class Sniper(Unit):
 
         """Update the unit's position if it's moving."""
         for animation in self.animations.values():
-            animation.update(self.x, self.y)        
+            animation.update()        
         
         if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive and self.current_action != "move_to_target" and self.current_action != "fire_to_target":
             self.angle = math.atan2(inputs.mouse.pos[1] - self.y, inputs.mouse.pos[0] - self.x) * 180 / math.pi

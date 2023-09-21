@@ -6,13 +6,14 @@ import math
 from config import get_unit_settings, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY, MAX_SQUARES_PER_ROW, SQUARE_SPACING, SQUARE_SIZE, BACKGROUND_COLOR, POINTS_COLOR, HEALTH_COLOR, STATUS_BAR_HEIGHT, STATUS_BAR_WIDTH
 import pygame
 import random
+import time
 
 class HelicopterBlades():
     def __init__(self, base_folder, screen, parent):
         self.parent = parent
         self.screen = screen
         self.animations = {}
-        self.current_animation = "Fast"
+        self.current_animation = "Idle"
         self.offset = (0,0)
         self.x = 0
         self.y = 0
@@ -21,16 +22,12 @@ class HelicopterBlades():
         self.animations["Idle"] = Animation(self.screen,base_folder,"Helicopter_blades_", "Idle", 0, (0,-10),90)
         self.animations["Slow"] = Animation(self.screen,base_folder,"blades_", "Move_slow", -1, (0,-10),90, frame_duration=50)
         self.animations["Fast"] = Animation(self.screen,base_folder,"blades_", "Move_fast", -1, (0,-10),90, frame_duration=50)
+        self.animations["Slow"].play()
         self.animations["Fast"].play()
 
 
     def draw(self):
         center = self.animations["Idle"].get_current_rect().center
-        lst = list(center)
-        # Modify the list
-        lst[1] -= 10
-        # Convert list back to tuple
-        center = tuple(lst)
 
         outline_color=None
         outline_thickness=None
@@ -38,11 +35,12 @@ class HelicopterBlades():
             outline_color = (255,0,0)
             outline_thickness = 2
 
+        center = center[0], center[1] - 10
         if self.current_animation == "Fire":
             self.animations["Shot"].draw(self.x, self.y, -self.angle, (46, 32), outline_color ,outline_thickness)
             self.animations["Fire"].draw(self.x, self.y, -self.angle, (46,-10), outline_color ,outline_thickness)
         else:
-            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, center, (0,0), outline_color ,outline_thickness)
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, center, (0,0), outline_color ,outline_thickness, scale=self.parent.scale_factor)
 
 
     def rotate_rect(self, rect, angle_degrees):
@@ -61,7 +59,8 @@ class HelicopterBlades():
         return rotated_corners
     
 
-    def get_shoot_positions(self, rotated_corners, distance_from_center=20, distance_from_axis=20):
+    def get_shoot_positions(self, rotated_corners, distance_from_center=0, distance_from_axis=0):
+        #pygame.draw.polygon(self.screen, (0, 0, 255), rotated_corners, 2)
 
         # Top side is defined by the first two points in the rotated_corners
         top_left = rotated_corners[0]
@@ -83,37 +82,33 @@ class HelicopterBlades():
         # Determine the perpendicular vector to the direction vector
         perp_dx = -dy
         perp_dy = dx
-        
+
         # Calculate the positions for the lights adjusting in both directions
-        light1_position = (center_x - dx * distance_from_center + perp_dx * distance_from_axis, 
+        position = (center_x - dx * distance_from_center + perp_dx * distance_from_axis, 
                         center_y - dy * distance_from_center + perp_dy * distance_from_axis)
-        
-        light2_position = (center_x + dx * distance_from_center - perp_dx * -distance_from_axis, 
-                        center_y + dy * distance_from_center - perp_dy * -distance_from_axis)
-        
-        return light1_position, light2_position
+
+        return position    
 
     
 
     def update(self, parent_pos, angle):
 
         rect =self.animations["Idle"].get_current_rect().copy()
-        rect.x = parent_pos[0] - self.parent.offset[0]
-        rect.y = parent_pos[1] - self.parent.offset[1]
+        rect.center = (parent_pos[0] + self.parent.offset[0], parent_pos[1] + self.parent.offset[1])
 
         self.angle = angle
 
         rotated_corners  = self.rotate_rect(rect, self.angle + 90)
         #pygame.draw.polygon(self.screen, (0, 0, 255), rotated_corners, 2)
-        self.shoot_positions = self.get_shoot_positions(rotated_corners, 5, 10)
-        # pygame.draw.circle(self.screen, (0,0,0), self.shoot_positions[0], 2)
+        self.shoot_position = self.get_shoot_positions(rotated_corners, 0, 10)
+        # pygame.draw.circle(self.screen, (0,0,0), self.shoot_position, 2)
         # pygame.draw.circle(self.screen, (0,0,0), self.shoot_positions[1], 2)
         self.x = parent_pos[0] + self.offset[0]
         self.y = parent_pos[1] + self.offset[1]
         #self.parent_angle = -parent_angle
 
         for animation in self.animations.values():
-            animation.update(self.x, self.y) 
+            animation.update() 
 
         # if self.current_animation == "Fire":
         #     finished = self.animations["Fire"].is_finished() and self.animations["Shot"].is_finished()
@@ -125,9 +120,11 @@ class HelicopterBlades():
 
 
 class Helicopter(Unit):
-    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Helicopter', screen=None, gun_sound_file="assets\\sounds\\helicoptergun.wav"):
+    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Helicopter', screen=None, gun_sound_file="assets\\sounds\\helicoptergun.wav", choosing_action_finished=None):
         super().__init__(target_tile, player, grid, base_folder, screen)
         self.engine_sound = pygame.mixer.Sound("assets\\sounds\\helicopterEngine.wav")
+        self.take_off_sound = pygame.mixer.Sound("assets\\sounds\\helicopterTakeOff.wav")
+        self.landing_sound = pygame.mixer.Sound("assets\\sounds\\helicopterLanding.wav")
         self.type = "Helicopter"
         self.settings = get_unit_settings(self.type)
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
@@ -148,7 +145,9 @@ class Helicopter(Unit):
         self.seat_left = self.seats
         self.move_cost = self.settings["Move Cost"]
         self.fire_cost = self.settings["Fire Cost"]
-        self.actions = {"Move To":self.move_cost, "Fire":self.fire_cost, "Get Out": 1}
+        self.actions_ground = {"Get Out": 1, "Take Off": 1}
+        self.actions_altitude = {"Move To":self.move_cost, "Fire":self.fire_cost, "Landing": 1}
+        self.actions = self.actions_ground
         self.tower = HelicopterBlades(base_folder, screen, self)
         self.screen = screen
         self.animations = {}
@@ -172,9 +171,23 @@ class Helicopter(Unit):
         self.target_x = 0
         self.target_y = 0
         self.all_sprites = pygame.sprite.LayeredUpdates()
-        self.gun_sound_channel = None
         self.angle = 90
         self.tower.angle = self.angle
+        self.altitude_scale_factor = 1.5  # Target size is 1.5 times the original size
+        self.time_to_reach_altitude = 1.0  # Time in seconds to reach the target size
+        rect = self.animations["Idle"].get_current_rect()
+        self.original_width, self.original_height = rect.width, rect.height
+        self.scale_factor = 1.0
+        self.going_up = 1
+        self.last_action_time = None
+        self.take_off_sound_channel = None
+        self.take_off_sound_playing = None
+        self.landing_sound_channel = None
+        self.landing_sound_playing = None
+
+        # Calculate the scaling factor per frame
+        self.altitude_delta_width = (self.altitude_scale_factor - 1) * self.original_width / (self.time_to_reach_altitude * 60)
+
         # self.tower.animations["Fire"].play() 
 
     def take_seat(self, unit):
@@ -261,23 +274,32 @@ class Helicopter(Unit):
 
     def load_animations(self, base_folder):
         self.animations["Idle"] = Animation(self.screen,base_folder,"Helicopter_base_", "Idle", 0, self.offset, 90)
-        self.animations["Idle_shadow"] = Animation(self.screen,base_folder,"Helicopter_shadow_", "Idle", 0, self.offset, 90)
+        self.bullet_image = Animation(self.screen,base_folder,"", "Bullet", -1, self.offset, 90) 
+        self.bullet_explosion_animation = Animation(self.screen, "assets\\images\\Effects","", "Explosion", 0, self.offset, 0, frame_duration=25) 
+        self.explosion_animation = Animation(self.screen, "assets\\images\\Effects","Explosion_", "1", 0, self.offset, 0, frame_duration=25) 
         #self.animations["Broken"] = Animation(self.screen,base_folder,"Helicopter_base_", "Broken", 0, self.offset, 90)
 
     
     def calc_screen_pos(self,tile_x, tile_y):
-        screen_x = tile_x * TILE_SIZE
-        screen_y = tile_y * TILE_SIZE
+        screen_x = tile_x * TILE_SIZE + self.grid.offset[0]
+        screen_y = tile_y * TILE_SIZE + self.grid.offset[1]
         return screen_x, screen_y
 
     
     def draw(self):
         if self.player != self.grid.current_player:
-            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None, (255,0,0), 2)
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None, (255,0,0), 2, scale=self.scale_factor)
         else:
-            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None)
+            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None, scale=self.scale_factor)
         
         self.tower.draw()
+
+        if self.explosion_animation.is_playing:
+            self.explosion_animation.draw(self.x, self.y, 0, None, None)
+
+        if not self.is_alive:
+            return
+                
         if self.seat_taken == 0:
             self_selected = False
             if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive:
@@ -285,7 +307,6 @@ class Helicopter(Unit):
             if self_selected:
                 bar_width = (SQUARE_SIZE+SQUARE_SPACING) * self.seats
                 self.draw_points_as_squares(self.x + 64 - bar_width, self.y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)                            
-            return
         
         rect = self.animations[self.current_animation].get_current_rect()
 
@@ -302,13 +323,13 @@ class Helicopter(Unit):
         self.draw_status_bar(status_bar_x, status_bar_y, self.health, self.max_health, HEALTH_COLOR)
         self.draw_status_bar(status_bar_x, status_bar_y + STATUS_BAR_HEIGHT, self.action_points, self.max_action_points, POINTS_COLOR) 
 
-        self.draw_points_left()
+        #self.draw_points_left()
 
         bar_width = (SQUARE_SIZE+SQUARE_SPACING) * self.seats
         self.draw_points_as_squares(self.x + 64 - bar_width, self.y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)
 
         if self.current_action == "choosing_move_target":
-            self.grid.highlight_tiles((self.x // TILE_SIZE, self.y // TILE_SIZE), min(self.max_move, self.action_points / self.move_cost), (00, 100, 00, 50), self.current_action)       
+            self.grid.highlight_tiles((self.x // TILE_SIZE, self.y // TILE_SIZE),self.max_move, (00, 100, 00, 50), self.current_action)       
 
         if self.current_action == "choosing_fire_target":
             self.grid.highlight_tiles((self.x // TILE_SIZE, self.y // TILE_SIZE), self.fire_range, (100, 00, 00, 50), self.current_action)       
@@ -342,7 +363,7 @@ class Helicopter(Unit):
         # Calculate the distance to the target
         target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
         squares_to_target = (target_x - self.x) / TILE_SIZE, (target_y - self.y) / TILE_SIZE
-        movement_cost = (abs(squares_to_target[0]) + abs(squares_to_target[1])) * self.settings["Move Cost"]
+        movement_cost = self.settings["Move Cost"]
         if movement_cost <= self.action_points:
             self.target_point = (target_x + self.offset[0], target_y + self.offset[1])
             self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
@@ -354,9 +375,9 @@ class Helicopter(Unit):
             self.target_tile = target_tile
             self.action_points -= movement_cost
             self.target_x, self.target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
-            self.current_animation = "Move"
+            #self.current_animation = "Move"
             self.engine_sound.play(loops=-1)
-            self.animations[self.current_animation].play()
+            #self.animations[self.current_animation].play()
             self.distance_to_target = math.sqrt((self.target_x - self.x)**2 + (self.target_y - self.y)**2)
             if self.distance_to_target < self.min_distance:
                 self.min_distance = self.distance_to_target
@@ -383,24 +404,83 @@ class Helicopter(Unit):
         if fire_cost <= self.action_points:
             #self.tower.angle = self.angle
             self.bullets_fired = 0
-            self.gun_sound_channel  = self.gun_sound.play()
-            self.gun_sound_playing = True
+            self.gun_sound.play()
 
             self.target_tile = target_tile
-            self.attack_damage
             self.target_point = (target_x + self.offset[0], target_y + self.offset[1])
             self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
             self.angle = math.atan2(self.target_point[1] - self.origin_point[1] ,  self.target_point[0] - self.origin_point[0] ) * 180 / math.pi
             self.action_points -= fire_cost
-            self.tower.animations["Shot"].play()
+            #self.tower.animations["Shot"].play()
             self.tower.animations["Fire"].play() 
             self.target_x, self.target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
             self.tower.current_animation = "Fire"
             self.distance_to_target = math.sqrt((self.target_x - self.x)**2 + (self.target_y - self.y)**2)
 
-        
+    def bullet_reach_target(self, bullet):
+        pass
+
+    def take_off(self):
+        self.going_up = 0
+        self.current_action = "Taking Off"
+        self.actions = self.actions_altitude
+        self.take_off_sound_channel = self.take_off_sound.play()
+        self.take_off_sound_playing = True
+        self.tower.current_animation = "Slow"       
+
+    def land(self):
+        self.going_up = -1
+        self.current_action = "Landing"
+        self.actions = self.actions_ground
+        self.engine_sound.play(-1)
+
+
+    def start_helicopter(self):
+        if self.take_off_sound_playing and not self.take_off_sound_channel.get_busy():
+            self.take_off_sound_playing = False
+            self.engine_sound.play(-1)
+            self.tower.current_animation = "Fast"
+            self.going_up = 1
+
+        if self.going_up == 1:
+            if self.scale_factor < self.altitude_scale_factor:
+                self.scale_factor += self.altitude_delta_width / self.original_width  # Update scale factor
+            else:
+                self.scale_factor = self.altitude_scale_factor
+                self.going_up = 0
+                self.current_action = None
+                self.engine_sound.stop()             
+
+
+    def shut_down_helicopter(self):
+        if self.landing_sound_playing and not self.landing_sound_channel.get_busy():
+            self.landing_sound_playing = False
+            self.tower.current_animation = "Idle"
+            self.going_up = 0
+            self.current_action = None
+
+        if self.going_up == -1:
+            if self.scale_factor > 1:
+                self.scale_factor -= self.altitude_delta_width / self.original_width
+            else:
+                self.scale_factor = 1
+                self.going_up = 0                
+                self.engine_sound.stop()
+                self.landing_sound_channel = self.landing_sound.play()
+                self.landing_sound_playing = True
+                self.tower.current_animation = "Slow"       
+
+
+               
 
     def update(self, inputs):
+
+        # Update animations.
+        for animation in self.animations.values():
+            animation.update()       
+
+        self.explosion_animation.update()
+
         # If there's no driver, just update the tower's position and angle and exit.
         if self.seat_taken == 0:
             self.tower.update((self.x, self.y), self.tower.angle if self.tower.angle else 0) 
@@ -446,6 +526,10 @@ class Helicopter(Unit):
                                 self.current_action = "choosing_fire_target"
                             elif action == "Get Out":
                                 self.get_unit_out()
+                            elif action == "Take Off":
+                                self.take_off()
+                            elif action == "Landing":
+                                self.land()
                 else:
                     self.current_action = None     
 
@@ -456,42 +540,40 @@ class Helicopter(Unit):
         elif inputs.keyboard.clicked[pygame.K_ESCAPE]:
                 self.current_action = None
 
-        # if self.gun_sound_channel and not self.gun_sound_channel.get_busy():
-        #     if self.gun_sound_playing:
-        #         self.tower.animations["Shot"].stop()
-        #         self.tower.animations["Fire"].stop()  
-        #         self.tower.current_animation = "Idle"              
-        #     self.gun_sound_playing = False
-
-
-        # Update animations.
-        for animation in self.animations.values():
-            animation.update(self.x, self.y)        
 
         # Update the tower's position and angle.
         current_time = pygame.time.get_ticks()
 
-        # Check if the shooting action is finished.
-        finished_shooting = True
-        if self.current_action == "fire_to_target":
-            finished_shooting = self.bullets_fired == self.NUM_BULLETS
+
+        # Update bullet positions and check for hits.
+        all_reached_target = True
+        finished_shooting = False
+        for bullet in self.bullets:
+            bullet.update()
+            if not bullet.target_reached:
+                all_reached_target = False
+
+        if all_reached_target and self.current_action == "fire_to_target" and self.bullets_fired == self.NUM_BULLETS:
+            finished_shooting = True
 
         # Shoot bullets at a specific firing rate.
-        point_x = self.target_tile.x*TILE_SIZE
-        point_y = self.target_tile.y*TILE_SIZE        
-        if not finished_shooting and  current_time - self.last_fired > self.FIRING_RATE:
-            shoot_positions = self.tower.shoot_positions
-            shoot_position = shoot_positions[self.canon_number]
+        point_x = self.target_tile.x*TILE_SIZE + self.offset[0]
+        point_y = self.target_tile.y*TILE_SIZE + self.offset[1]
+        if self.current_action == "fire_to_target" and not finished_shooting and self.bullets_fired < self.NUM_BULLETS and current_time - self.last_fired > self.FIRING_RATE:
+            shoot_position = self.tower.shoot_position
+            shoot_position = shoot_position[0] - self.tower.offset[0], shoot_position[1] - self.tower.offset[1]
             self.canon_number += 1
             self.canon_number %= 2
-            angle = math.atan2(self.target_tile.y*TILE_SIZE - shoot_position[1] + self.offset[1], self.target_tile.x*TILE_SIZE - shoot_position[0] + self.offset[0]) * 180 / math.pi
+            angle = math.atan2((self.target_tile.y*TILE_SIZE) - shoot_position[1] , (self.target_tile.x*TILE_SIZE) - shoot_position[0]) * 180 / math.pi
 
-            self.bullets.append(Bullet(shoot_position[0], shoot_position[1],  angle, self.screen ,self.BULLET_SPEED, self.target_tile, self.base_folder, damage=self.attack_damage / self.NUM_BULLETS))
+            self.bullets.append(Bullet(shoot_position[0],shoot_position[1],angle, self.screen ,self.BULLET_SPEED, self.target_tile, self.base_folder, image=self.bullet_image, 
+                                        explosion_animation=self.bullet_explosion_animation, reach_callback=self.bullet_reach_target,
+                                        explosion_sound=self.bullet_explosion_sound, damage=self.attack_damage / self.NUM_BULLETS))
             self.bullets_fired += 1
             self.last_fired = current_time
 
 
-        self.origin_point = (self.x , self.y)
+        self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
         self_selected = False
         if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive:
             self_selected = True
@@ -514,8 +596,16 @@ class Helicopter(Unit):
         #     self.angle = math.atan2(inputs.mouse.pos[1] - self.origin_point[1], inputs.mouse.pos[0] - self.origin_point[0]) * 180 / math.pi
 
         # If moving to a target, update the unit's position.
+
+        if self.current_action == "Taking Off":
+            self.start_helicopter()
+
+        if self.current_action == "Landing":
+            self.shut_down_helicopter()
+
+
         if self.current_action == "move_to_target":
-            self.target_point = (point_x + self.offset[0], point_y + self.offset[1])
+            self.target_point = (point_x, point_y)
             self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
             self.distance_to_target = math.sqrt((self.target_point[0] - self.origin_point[0])**2 + (self.target_point[1] - self.origin_point[1])**2)
             self.current_animation == "Walk"
@@ -525,25 +615,18 @@ class Helicopter(Unit):
             if self.distance_to_target < self.MOVE_SPEED:
                 self.x = self.target_x
                 self.y = self.target_y
-                self.animations[self.current_animation].stop()
+                #self.animations[self.current_animation].stop()
                 self.engine_sound.stop()
                 self.current_animation = "Idle"
                 self.current_action = None
         
-        # Update bullet positions and check for hits.
-        for bullet in self.bullets:
-            bullet.update()
-            if bullet.target_reached:
-                self.bullets.remove(bullet)
-                if bullet.target_tile.unit:
-                    bullet.target_tile.unit.take_damage(10)
+
                     
-        if finished_shooting and self.current_action == "fire_to_target":            
+        if finished_shooting and self.current_action == "fire_to_target":
             self.current_action = None
             self.current_animation = "Idle"
+            self.tower.current_animation = "Idle"
 
-        # if self_selected:
-        #     self.draw_points_left()
 
     def draw_points_left(self):
         # Draw each action text with appropriate color based on hover state
@@ -597,7 +680,11 @@ class Helicopter(Unit):
 
         
     def die(self):
-        pass        
+        self.is_alive = False
+        self.current_animation = "Broken"
+        self.tower.current_animation = "Broken"
+        self.explosion_animation.play()
+        self.explosion_sound.play()
 
     def draw_points_as_squares(self, x, y, current_points, max_points, color1, color2, max_squares_per_row):
         for i in range(max_points):

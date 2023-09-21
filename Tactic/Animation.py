@@ -84,12 +84,16 @@ class Animation:
 
 
 
-    def draw(self, x, y, angle=0, rotation_center=None, offset=None, outline_color=None, outline_thickness=None):
+    def draw(self, x, y, angle=0, rotation_center=None, offset=None, outline_color=None, outline_thickness=None, scale = 1.0):
         image = self.images[self.current_frame]
         if rotation_center is None:
             rotation_center = image.get_rect().center
             
         rotated_image, rotated_image_rect = self.blitRotate(image, (x,y), rotation_center, angle, offset)
+        if scale != 1.0:
+            rotated_image = pygame.transform.scale(rotated_image, (int(rotated_image.get_width() * scale), int(rotated_image.get_height() * scale)))
+            rotated_image_rect = rotated_image.get_rect(center = rotated_image_rect.center)
+
         if outline_color and outline_thickness:            
             outlined = self.draw_outline(rotated_image, outline_color, outline_thickness)
             self.screen.blit(outlined, rotated_image_rect)
@@ -185,7 +189,7 @@ class Animation:
         self.last_update = pygame.time.get_ticks()
         self.frames_count = 0
 
-    def update(self, x, y):
+    def update(self):
         now = pygame.time.get_ticks()
         if self.is_playing and now - self.last_update > self.frame_duration:
             if self.is_looping > 0 and self.loop_count >= self.is_looping:

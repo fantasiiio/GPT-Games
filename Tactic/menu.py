@@ -43,10 +43,17 @@ tank.tower.angle = 180
 
 tank.max_action_points = 50
 tank.action_points = 50
-tank.move(grid.tiles[25][26])
 tank.action_points = 50
 tank.current_action = "move_to_target"
 tank.seat_taken = 1
+
+silence_sound = pygame.mixer.Sound("assets\\sounds\\silence.wav")
+tank.gun_sound = silence_sound
+tank.engine_sound = silence_sound
+tank.explosion_sound = silence_sound
+
+tank.move(grid.tiles[25][26])
+
 
 running = True
 while running:
