@@ -1,1 +1,3 @@
 *.pyc
+Tactic/dist
+Tactic/build

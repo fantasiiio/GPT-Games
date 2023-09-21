@@ -38,9 +38,9 @@ def identify_shape_block_corners(grid, player_id):
 
 # Define the W shape
 W_shape = [
-    [1, 1, 0, 0],
-    [1, 1, 1, 1],
-    [0, 0, 1, 0],
+    [1, 0, 0],
+    [1, 1, 1],
+    [0, 0, 1],
 ]
 
 

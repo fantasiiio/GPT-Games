@@ -27,8 +27,8 @@ class Connect4Node(Node):
         self.reward = {1: 0, 2:0}
         self.total_reward = {1: 0, 2:0}
         self.last_move = last_move
-        self.history = history if history is not None else []  
-        self.history = history.copy() 
+        self.history = history if history is not None else []
+        self.history = history.copy()
         self.children = []
         self.winner = winner
         self.Q = {1: 0, 2:0}
@@ -64,7 +64,7 @@ class Connect4Node(Node):
                                 history=existing_node.history.copy(),
                                 winner=existing_node.winner,
                                 resnet=resnet)
-        return new_node        
+        return new_node
 
 
     def detect_board_type(self, board):
@@ -74,14 +74,14 @@ class Connect4Node(Node):
         rows, cols = 6, 7
         board = np.zeros((rows, cols), dtype=np.int8)
         mask = 0b11  # Mask to extract 2 bits
-        
+
         for row in range(rows):
             for col in range(cols):
                 # Calculate the position of the bits in the integer
                 pos = 2 * (row * cols + col)
                 # Extract the bits for the current cell and assign it to the board
                 board[row, col] = (self.board >> pos) & mask
-        
+
         return board
 
     def board_to_int(self, board):
@@ -92,7 +92,7 @@ class Connect4Node(Node):
                 shift_value = 2 * (row * 7 + col)
                 mask = value << shift_value
                 board_int |= mask
-        return board_int          
+        return board_int
 
 
     @lru_cache(maxsize=None)
@@ -100,7 +100,7 @@ class Connect4Node(Node):
         shift_value = 2 * (row * 7 + col)
         mask = 0b11 << shift_value
         return (self.board & mask) >> shift_value
-        
+
     def set_cell(self, row, col, value):
         mask = 0b11 << (2 * (row * 7 + col))
         board = (self.board & ~mask) | (value << (2 * (row * 7 + col)))
@@ -124,8 +124,8 @@ class Connect4Node(Node):
                 for row in range(6):
                     if self.get_cell(row, col) == 0:
                         id = next(gen)
-                        new_history = self.history + [col]        
-                        opponent = 3 - self.player                     
+                        new_history = self.history + [col]
+                        opponent = 3 - self.player
                         new_node = Connect4Node(board=new_board, player=opponent, last_move=col, history=new_history, winner=self.winner)
                         if(not hasattr(new_node, "board")):
                             new_node = Connect4Node(board=new_board, player=opponent)
@@ -133,6 +133,7 @@ class Connect4Node(Node):
                         is_terminal, player_win = new_node.check_terminal()
                         new_node.winner = opponent if is_terminal and player_win else None
                         new_node._is_terminal = is_terminal
+                        new_node.reward[new_node.player] = new_node.evaluate_board()
                         if is_terminal:
                             new_node.reward[new_node.player] = new_node.evaluate_board()
                             new_node.total_reward[new_node.player] = new_node.reward[new_node.player]
@@ -140,26 +141,27 @@ class Connect4Node(Node):
 
                         self.children.append(new_node)
                         break
+
         return self.children
 
 
     def check_terminal(self):
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
         rows, cols = 6, 7
-        
+
         for row in range(rows):
             for col in range(cols):
                 current_cell = self.get_cell(row, col)
-                
+
                 # Skip empty cells
                 if current_cell == 0:
                     continue
-                
+
                 for dr, dc in directions:
                     # Limit the search space to avoid unnecessary checks
                     if not (0 <= row + 3*dr < rows and 0 <= col + 3*dc < cols):
                         continue
-                    
+
                     count = 0
                     for i in range(4):  # You only need to check the next 3 cells
                         r, c = row + dr * i, col + dc * i
@@ -167,17 +169,17 @@ class Connect4Node(Node):
                             count += 1
                         else:
                             break  # Sequence broken, no need to continue
-                        
+
                         if count == 4:
                             return True, True  # Winning condition met
-                    
+
         if self.is_board_full():
             return True, False  # Draw condition
-            
+
         return False, False  # Game is not over
 
 
-    
+
     def is_board_full(self):
         mask = 0b11  # Binary mask for two bits
         for i in range(42):  # Total cells in a 6x7 board
@@ -185,7 +187,7 @@ class Connect4Node(Node):
             if cell_value == 0:
                 return False
         return True
-    
+
     def is_terminal(self):
         return self._is_terminal
 
@@ -196,7 +198,7 @@ class Connect4Node(Node):
 
     def __hash__(self):
         return self.hash
-    
+
     def get_valid_moves(self):
         rows, cols = 6, 7
         valid_moves = []
@@ -208,7 +210,7 @@ class Connect4Node(Node):
                 valid_moves.append(child)
 
         return valid_moves
-    
+
     def is_valid_location(self, col):
         return self.get_cell(5, col) == 0
 
@@ -222,22 +224,6 @@ class Connect4Node(Node):
             available_moves = self.get_valid_moves()
             best_child = self._uct_select(available_moves)
             return best_child
-    
-    # def _uct_select(self, node):
-    #     "Select a child of node, balancing exploration & exploitation"
-
-    #     # All children of node should already be expanded:
-    #     assert all(n in self.children for n in self.children[node])
-
-    #     log_N_vertex = math.log(self.N[node])
-
-    #     def uct(n):
-    #         "Upper confidence bound for trees"
-    #         return self.Q[n] / self.N[n] + self.exploration_weight * math.sqrt(
-    #             log_N_vertex / self.N[n]
-    #         )
-
-    #     return max(self.children[node], key=uct)
 
     def _uct_select(self, nodeList):
         total_simulations = self.N[1] + self.N[2]
@@ -245,8 +231,8 @@ class Connect4Node(Node):
         log_N = math.log(total_simulations)
         def uct(n):
             N = n.N[n.player]+1
-            Q = n.Q[n.player] 
-            
+            Q = n.Q[n.player]
+
             C = 2
             if N == 0:
                 return float("inf")
@@ -257,13 +243,13 @@ class Connect4Node(Node):
                 exploration_value = C * math.sqrt(log_N / (N))
             else:
                 exploration_value = 0
-                
-            return exploitation_value + exploration_value    
-        
+
+            return exploitation_value + exploration_value
+
         for n in nodeList:
-            n.uct_value[n.player] = uct(n)        
-         
-            
+            n.uct_value[n.player] = uct(n)
+
+
         return max(nodeList, key=lambda n: n.uct_value[n.player])
 
     #  This function counts the number of potential patterns of a given length that could be extended to 4-in-a-line on a board.
@@ -283,7 +269,7 @@ class Connect4Node(Node):
                         continue
 
                     pattern = [self.get_cell(i + k * dx, j + k * dy) for k in range(4)]
-                    
+
                     if pattern.count(player) == length and pattern.count(0) == empty_spaces_needed:
                         if debug:
                             # Generate board visualization for each potential pattern
@@ -293,15 +279,15 @@ class Connect4Node(Node):
                             cell_value = self.get_cell(row, col)
                             if debug:
                                 visual_board[row][col] = str(cell_value) if cell_value == player else 'x'
-                        
+
                         if debug:
                             # Print the visual board
                             print("Potential pattern found:")
                             for row in visual_board:
                                 print(" ".join(row))
-                        
+
                         count += 1
-                            
+
         return count
 
 
@@ -320,7 +306,7 @@ class Connect4Node(Node):
             score += PATTERN_SCORES[pattern_len] * patterns_count
 
         return score
-    
+
     def update_win_count(self, winner):
         if winner in self.win_count:
             self.win_count[winner] += 1

@@ -1,14 +1,6 @@
-from memory_profiler import profile
 import numpy as np
-from igraph import Graph, plot
-from ete3 import TreeStyle
-from ete3 import Tree
-from total_size import total_size
-from tree3 import TreeNode
-import networkx as nx
-import matplotlib.pyplot as plt
-from mctsTree import MCTSTree
-import random
+#from tree3 import TreeNode
+#from mctsTree import MCTSTree
 
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -36,7 +28,7 @@ class MCTS:
 
         return max(node.children, key=score)
 
-    def do_rollout(self, node):        
+    def do_rollout(self, node):               
         if self.root_node is None:
             self.root_node = node
         "Make the tree one layer better. (Train for one iteration.)"
@@ -61,29 +53,48 @@ class MCTS:
             unexplored = [child for child in children if not child.children]
 
             if unexplored:
-                # Choose randomly an unexplored child node 
-                best_child = np.random.choice(unexplored)
+                max_reward = max(unexplored, key=lambda x: x.reward[x.player])
+                candidates = [child for child in unexplored if child.reward[child.player] == max_reward.reward[max_reward.player]]
+                best_child = np.random.choice(candidates)
+
                 path.append(best_child)
                 return path
 
-            #node = random.choice(children)  # descend a layer deeper
-            node = node._uct_select(node.children)  # descend a layer deeper
+            node = node._uct_select(node.children)
 
 
     def _expand(self, node):
-        "Update the `children` dict with the children of `node`"
-        if node.children:
-            return  # already expanded
-        node.children = node.create_children()
-        node = node
+        pass
+        # "Update the `children` dict with the children of `node`"
+        # if node.children:
+        #     return  # already expanded
+        # node.children = node.create_children()
+        # node = node
     
+
+    def print_grid(self, grid):
+        print("-" * 30)
+        for i, row in enumerate(grid):
+            row_str = ""
+            for j, cell in enumerate(row):
+                cell = grid[i][j]
+                if cell == 1:
+                    row_str += '+ '
+                elif cell == 2:
+                    row_str += 'x '                    
+                else:
+                    row_str += f"  "
+            print(row_str)
+        print()
+
     def _simulate(self, node):
         path = []
         starting_node = node
         while True:
+            #self.print_grid(node.bit_grid.decompress_grid_x_bits())
             node.simulated = True
             path.append(node.last_move)
-            is_terminal = node.check_terminal()
+            is_terminal = node.is_terminal
             if is_terminal[0]:
                 starting_node.simulation_paths.append(path)
                 return 0, node.player

@@ -3,7 +3,7 @@ import numpy as np
 from igraph import Graph, plot
 from ete3 import TreeStyle
 from ete3 import Tree
-from total_size import total_size
+#from total_size import total_size
 from tree3 import TreeNode
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -34,7 +34,7 @@ class MCTS:
         def score(n):
             #if n.N[n.player] == 0:
             #    return float("-inf")  
-            return (n.win_count[n.player] - n.win_count[3-n.player]) / n.N[n.player]
+            return (n.win_count[n.player] - n.win_count[3-n.player]) / (n.N[n.player] + 1)
             #return n.total_reward[n.player]
 
         return max(node.children, key=score)
@@ -64,8 +64,10 @@ class MCTS:
             unexplored = [child for child in children if not child.children]
 
             if unexplored:
-                # Choose randomly an unexplored child node 
-                best_child = np.random.choice(unexplored)
+                max_reward = max(unexplored, key=lambda x: x.reward[x.player])
+                candidates = [child for child in unexplored if child.reward[child.player] == max_reward.reward[max_reward.player]]
+                best_child = np.random.choice(candidates)
+
                 path.append(best_child)
                 return path
 

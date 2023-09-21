@@ -1,8 +1,25 @@
+import math
+import pickle
+
 class BitGrid():
-    def __init__(self, x_bits):
+    def __init__(self, x_bits, uncompress_grid = None):
         self.compressed_grid = []
         self.x_bits = x_bits
+        if uncompress_grid is not None:
+            self.compressed_grid = self.compress_grid_x_bits(uncompress_grid)
 
+    def copy(self):
+        new_grid = BitGrid(self.x_bits)
+        new_grid.compressed_grid = self.compressed_grid[:]
+        return new_grid
+
+    def required_bits(n):
+        """Return the number of bits needed to store the given integer."""
+        if n < 0:
+            raise ValueError("The function only supports non-negative integers.")
+        if n == 0:
+            return 1  # Special case: 0 requires 1 bit
+        return math.ceil(math.log2(n + 1))
     
     # Function to compress a 14x14 grid using variable bit-level compression
     def compress_grid_x_bits(self, grid):
@@ -70,7 +87,7 @@ class BitGrid():
             raise ValueError(f"Number {new_number} cannot be represented with {self.x_bits} bits.")
         
         # Calculate the position in the compressed data
-        pos = row * 14 + col
+        pos = col * 14 + row
         chunk_index = pos // (64 // self.x_bits)  # The index of the 64-bit integer that contains the number
         chunk_pos = pos % (64 // self.x_bits)  # The position of the number within the 64-bit integer
         
@@ -85,7 +102,7 @@ class BitGrid():
     # Function to read a single number from a compressed grid
     def read(self, row, col):
         # Calculate the position in the compressed data
-        pos = row * 14 + col
+        pos = col * 14 + row
         chunk_index = pos // (64 // self.x_bits)  # The index of the 64-bit integer that contains the number
         chunk_pos = pos % (64 // self.x_bits)  # The position of the number within the 64-bit integer
         
@@ -94,6 +111,15 @@ class BitGrid():
         num = (self.compressed_grid[chunk_index] >> (64 - self.x_bits * (chunk_pos + 1))) & mask
         
         return num
+    
+    def save_to_file(self, filename="grid.txt"):
+        with open(filename, 'wb') as file:
+            pickle.dump(self, file)
+
+    @staticmethod
+    def load_from_file(filename="grid.txt"):
+        with open(filename, 'rb') as file:
+            return pickle.load(file)
 
 # grid = BitGrid(2)
 

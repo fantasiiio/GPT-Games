@@ -62,6 +62,7 @@ class Game:
         self.AI = 2
         self.EMPTY = 0
         self.board_history = []
+
         self.game_over = False
         self.iterations = 100
         self.start_iterations = self.iterations
@@ -154,62 +155,75 @@ class Game:
     def run(self):
         quit = False
 
+        print("1- player vs AI")
+        print("2- AI vs AI")
+        print("3- player vs player")
+        choice = int(input("Enter your choice: "))
+        if choice == 1:
+            player_type = {1: "human", 2: "AI"}
+        elif choice == 2:
+            player_type = {1: "AI", 2: "AI"}
+        elif choice == 3:
+            player_type = {1: "human", 2: "human"}
+
         while not quit:
             game_over = False
-            turn = self.PLAYER
             board = self.create_board()
-            self.node = Connect4Node(board, self.AI, False, 0)
+            turn = player_type[1]
+            self.node = Connect4Node(board, 2, False, 0)
             self.node.create_children()
             while not game_over:
-                if turn == self.AI and not game_over:
-                    self.get_mcts_move_single()
-                    terminal = self.node.check_terminal()
-                    if terminal[0]:
-                        self.end_game(self.AI)
-                        game_over = True
+                if not game_over:
+                    if turn == "AI":  # AI's turn in player vs AI or AI vs AI
+                        self.iterations = 50 * (((self.node.player-1) * 3) + 1)
+                        self.get_mcts_move_single()
+                        terminal = self.node.check_terminal()
+                        if terminal[0]:
+                            self.end_game(self.node.player)
+                            game_over = True
+                        if not game_over:
+                            turn = player_type[3-self.node.player]
 
-                    turn = self.PLAYER
+                if turn == "human": 
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            sys.exit()
 
-                if len([c for c in range(self.COLUMN_COUNT) if self.node.is_valid_location(c)]) == 0:
-                    self.end_game(0)
-                    game_over = True
+                        if event.type == pygame.MOUSEMOTION:
+                            pygame.draw.rect(self.screen, (0, 0, 0), (0, 0, WIDTH, SQUARESIZE))
+                            posx = event.pos[0]
+                            if turn == self.PLAYER:
+                                pygame.draw.circle(self.screen, RED, (posx, int(SQUARESIZE/2)), RADIUS)
+                            else:
+                                pygame.draw.circle(self.screen, YELLOW, (posx, int(SQUARESIZE/2)), RADIUS)
 
+                        if event.type == pygame.MOUSEBUTTONDOWN:
+                            pygame.draw.rect(self.screen, (0, 0, 0), (0, 0, WIDTH, SQUARESIZE))
+                            col = int(event.pos[0] // SQUARESIZE)
 
-                for event in pygame.event.get():            
-                    if event.type == pygame.QUIT:
-                        sys.exit()
+                            if self.node.is_valid_location(col):
+                                self.update_node_to_child(col)
+                                terminal = self.node.check_terminal()
+                                if terminal[0]:
+                                    self.end_game(turn)
+                                    game_over = True
 
-                    if event.type == pygame.MOUSEMOTION:
-                        pygame.draw.rect(self.screen, (0, 0, 0), (0, 0, WIDTH, SQUARESIZE))
-                        posx = event.pos[0]
-                        if turn == self.PLAYER:
-                            pygame.draw.circle(self.screen, RED, (posx, int(SQUARESIZE/2)), RADIUS)
-                        else:
-                            pygame.draw.circle(self.screen, YELLOW, (posx, int(SQUARESIZE/2)), RADIUS)
+                                if not game_over:
+                                    if choice == 3:
+                                        turn = self.PLAYER if turn == self.AI else self.AI
+                                    elif choice == 1:
+                                        turn = self.AI
 
-
-                    if event.type == pygame.MOUSEBUTTONDOWN:
-                        pygame.draw.rect(self.screen, (0, 0, 0), (0, 0, WIDTH, SQUARESIZE))                
-                        col = int(event.pos[0] // SQUARESIZE)
-
-                        if self.node.is_valid_location(col):
-                            self.update_node_to_child(col)
-                            terminal = self.node.check_terminal()
-                            if terminal[0]:
-                                self.end_game(self.PLAYER)
-                                game_over = True
-
-                        turn = self.AI
-            
-                #draw_text_board(self.node.int_to_board())
                 self.draw_board(self.node.int_to_board())
                 pygame.display.update()
+                pygame.time.wait(100)
+                
+
             click = False
             while not click:
-                for event in pygame.event.get():            
+                for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         sys.exit()
-
 
                     if event.type == pygame.MOUSEBUTTONDOWN:
                         click = True
@@ -217,7 +231,6 @@ class Game:
             
     def get_mcts_move_single(self):
         mcts = MCTS()
-        # iterations = 10000
         
         for _ in tqdm(range(self.iterations), desc="Running MCTS"):
             mcts.do_rollout(self.node)

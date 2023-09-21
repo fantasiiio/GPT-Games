@@ -90,24 +90,23 @@ def print_grid(grid):
 
 # Example usage:
 grid = [
-    [0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0],
 ]
 
 shape = [
-    [0, 1],
-    [0, 1],
-    [1, 1]
+    [0, 1, 1],
+    [0, 1, 0],
+    [1, 1, 0]
 ]
 
 shape_x, shape_y = 0, 0  # The corner (x, y) of the shape
 piece = Piece(shape, 1, 1, orientation= 1)
 transformed_shape = piece.transform()
-grid_x, grid_y = 2,2    # The position (x, y) on the grid where you want to place the shape's corner
+grid_x, grid_y = 3,2    # The position (x, y) on the grid where you want to place the shape's corner
 
-result, message = place_shape_on_grid(grid, transformed_shape, shape_x, shape_y, grid_x, grid_y)
-print(message)
+result = place_shape_on_grid(grid, transformed_shape, shape_x, shape_y, grid_x, grid_y)
 print_grid(grid)

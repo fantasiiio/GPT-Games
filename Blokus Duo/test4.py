@@ -34,8 +34,8 @@ def print_grid(grid):
             cell = grid[i][j]
             if cell == 1:
                 row_str += 'X '
-            elif cell == 3:
-                row_str += '+ '                    
+            elif cell == 2:
+                row_str += '| '                    
             else:
                 row_str += f"{cell} "
         print(row_str)
@@ -58,13 +58,13 @@ def identify_grid_corners_positions(grid, player_id, check_outer_edges=True):
                                 edge_touch = True
                                 break
                         if not edge_touch:
-                            corner_positions.append((dx, dy))
+                            corner_positions.append((dy, dx))
 
     # remove position where x oy y is outsize of the grid
     new_list = []
     if not check_outer_edges:
         for i in range(len(corner_positions)):
-            if corner_positions[i][0] >= 0 and corner_positions[i][1] >= 0 and corner_positions[i][0] < rows and corner_positions[i][1] < cols:
+            if corner_positions[i][0] >= 0 and corner_positions[i][1] >= 0 and corner_positions[i][0] < cols and corner_positions[i][1] < rows:
                 new_list.append(corner_positions[i])
     else:
         new_list = corner_positions
@@ -162,7 +162,18 @@ def is_move_valid(grid, shape, shape_x, shape_y, grid_x, grid_y):
 GRID_SIZE = 14
 
 def place_shape_on_grid(grid, shape, shape_x, shape_y, grid_x, grid_y):
+    # Get the dimensions of the shape and the grid
     shape_height, shape_width = len(shape), len(shape[0])
+    grid_height, grid_width = len(grid), len(grid[0])
+    
+    # Check if the shape can be placed at the specified position
+    for i in range(shape_height):
+        for j in range(shape_width):
+            if shape[i][j]:
+                if (grid_y + i - shape_y < 0 or grid_y + i - shape_y >= grid_height or
+                    grid_x + j - shape_x < 0 or grid_x + j - shape_x >= grid_width or
+                    grid[grid_y + i - shape_y][grid_x + j - shape_x]):
+                    return False
     
     # Place the shape on the grid
     for i in range(shape_height):
@@ -175,21 +186,34 @@ def place_shape_on_grid(grid, shape, shape_x, shape_y, grid_x, grid_y):
 def place_piece_on_all_corners_debug(grid, available_corners, piece):
     move_index = 0
     possible_placements = []
-    no_rotation, no_mirror, semi_symmetric = get_symmetry_flags(piece.shape)    
+    no_rotation, no_mirror, semi_symmetric = get_symmetry_flags(piece.shape) 
+    #print(f"Symmetry Flags - No Rotation: {no_rotation}, No Mirror: {no_mirror}, Semi Symmetric: {semi_symmetric}")
+
     for grid_corner in available_corners:
+        #print(f"\n\nChecking available corner: {grid_corner}")
         for orientation, mirror in product(range(4), [False, True]):
             piece.orientation = orientation
             piece.mirror = mirror
             transformed_shape = piece.transform()
             piece_corners = identify_shape_corners(transformed_shape, 1)
+            #print(f"Piece Corners: {piece_corners}")
             if (no_rotation and orientation > 0) or (no_mirror and mirror) or (semi_symmetric and orientation >= 2 and not mirror):
                 continue
             for piece_corner_idx, piece_corner in enumerate(piece_corners):
-                edge_touching = find_edge_touching_pieces(grid, transformed_shape, piece_corner[0], piece_corner[1], grid_corner[1], grid_corner[0])
-                move_valid = not edge_touching and is_move_valid(grid, transformed_shape, piece_corner[0], piece_corner[1], grid_corner[1], grid_corner[0])
+                move_index += 1
+                #print(move_index)
+                #print(f"\nChecking piece corner : Position: {piece_corner}, Orientation: {orientation}, Mirror: {mirror}, Piece Corner Index: {piece_corner_idx}")
+                edge_touching = find_edge_touching_pieces(grid, transformed_shape, piece_corner[0], piece_corner[1], grid_corner[0], grid_corner[1])
+                move_valid = not edge_touching and is_move_valid(grid, transformed_shape, piece_corner[0], piece_corner[1], grid_corner[0], grid_corner[1])
+                temp_grid = copy.deepcopy(grid)
+                place_shape_on_grid(temp_grid, transformed_shape, piece_corner[0],piece_corner[1],  grid_corner[0], grid_corner[1])
+                # print()
+                # print("Grid after placing the piece:")
+                # print_grid(temp_grid)#
+                # print()
+
                 if move_valid:
-                    move_index += 1
-                    print(move_index)
+                    #print(f"Valid placement found:")
                     placement_info = {
                         'piece_corner_idx': piece_corner_idx,
                         'orientation': orientation,
@@ -197,15 +221,8 @@ def place_piece_on_all_corners_debug(grid, available_corners, piece):
                         'Grid pos': grid_corner,
                         'Piece pos': piece_corner,
                     }
-                    print(placement_info)
+                    #print(placement_info)
                     possible_placements.append(placement_info)
-                    temp_grid = copy.deepcopy(grid)
-                    place_shape_on_grid(temp_grid, transformed_shape, piece_corner[0],piece_corner[1],  grid_corner[1], grid_corner[0])
-                    # temp_grid[grid_corner[0]][grid_corner[1]] = 3
-                    print()
-                    print("Grid after placing the piece:")
-                    print_grid(temp_grid)#
-                    print()
         
     return possible_placements
 
@@ -230,12 +247,23 @@ w_shape = [
 piece = Piece(w_shape, 2, 2)
 print_grid(grid)
 
-# Identify available corners
-available_corners = identify_grid_corners_positions(grid, 1, False)
-print(f"Grig available corners: {available_corners}")
 
-available_corners = identify_shape_corners(w_shape, 1)
-print(f"Piece available corners: {available_corners}")
+import time
 
-possible_placements = place_piece_on_all_corners_debug(grid, available_corners, piece)
-print(f"Possible placements: {len(possible_placements)}")
+start_time = time.time()
+for i in range(1):
+    # Identify available corners
+    grid_available_corners = identify_grid_corners_positions(grid, 1, False)
+    #print(f"Grig available corners: {grid_available_corners}")
+
+    shape_available_corners = identify_shape_corners(w_shape, 1)
+    #print(f"Piece available corners: {shape_available_corners}")
+
+    possible_placements = place_piece_on_all_corners_debug(grid, grid_available_corners, piece)
+    #print(f"Possible placements: {len(possible_placements)}")
+
+
+end_time = time.time()
+
+elapsed_time = end_time - start_time
+print(f"Function took {elapsed_time} seconds to run.")
