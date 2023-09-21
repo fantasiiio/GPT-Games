@@ -257,10 +257,6 @@ class Boat(Unit):
 
 
 
-    
-    def take_damage(self, damage):
-        pass
-
     def load_animations(self, base_folder):
         self.animations["Idle"] = Animation(self.screen,base_folder,"Boat_base_", "Idle", -1, self.offset, 90, frame_duration = 300)
         self.animations["Broken"] = Animation(self.screen,base_folder,"Boat", "Broken", -1, self.offset, 90)
@@ -279,7 +275,11 @@ class Boat(Unit):
         else:
             self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None)
         
+        if not self.is_alive:
+            return
+        
         self.tower.draw()
+
         if self.seat_taken == 0:
             self_selected = False
             if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive:
@@ -599,7 +599,8 @@ class Boat(Unit):
 
         
     def die(self):
-        pass        
+        self.is_alive = False
+        self.current_animation = "Broken"
 
     def draw_points_as_squares(self, x, y, current_points, max_points, color1, color2, max_squares_per_row):
         for i in range(max_points):

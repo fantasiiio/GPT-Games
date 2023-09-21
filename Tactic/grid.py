@@ -256,6 +256,10 @@ class Grid:
         if action == "choosing_fire_target" and self.selected_tile.unit and tile.unit is not None and tile.unit.player == self.selected_tile.unit.player:
             return False
 
+        if action == "choosing_fire_target" and self.selected_tile.unit and tile.unit is not None and not tile.unit.is_alive:
+            return False
+
+
         # if action == "choosing_fire_target" and tile.unit is not None and tile.unit.type == "Tank" and tile.unit.driver:
         #     return False
 
