@@ -120,7 +120,7 @@ class HelicopterBlades():
 
 
 class Helicopter(Unit):
-    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Helicopter', screen=None, gun_sound_file="assets\\sounds\\helicoptergun.wav", choosing_action_finished=None):
+    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Helicopter', screen=None, gun_sound_file="assets\\sounds\\helicoptergun.wav", action_finished=None):
         super().__init__(target_tile, player, grid, base_folder, screen)
         self.engine_sound = pygame.mixer.Sound("assets\\sounds\\helicopterEngine.wav")
         self.take_off_sound = pygame.mixer.Sound("assets\\sounds\\helicopterTakeOff.wav")

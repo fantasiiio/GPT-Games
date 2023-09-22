@@ -23,9 +23,10 @@ class Unit:
         from config import TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y    
         self.target_screen_x = None  # Target position for movement
         self.target_screen_y = None
-        self.x, self.y = self.calc_screen_pos(target_tile.x, target_tile.y)  
-        self.tile = target_tile
-        self.tile.unit = self
+        if target_tile:
+            self.x, self.y = self.calc_screen_pos(target_tile.x, target_tile.y)  
+            self.tile = target_tile
+            self.tile.unit = self
         self.animations = {}
         self.current_animation = "Idle"
         self.current_action = None

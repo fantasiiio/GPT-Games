@@ -1,5 +1,6 @@
 import json
 import random
+from enum import Enum
 
 WHITE = (255, 255, 255)
 GRAY = (200, 200, 200)
@@ -53,3 +54,16 @@ with open('names-male.json', 'r') as file:
 
 def pick_random_name():
     return random.choice(maleNames)
+
+GameStateString = {
+    "UNIT_PLACEMENT": "Unit Placement",
+    "PLANNING": "Planning",
+    "EXECUTION": "Execution",
+    "OUTCOME": "Outcome"
+}
+
+class GameState(Enum):
+    UNIT_PLACEMENT = 1
+    PLANNING = 2
+    EXECUTION = 3
+    OUTCOME = 4

@@ -12,9 +12,9 @@ from config import  pick_random_name, get_unit_settings, TILE_SIZE, GRID_WIDTH, 
 
 class Soldier(Unit):
     
-    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Gunner', screen=None, gun_sound_file="assets\\sounds\\pistol.wav", choosing_action_finished=None):
+    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Gunner', screen=None, gun_sound_file="assets\\sounds\\pistol.wav", action_finished=None):
         super().__init__(target_tile, player, grid, base_folder, screen)
-        self.choosing_action_finished = choosing_action_finished
+        self.action_finished = action_finished
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
         self.death_sound = pygame.mixer.Sound("assets\\sounds\\dying2.wav")
         self.screen = screen
@@ -316,7 +316,7 @@ class Soldier(Unit):
                         touching = True
                         self.last_action = "move_to_target"
                         self.last_action_target = tile
-                        #self.choosing_action_finished(self)
+                        #self.action_finished(self)
                         self.move(tile)
                         self.current_action = "move_to_target"  
                 if not touching:
@@ -329,7 +329,7 @@ class Soldier(Unit):
                         if tile.unit and tile.unit.player != self.player:
                             self.last_action = "fire_to_target"
                             self.last_action_target = tile
-                            #self.choosing_action_finished(self)
+                            #self.action_finished(self)
                             self.fire(tile)
                             self.current_action = "fire_to_target"                               
                 if not touching:

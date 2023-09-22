@@ -22,7 +22,10 @@ class UIElement:
         if self.image:
             self.draw_9_slice(screen)
         else:
-            pygame.draw.rect(screen, self.color, self.rect)
+            transparent_surface = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
+            transparent_surface.fill((*self.color, 100))  # Assuming self.color is an (R, G, B) tuple
+            screen.blit(transparent_surface, self.rect.topleft)            
+            #pygame.draw.rect(screen, self.color, self.rect)
 
     def draw_9_slice(self, screen):
         border = self.border_size
@@ -53,9 +56,10 @@ class UIElement:
 
 
 class UIImage(UIElement):
-    def __init__(self, x, y, image=None, parent=None,color=(100, 100, 100), border_size=0, move_to_bounding_pos=False):
+    def __init__(self, x, y, image=None, parent=None,color=(100, 100, 100), border_size=0, move_to_bounding_pos=False, callback=None):
         super().__init__(x, y, 0,0, parent, image, color, border_size)
         self.move_to_bounding_pos = move_to_bounding_pos
+        self.callback = callback
         if image:
             self.image = pygame.image.load(image)
             self.bounding_rect = self.get_bounding_rectangle()
@@ -81,6 +85,18 @@ class UIImage(UIElement):
         if self.move_to_bounding_pos:
             pos[0] -= self.bounding_offset[0]
             pos[1] -= self.bounding_offset[1]  
+        return pos
+
+    def local_to_world(self, pos):
+        pos[0] += self.parent.rect.x
+        pos[1] += self.parent.rect.y
+        if self.parent:
+            pos[0] -= self.parent.border_size
+            pos[1] -= self.parent.border_size
+
+        if self.move_to_bounding_pos:
+            pos[0] += self.bounding_offset[0]
+            pos[1] += self.bounding_offset[1]  
         return pos
 
     def set_parent(self, parent):
@@ -138,8 +154,22 @@ class UIImage(UIElement):
         # Return as a pygame.Rect object
         return pygame.Rect(x1, y1, x2 - x1 + 1, y2 - y1 + 1)                        
 
+class UILabel(UIImage):
+    def __init__(self, x, y, text,  parent=None, font_size=20, text_color=(255, 255, 255)):
+        super().__init__(x, y, None, parent, text_color)    
+        self.text = text
+        self.font = pygame.font.Font(None, font_size)
+        self.text_color = text_color
+
+    def draw(self, screen):
+        if not self.font:
+            return
+        text_surface = self.font.render(self.text, True, self.text_color)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        screen.blit(text_surface, (text_rect.topleft[0], text_rect.topleft[1]))
+
 class UIButton(UIElement):
-    def __init__(self, x, y, width, height, text, font_size = 20, image=None, parent=None,color=(100, 100, 100), border_size=10, text_color=(0,0,0), hover_text_color=(255, 255, 255), callback=None):
+    def __init__(self, x, y, width, height, text, font_size = 20, image=None, parent=None,color=(100, 100, 100), border_size=10, text_color=(255, 255, 255), hover_text_color=(255, 255, 0), callback=None):
         super().__init__(x, y, width, height, parent, image, color, border_size)
         self.text = text
         self.font = pygame.font.Font(None, font_size)
@@ -148,6 +178,7 @@ class UIButton(UIElement):
         self.hover_text_color = hover_text_color
         self.callback = callback
         self.is_hovered = False
+        self.enabled = True
 
     def draw(self, screen):
         super().draw(screen)
@@ -155,19 +186,17 @@ class UIButton(UIElement):
         # Draw the button text
         if not self.font:
             return
-        text_surface = self.font.render(self.text, True, self.text_color)
+        text_color = self.text_color
+        if not self.enabled:
+            text_color = (100, 100, 100)
+        text_surface = self.font.render(self.text, True, text_color)
         text_rect = text_surface.get_rect(center=self.rect.center)
         screen.blit(text_surface, (text_rect.topleft[0], text_rect.topleft[1]))
 
     def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            # Check if the button was clicked
-            if self.rect.collidepoint(event.pos):
-                # If there's a callback, call it
-                if self.callback:
-                    self.callback()
-
-    def handle_event(self, event):
+        if not self.enabled:
+            return
+        
         if event.type == pygame.MOUSEMOTION:
             if self.is_mouse_is_over(event.pos):
                 if not self.is_hovered:  # If the button was not already hovered

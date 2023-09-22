@@ -4,7 +4,7 @@ from Animation import Animation
 from SpriteLayer import SpriteLayer
 from Unit import Unit
 import math
-from config import get_unit_settings, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY, MAX_SQUARES_PER_ROW, SQUARE_SPACING, SQUARE_SIZE, BACKGROUND_COLOR, POINTS_COLOR, HEALTH_COLOR, STATUS_BAR_HEIGHT, STATUS_BAR_WIDTH
+from config import GameState, get_unit_settings, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY, MAX_SQUARES_PER_ROW, SQUARE_SPACING, SQUARE_SIZE, BACKGROUND_COLOR, POINTS_COLOR, HEALTH_COLOR, STATUS_BAR_HEIGHT, STATUS_BAR_WIDTH
 import pygame
 import random
 #from SpriteLayer import SpriteLayers
@@ -121,8 +121,10 @@ class TankTower:
 
 
 class Tank(Unit):
-    def __init__(self, target_tile, player, grid,  base_folder='assets\\images\\Tank', screen=None, gun_sound_file="assets\\sounds\\tank shots.wav", choosing_action_finished=None):
+    def __init__(self, target_tile, player, grid,  base_folder='assets\\images\\Tank', screen=None, gun_sound_file="assets\\sounds\\tank shots.wav", action_finished=None, id=None):
         super().__init__(target_tile, player, grid, base_folder, screen)
+        self.id = id
+        self.action_finished = action_finished
         self.engine_sound = pygame.mixer.Sound("assets\\sounds\\tankEngine.wav")
         self.bullet_explosion_sound = pygame.mixer.Sound("assets\\sounds\\explosion 1.wav")
         self.explosion_sound = pygame.mixer.Sound("assets\\sounds\\explosion 2.wav")
@@ -158,15 +160,17 @@ class Tank(Unit):
         self.offset = (32,32)
         self.tower.offset = tuple(a + b for a, b in zip(self.tower.offset, self.offset))
         self.tile = None	
-        self.place_on_tiles(target_tile)
-        self.x, self.y = self.calc_screen_pos(target_tile.x, target_tile.y)
+        if target_tile:
+            self.place_on_tiles(target_tile)
+            self.x, self.y = self.calc_screen_pos(target_tile.x, target_tile.y)
+            self.target_tile = target_tile
+
         self.load_animations(base_folder)
         self.animations["Idle"].play()
         self.velocity_x = 0
         self.velocity_y = 0
         self.last_fired = pygame.time.get_ticks()  # Time when the last bullet was fired
         self.bullets_fired = 0  # Number of bullets fired
-        self.target_tile = target_tile
         self.canon_number = 0
         #self.driver = None
         self.passengers = []
@@ -174,6 +178,7 @@ class Tank(Unit):
         self.target_y = 0
         self.all_sprites = pygame.sprite.LayeredUpdates()
         self.angle = 0
+        self.current_game_state = None
         # self.tower.animations["Fire"].play() 
 
     def take_seat(self, unit):
@@ -403,8 +408,27 @@ class Tank(Unit):
     def bullet_reach_target(self, bullet):
         pass
 
-    def update(self, inputs):
+    def place_unit(self, inputs):
+        self.mouse_x, self.mouse_y = inputs.mouse.pos
+        # Snap mouse position to grid
+        grid_x = (self.mouse_x // TILE_SIZE) * TILE_SIZE 
+        grid_y = (self.mouse_y // TILE_SIZE) * TILE_SIZE       
+        self.x = grid_x
+        self.y = grid_y
+        self.tower.update((self.x, self.y), self.tower.angle if self.tower.angle else 0) 
+        
+        if inputs.mouse.clicked[0] and self.grid.selected_tile and not self.grid.selected_tile.unit: 
+            self.place_on_tiles(self.grid.selected_tile)
+            self.action_finished(self)
 
+    def on_message(self, event, value):
+        if event == "game_state_changed":
+            self.current_game_state = value
+
+    def update(self, inputs):
+        if self.current_game_state == GameState.UNIT_PLACEMENT:
+            self.place_unit(inputs)
+            return
         # Update animations.
         for animation in self.animations.values():
             animation.update()       
