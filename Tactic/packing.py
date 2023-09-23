@@ -7,8 +7,6 @@ class FreeRect:
     def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.x = 0
-        self.y = 0
 
     def split(self, box_width, box_height):
         bottom_rect = FreeRect(self.width - box_width, box_height)

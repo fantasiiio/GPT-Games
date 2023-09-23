@@ -156,17 +156,23 @@ class UIImage(UIElement):
 
 class UILabel(UIImage):
     def __init__(self, x, y, text,  parent=None, font_size=20, text_color=(255, 255, 255)):
-        super().__init__(x, y, None, parent, text_color)    
+        super().__init__(x, y, None, parent, text_color) 
         self.text = text
         self.font = pygame.font.Font(None, font_size)
         self.text_color = text_color
+        self.text_surface = self.font.render(self.text, True, self.text_color)
+        self.rect = self.text_surface.get_rect(top=self.rect.top, left=self.rect.left)
+
+    def set_text(self, text):
+        self.text = text
+        self.text_surface = self.font.render(self.text, True, self.text_color)
+        self.rect = self.text_surface.get_rect(top=self.rect.top, left=self.rect.left)
 
     def draw(self, screen):
         if not self.font:
             return
-        text_surface = self.font.render(self.text, True, self.text_color)
-        text_rect = text_surface.get_rect(center=self.rect.center)
-        screen.blit(text_surface, (text_rect.topleft[0], text_rect.topleft[1]))
+        #self.set_parent(self.parent)
+        screen.blit(self.text_surface, (self.rect.topleft[0], self.rect.topleft[1]))
 
 class UIButton(UIElement):
     def __init__(self, x, y, width, height, text, font_size = 20, image=None, parent=None,color=(100, 100, 100), border_size=10, text_color=(255, 255, 255), hover_text_color=(255, 255, 0), callback=None):

@@ -13,44 +13,24 @@ from config import  pick_random_name, get_unit_settings, TILE_SIZE, GRID_WIDTH, 
 class Soldier(Unit):
     
     def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Gunner', screen=None, gun_sound_file="assets\\sounds\\pistol.wav", action_finished=None):
-        super().__init__(target_tile, player, grid, base_folder, screen)
-        self.action_finished = action_finished
+        super().__init__(target_tile, player, grid, base_folder, screen, "Soldier-Pistol", action_finished)
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
         self.death_sound = pygame.mixer.Sound("assets\\sounds\\dying2.wav")
         self.screen = screen
-        self.type = "Soldier-Pistol"
-        self.settings = get_unit_settings(self.type)
-
-        self.MOVE_SPEED = self.settings["Speed"]
-        self.grid = grid
-        self.max_move = self.settings["Max Move Range"]
-        self.max_action_points = self.settings["Max AP"]
-        self.action_points = self.max_action_points  
-        self.max_health = self.settings["Max HP"]
-        self.health = self.max_health
-        self.NUM_BULLETS = self.settings["Num Bullet Per Shot"]
-        self.BULLET_SPEED = self.settings["Bullet Speed"]
-        self.FIRING_RATE = self.settings["Firing Rate"]
-        self.fire_range = self.settings["Max Attack Range"]
-        self.attack_damage = self.settings["Damage"]
 
         self.name = pick_random_name()
         self.grid = grid
         self.is_alive = True
         self.move_cost = self.settings["Move Cost"]
         self.fire_cost = self.settings["Fire Cost"]
-        self.actions = {"Move To":self.move_cost, "Fire":self}
+        self.actions = {"Move To", "Fire"}
 
-        self.x, self.y = self.calc_screen_pos(target_tile.x, target_tile.y)  
         self.last_fired = pygame.time.get_ticks() 
         self.animations = {}
         self.current_animation = "Idle"
         self.current_action = None
         self.angle = 0
         self.offset = (32,32)
-        self.tile = None
-        self.place_on_tiles(target_tile)
-        self.x, self.y = self.calc_screen_pos(target_tile.x, target_tile.y)
         self.load_animations(base_folder)
         self.bullets = []
         self.action_rects = []
@@ -66,12 +46,6 @@ class Soldier(Unit):
         self.target_y = 0
         self.last_action = None
         self.last_action_target = None
-
-    def place_on_tiles(self, tile):
-        tile.unit = self
-        if self.tile:
-            self.tile.unit = None
-        self.tile = tile
 
     def draw_actions_menu(self):       
         font = pygame.font.SysFont(None, 25)
@@ -178,16 +152,10 @@ class Soldier(Unit):
         self.animations["GunEffect"] = Animation(self.screen, base_folder,"Gunner" , "GunEffect", False, self.offset, 90)
         #self.animations["Bullet"] = Animation(self.screen, base_folder, "Bullet", False, self.offset)
 
-
-    def calc_screen_pos(self,tile_x, tile_y):
-        screen_x = tile_x * TILE_SIZE
-        screen_y = tile_y * TILE_SIZE
-        return screen_x, screen_y
-
     def draw(self):
         if self.is_driver:
             return
-        if self.player != self.grid.current_player:
+        if self.player != self.current_player:
             self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None, (255,0,0), 2)
         else:
             self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None)
@@ -336,13 +304,14 @@ class Soldier(Unit):
                     self.current_action = None
 
             elif self.current_action == "choosing_action":
-                if self.hover_menu:
+                if self.hover_menu and not self.is_disabled:
                     for index, action in enumerate(self.actions):
                         if self.action_rects[index+1].collidepoint(inputs.mouse.pos):
                             if action == "Move To":
                                 self.current_action = "choosing_move_target"
                             elif action == "Fire":
-                                self.current_action = "choosing_fire_target"
+                                if self.can_attack:
+                                    self.current_action = "choosing_fire_target"
                             elif action == "Build":
                                 pass
 

@@ -57,6 +57,7 @@ def pick_random_name():
 
 GameStateString = {
     "UNIT_PLACEMENT": "Unit Placement",
+    "RANDOM_EVENT": "Random Event",
     "PLANNING": "Planning",
     "EXECUTION": "Execution",
     "OUTCOME": "Outcome"
@@ -64,6 +65,7 @@ GameStateString = {
 
 class GameState(Enum):
     UNIT_PLACEMENT = 1
-    PLANNING = 2
-    EXECUTION = 3
-    OUTCOME = 4
+    RANDOM_EVENT = 2
+    PLANNING = 3
+    EXECUTION = 4
+    OUTCOME = 5

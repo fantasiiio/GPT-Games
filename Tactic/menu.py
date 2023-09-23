@@ -6,22 +6,8 @@ from Tank import Tank
 
 
 class MainMenu:
-    def __init__(self):
-        # Config
-        pygame.init()
-        self.full_screen = False 
-        
-        # Setup screen
-        info = pygame.display.Info()
-        if self.full_screen:
-            self.screen_width = info.current_w
-            self.screen_height = info.current_h
-            self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.FULLSCREEN)    
-        else:
-            self.screen_width = 1500
-            self.screen_height = 1200
-            self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-
+    def __init__(self, init_pygame=True, full_screen=False, screen=None):
+        self.init_graphics(init_pygame, full_screen, screen, 1500,1200)
         
         self.TILE_SIZE = 64
         self.MENU_TILES_X = 20
@@ -32,7 +18,8 @@ class MainMenu:
         pygame.display.set_caption('Strategy Game')
         
         self.inputs = Inputs()
-        self.panel_width = 250
+        self.panel_width = 240
+        self.panel_height = 300
         self.grid = Grid(pygame, self.screen, "assets/maps/menu.tmx")
         self.grid_offset = (-(self.grid.tiles_x*64)/2 + self.screen_width/2, 
                             -(self.grid.tiles_y*64)/2 + self.screen_height/2 + 64*2)
@@ -40,7 +27,7 @@ class MainMenu:
         self.grid.move(self.grid_offset[0], self.grid_offset[1])
         
         self.menu_panel = UIPanel(self.screen_width/2 - self.panel_width/2, 20, 
-                             self.panel_width, 200, image="panel.png", border_size=12)
+                             self.panel_width, self.panel_height, image="panel.png", border_size=12)
                              
 
         self.create_buttons()
@@ -62,9 +49,33 @@ class MainMenu:
         self.selected_menu_item = None
         self.running = True
         
+
+    def init_graphics(self, init_pygame, full_screen, screen, width, height):
+        self.init_pygame = init_pygame
+        if init_pygame:
+            pygame.init()
+            self.full_screen = full_screen 
+            
+            # Setup screen
+            info = pygame.display.Info()
+            if self.full_screen:
+                self.screen_width = info.current_w
+                self.screen_height = info.current_h
+                self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.FULLSCREEN)    
+            else:
+                self.screen_width = width
+                self.screen_height = height
+                self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        else:
+            self.screen = screen
+            self.screen_width = screen.get_width()
+            self.screen_height = screen.get_height()   
+
     def create_buttons(self):
             button_map = {
                 "New Game": self.menu_clicked,
+                "Multiplayer": self.menu_clicked,
+                "Instructions": self.menu_clicked,
                 "Quit": self.menu_clicked
             }
 
@@ -73,9 +84,6 @@ class MainMenu:
                 button = UIButton(20, y_offset, 200, 50, label, 40, "Box03.png", border_size=23, callback=callback)
                 y_offset += 60  # Increment vertical offset for the next button
                 self.menu_panel.add_element(button)
-
-
-
 
 
     def menu_clicked(self, button):
@@ -115,7 +123,8 @@ class MainMenu:
             self.handle_input()
             self.update()
             self.render()
-        pygame.quit()            
+        if self.init_pygame:
+            pygame.quit()            
         return self.selected_menu_item
             
 if __name__ == "__main__":

@@ -47,7 +47,6 @@ class Tile:
 class Grid:
     def __init__(self, pygame, screen, file_name):
         self.offset = (0,0)
-        self.current_player = 1
         self.pygame = pygame
         self.screen = screen
         self.tiles = None
@@ -195,15 +194,14 @@ class Grid:
 
     def update(self, inputs):
         selected_tile = self.selected_tile
-        x, y = inputs.mouse.pos
-        clicked_tile = self.get_tile_from_coords(x, y)
-        self.mouse_over_tile = self.get_tile_from_coords(x, y)
         if inputs.mouse.clicked[0]:
-            if clicked_tile != selected_tile:
+            x, y = inputs.mouse.pos
+            self.mouse_over_tile = self.get_tile_from_coords(x, y)
+            if self.mouse_over_tile != selected_tile:
                 if selected_tile and selected_tile.unit and selected_tile.unit.current_action is not None:
                     return
-                if not (clicked_tile.unit and clicked_tile.unit.current_action != None):
-                    self.selected_tile = clicked_tile
+                if not (self.mouse_over_tile.unit and self.mouse_over_tile.unit.current_action != None):
+                    self.selected_tile = self.mouse_over_tile
             else:
                 if not (self.selected_tile and self.selected_tile.unit):
                     self.selected_tile = None  
@@ -298,9 +296,9 @@ class Grid:
                     self.pygame.draw.rect(self.screen, (0, 0, 255), (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE), 2)
         
         selected_tile = self.selected_tile
-        x, y = inputs.mouse.pos
-        clicked_tile = self.get_tile_from_coords(x, y)        
         if selected_tile and selected_tile.unit and selected_tile.unit.current_action == "choosing_move_target":
+            x, y = inputs.mouse.pos
+            clicked_tile = self.get_tile_from_coords(x, y)        
             path = self.manhattan_path((selected_tile.x, selected_tile.y), (clicked_tile.x, clicked_tile.y))
             touching = False
             for tile in self.highlighted_tiles:

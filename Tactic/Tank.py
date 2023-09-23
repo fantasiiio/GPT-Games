@@ -16,8 +16,7 @@ class TankTower:
         self.animations = {}
         self.current_animation = "Idle"
         self.offset = (0,0)
-        self.x = 0
-        self.y = 0
+
         #self.parent_angle = 0
         self.angle = 0
         self.animations["Idle"] = Animation(self.screen,base_folder,"Tank_tower_", "Idle", 0, (0,0), 90)
@@ -34,7 +33,7 @@ class TankTower:
 
         outline_color=None
         outline_thickness=None
-        if self.parent.player != self.parent.grid.current_player:
+        if self.parent.player != self.parent.current_player:
             outline_color = (255,0,0)
             outline_thickness = 2
 
@@ -122,34 +121,14 @@ class TankTower:
 
 class Tank(Unit):
     def __init__(self, target_tile, player, grid,  base_folder='assets\\images\\Tank', screen=None, gun_sound_file="assets\\sounds\\tank shots.wav", action_finished=None, id=None):
-        super().__init__(target_tile, player, grid, base_folder, screen)
+        super().__init__(target_tile, player, grid, base_folder, screen,"Tank", action_finished)
         self.id = id
-        self.action_finished = action_finished
         self.engine_sound = pygame.mixer.Sound("assets\\sounds\\tankEngine.wav")
         self.bullet_explosion_sound = pygame.mixer.Sound("assets\\sounds\\explosion 1.wav")
         self.explosion_sound = pygame.mixer.Sound("assets\\sounds\\explosion 2.wav")
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
-        self.type = "Tank"
-        self.settings = get_unit_settings(self.type)
 
-        self.MOVE_SPEED = self.settings["Speed"]
-        self.grid = grid
-        self.max_move = self.settings["Max Move Range"]
-        self.max_action_points = self.settings["Max AP"]
-        self.action_points = self.max_action_points  
-        self.max_health = self.settings["Max HP"]
-        self.health = self.max_health
-        self.NUM_BULLETS = self.settings["Num Bullet Per Shot"]
-        self.BULLET_SPEED = self.settings["Bullet Speed"]
-        self.FIRING_RATE = self.settings["Firing Rate"]
-        self.fire_range = self.settings["Max Attack Range"]
-        self.attack_damage = self.settings["Damage"]
-        self.seat_taken = 0
-        self.seats = self.settings["Seats"]
-        self.seat_left = self.seats		
-        self.move_cost = self.settings["Move Cost"]
-        self.fire_cost = self.settings["Fire Cost"]
-        self.actions = {"Move To":self.move_cost, "Fire":self.fire_cost, "Get Out": 1}
+        self.actions = {"Move To", "Fire", "Get Out"}
         self.tower = TankTower(base_folder, screen, self)
         self.screen = screen
         self.animations = {}
@@ -159,11 +138,6 @@ class Tank(Unit):
 
         self.offset = (32,32)
         self.tower.offset = tuple(a + b for a, b in zip(self.tower.offset, self.offset))
-        self.tile = None	
-        if target_tile:
-            self.place_on_tiles(target_tile)
-            self.x, self.y = self.calc_screen_pos(target_tile.x, target_tile.y)
-            self.target_tile = target_tile
 
         self.load_animations(base_folder)
         self.animations["Idle"].play()
@@ -181,83 +155,6 @@ class Tank(Unit):
         self.current_game_state = None
         # self.tower.animations["Fire"].play() 
 
-    def take_seat(self, unit):
-        if self.seat_left == 0:
-            return False
-        self.passengers.append(unit)
-        self.seat_left -= 1
-        self.seat_taken += 1
-
-        unit.is_driver = True
-        unit.current_action = None
-
-
-        return True        
-
-    def get_unit_out(self):
-        if self.action_points < 1:
-            return
-        if self.seat_taken > 0:
-            self.action_points -= 1
-            self.seat_taken -= 1
-            self.seat_left += 1
-            last_passenger = self.passengers.pop()            
-            free_tile = self.find_free_tile(self.tile)
-            free_tile.unit = last_passenger
-            last_passenger.is_driver = False
-            last_passenger.x = free_tile.x * TILE_SIZE
-            last_passenger.y = free_tile.y * TILE_SIZE
-            self.grid.selected_tile = free_tile
-            self.tile.unit = self
-            self.current_action = None
-
-
-    def place_on_tiles(self, tile):
-        tile.unit = self
-        if self.tile:
-            self.tile.unit = None
-        self.tile = tile
-
-    def draw_actions_menu(self):
-        font = pygame.font.SysFont(None, 25)
-        mouse_pos = pygame.mouse.get_pos()  # Get the current mouse position
-
-        # Initialize the list to store action rects
-        self.action_rects = []
-
-        # First, calculate the rects for each action based on their positions
-        for index, (action, value) in enumerate(self.actions.items()):
-            action_pos = (self.x, self.y - 30 - index * 30)
-            text_surface = font.render(f"{action} ({value})", True, (255, 255, 255))
-            rect = text_surface.get_rect(topleft=action_pos)
-            self.action_rects.append(rect)
-
-        # Calculate the encompassing rectangle
-        if self.action_rects:
-            self.action_menu_rect = self.action_rects[0].copy()
-            for action_rect in self.action_rects[1:]:
-                self.action_menu_rect.union_ip(action_rect)
-
-            # Inflate the encompassing rectangle for padding
-            padding = 10
-            self.action_menu_rect.inflate_ip(padding * 2, padding * 2)
-
-            # Draw the encompassing rectangle
-            pygame.draw.rect(self.screen, (50, 50, 50), self.action_menu_rect)
-
-        # Draw each action text with appropriate color based on hover state
-        for index, (action, value) in enumerate(self.actions.items()):
-            action_pos = (self.x, self.y - 30 - index * 30)
-
-            # Check if the mouse is hovering over this action
-            if self.action_rects[index].collidepoint(mouse_pos):
-                text_surface = font.render(f"{action} ({value})", True, (255, 255, 0))  # Hover color
-            else:
-                text_surface = font.render(f"{action} ({value})", True, (255, 255, 255))  # Default color
-
-            self.screen.blit(text_surface, action_pos)
-
-
 
     def load_animations(self, base_folder):
         self.animations["Idle"] = Animation(self.screen,base_folder,"Tank_base_", "Idle", -1, self.offset, 90)
@@ -267,16 +164,9 @@ class Tank(Unit):
         #SpriteLayers.add_animation("top", self.explosion_animation) 
         #self.animations["Move"] = Animation(self.screen,base_folder,"Tank_base_", "Move", -1, self.offset, 90)
         self.animations["Broken"] = Animation(self.screen,base_folder,"Tank_base_", "Broken", 0, self.offset, 90)
-
-    
-    def calc_screen_pos(self,tile_x, tile_y):
-        screen_x = tile_x * TILE_SIZE + self.grid.offset[0]
-        screen_y = tile_y * TILE_SIZE + self.grid.offset[1]
-        return screen_x, screen_y
-
     
     def draw(self):
-        if self.player != self.grid.current_player:
+        if self.player != self.current_player:
             self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None, (255,0,0), 2)
         else:
             self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None)
@@ -408,23 +298,6 @@ class Tank(Unit):
     def bullet_reach_target(self, bullet):
         pass
 
-    def place_unit(self, inputs):
-        self.mouse_x, self.mouse_y = inputs.mouse.pos
-        # Snap mouse position to grid
-        grid_x = (self.mouse_x // TILE_SIZE) * TILE_SIZE 
-        grid_y = (self.mouse_y // TILE_SIZE) * TILE_SIZE       
-        self.x = grid_x
-        self.y = grid_y
-        self.tower.update((self.x, self.y), self.tower.angle if self.tower.angle else 0) 
-        
-        if inputs.mouse.clicked[0] and self.grid.selected_tile and not self.grid.selected_tile.unit: 
-            self.place_on_tiles(self.grid.selected_tile)
-            self.action_finished(self)
-
-    def on_message(self, event, value):
-        if event == "game_state_changed":
-            self.current_game_state = value
-
     def update(self, inputs):
         if self.current_game_state == GameState.UNIT_PLACEMENT:
             self.place_unit(inputs)
@@ -471,13 +344,14 @@ class Tank(Unit):
                     self.current_action = None
             # Choosing an action from the menu.
             elif self.current_action == "choosing_action":
-                if self.hover_menu:
+                if self.hover_menu and not self.is_disabled:
                     for index, action in enumerate(self.actions):
                         if self.action_rects[index].collidepoint(inputs.mouse.pos):
                             if action == "Move To":
                                 self.current_action = "choosing_move_target"
                             elif action == "Fire":
-                                self.current_action = "choosing_fire_target"
+                                if self.can_attack:
+                                    self.current_action = "choosing_fire_target"
                             elif action == "Get Out":
                                 self.get_unit_out()
                 else:

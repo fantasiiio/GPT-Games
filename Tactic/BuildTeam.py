@@ -1,6 +1,6 @@
 import pygame
 from pygame.locals import QUIT, MOUSEBUTTONUP
-from GraphicUI import UIPanel, UIButton,UIImage
+from GraphicUI import UIPanel, UIButton,UIImage, UILabel
 from config import unitSettings
 from rectpack import newPacker, PackingMode, SORT_AREA
 from rectpack.maxrects import MaxRectsBl
@@ -31,22 +31,12 @@ class CashManager:
 
 class TeamBuilder:
     
-    def __init__(self, fullscreen=False):
-
+    def __init__(self,  player = 1, init_pygame=True, full_screen=False, screen=None):
+        self.current_player = player
         # Constants
         self.MAIN_WIDTH = 1500
         self.MAIN_HEIGHT = 1000 
-        pygame.init()
-
-        if fullscreen:
-            info = pygame.display.Info()
-            self.screen_width = info.current_w
-            self.screen_height = info.current_h
-        else:
-            self.screen_width = self.MAIN_WIDTH
-            self.screen_height = self.MAIN_HEIGHT
-            
-        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.FULLSCREEN if fullscreen else 0)
+        self.init_graphics(init_pygame, full_screen, screen, self.MAIN_WIDTH, self.MAIN_HEIGHT)
 
         self.global_id = 1
         self.cash_manager = CashManager(initial_cash=1500, frame_rate=30)
@@ -88,10 +78,14 @@ class TeamBuilder:
         self.units_panel_width = 800
         self.team_panel_height = 500
         self.button_width = 200
+        self.top_panel = UIPanel(0, 0, self.screen_width, 70, border_size=self.border_size)
+        self.player_label = self.state_label = UILabel(10, 30, f"Player {self.current_player}", self.top_panel, font_size=60)
+        self.player_label.rect.x = self.screen_width / 2 - self.player_label.rect.width / 2
+        self.top_panel.add_element(self.player_label)
 
-        self.units_panel = UIPanel(20, 20, self.units_panel_width, self.units_panel_height, image="panel.png", border_size=self.border_size)
+        self.units_panel = UIPanel(20, self.top_panel.rect.bottom, self.units_panel_width, self.units_panel_height, image="panel.png", border_size=self.border_size)
         self.team_panel = UIPanel(20, self.units_panel.rect.bottom, self.units_panel_width, self.team_panel_height, image="panel.png", border_size=self.border_size)
-        self.info_panel = UIPanel(self.units_panel_width+15, 20, self.MAIN_WIDTH-self.units_panel_width - 40, self.units_panel_height, image="panel.png", border_size=self.border_size)
+        self.info_panel = UIPanel(self.units_panel_width+15, self.top_panel.rect.bottom, self.MAIN_WIDTH-self.units_panel_width - 40, self.units_panel_height, image="panel.png", border_size=self.border_size)
         self.unit_properties_panel = UIPanel(self.team_panel.rect.right, self.team_panel.rect.top, self.MAIN_WIDTH - self.team_panel.rect.right - 25, self.team_panel.rect.height, image="panel.png", border_size=self.border_size)
         self.finish_button = UIButton(self.unit_properties_panel.rect.right - self.button_width, self.team_panel.rect.bottom + 5, self.button_width, 50, "Finish", font_size=40, callback=self.button_callback, image="Box03.png", border_size=23)
         remind_text = "Don't forget to add a driver and a gunner for each vehicle" 
@@ -103,6 +97,7 @@ class TeamBuilder:
         self.main_panel.add_element(self.info_panel)
         self.main_panel.add_element(self.unit_properties_panel)
         self.main_panel.add_element(self.finish_button)
+        self.main_panel.add_element(self.top_panel)
 
         self.container = (self.team_panel.rect.width - self.border_size*2, self.team_panel.rect.height - self.border_size*2)
         self.packer = newPacker(mode=PackingMode.Offline, pack_algo=MaxRectsBl, sort_algo=SORT_AREA, rotation=False)
@@ -144,6 +139,27 @@ class TeamBuilder:
         
         # Populate units
         self.populate_units()
+
+    def init_graphics(self, init_pygame, full_screen, screen, width, height):
+        self.init_pygame = init_pygame
+        if init_pygame:
+            pygame.init()
+            self.full_screen = full_screen 
+            
+            # Setup screen
+            info = pygame.display.Info()
+            if self.full_screen:
+                self.screen_width = info.current_w
+                self.screen_height = info.current_h
+                self.screen = pygame.display.set_mode((self.screen_width, self.screen_height), pygame.FULLSCREEN)    
+            else:
+                self.screen_width = width
+                self.screen_height = height
+                self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        else:
+            self.screen = screen
+            self.screen_width = screen.get_width()
+            self.screen_height = screen.get_height()  
 
     def add_text(self, panel, text, pos, font_size=20):
         font = pygame.font.Font(None, font_size)        
@@ -241,7 +257,8 @@ class TeamBuilder:
             pygame.display.flip()
             self.clock.tick(60)
         
-        pygame.quit()
+        if self.init_pygame:
+            pygame.quit()    
         return self.get_selected_team()
 
     def on_mouse_down(self, event):
@@ -389,7 +406,8 @@ class TeamBuilder:
             wrapped_paragraph = '\n\t'.join(lines)
             wrapped_paragraphs.append(wrapped_paragraph)
 
-        return '\n'.join(wrapped_paragraphs)
+        wrapped_text = '\n'.join(wrapped_paragraphs)
+        return self.simulate_tab(wrapped_text)
         
     def simulate_tab(self, text, tab_size=4):
         return text.replace("\t", " " * tab_size)
@@ -412,7 +430,6 @@ class TeamBuilder:
         formated = self.format_json(setting)
 
         wrapped_text = self.wrap_text_to_pixel_width(formated, font, rect.width - 40)
-        wrapped_text = self.simulate_tab(wrapped_text)
 
         setting = unitSettings[unit.id]
         cost = setting["Purchase Cost"]

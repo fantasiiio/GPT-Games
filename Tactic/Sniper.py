@@ -27,7 +27,6 @@ class Sniper(Unit):
         self.max_action_points = action_points        
         self.target_screen_x = None  # Target position for movement
         self.target_screen_y = None
-        self.x, self.y = self.calc_screen_pos(target_tile.x, target_tile.y)  
         self.tile = target_tile
         self.tile.unit = self
         self.animations = {}
@@ -98,12 +97,6 @@ class Sniper(Unit):
         self.animations["Fire"] = Animation(self.screen, base_folder,"Gunner" , "Fire", 0, self.offset, 90)
         self.animations["GunEffect"] = Animation(self.screen, base_folder,"Gunner" , "GunEffect", False, self.offset, 90)
         #self.animations["Bullet"] = Animation(self.screen, base_folder, "Bullet", False, self.offset)
-
-
-    def calc_screen_pos(self,tile_x, tile_y):
-        screen_x = tile_x * TILE_SIZE
-        screen_y = tile_y * TILE_SIZE
-        return screen_x, screen_y
 
     def draw(self):
         if self.is_driver:
@@ -245,13 +238,14 @@ class Sniper(Unit):
                     self.current_action = None
 
             elif self.current_action == "choosing_action":
-                if self.hover_menu:
+                if self.hover_menu and not self.is_disabled:
                     for index, action in enumerate(self.actions):
                         if self.action_rects[index].collidepoint(inputs.mouse.pos):
                             if action == "Move To":
                                 self.current_action = "choosing_move_target"
                             elif action == "Fire":
-                                self.current_action = "choosing_fire_target"
+                                if self.can_attack:
+                                    self.current_action = "choosing_fire_target"
                             elif action == "Build":
                                 pass
 
