@@ -5,7 +5,8 @@ class Player:
         self.units = []  # List to store all units owned by the player
         self.enemy = None  # Reference to the enemy player#
         self.name = f"Player {number}"
-
+        self.current_event = None
+        
     def add_unit(self, unit):
         """Add a unit to the player's list of units."""
         self.units.append(unit)

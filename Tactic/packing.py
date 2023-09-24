@@ -10,12 +10,12 @@ class FreeRect:
 
     def split(self, box_width, box_height):
         bottom_rect = FreeRect(self.width - box_width, box_height)
-        bottom_rect.x = self.x + box_width
-        bottom_rect.y = self.y
+        bottom_rect.x = self.screen_x + box_width
+        bottom_rect.y = self.screen_y
 
         right_rect = FreeRect(self.width, self.height - box_height)
-        right_rect.x = self.x
-        right_rect.y = self.y + box_height
+        right_rect.x = self.screen_x
+        right_rect.y = self.screen_y + box_height
 
         return [bottom_rect, right_rect]
 

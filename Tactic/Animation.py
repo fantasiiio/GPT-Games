@@ -1,8 +1,10 @@
 import pygame
 import os
-
+import time
+import math
 class Animation:
-    def __init__(self, screen, base_folder, prefix, action_name, is_looping, offset, offset_angle, total_loop_time=None, frame_duration = 100):
+    start_time = time.time() 
+    def __init__(self, screen, base_folder, prefix, action_name, is_looping, offset, offset_angle, total_loop_time=None, frame_duration = 100, outline_image=None):
         self.offset_angle = offset_angle
         self.screen = screen
         self.images = []
@@ -17,6 +19,10 @@ class Animation:
         self.load_action(base_folder, prefix ,action_name)
         self.offset = offset
         self.frames_count = 0
+        self.outline_image = None
+
+        if outline_image:
+            self.load_outline_image(outline_image)
 
         if total_loop_time:
             self.frames_required = total_loop_time // self.frame_duration
@@ -25,6 +31,10 @@ class Animation:
 
         
         self.time_played = 0  # Initialize the time_played to zero
+
+    def load_outline_image(self, outline_image_file):
+        self.outline_image = pygame.image.load(outline_image_file)
+        self.outline_image.convert_alpha()
 
     def get_current_rect(self):
         return self.rects[self.current_frame]
@@ -83,8 +93,7 @@ class Animation:
 
 
 
-
-    def draw(self, x, y, angle=0, rotation_center=None, offset=None, outline_color=None, outline_thickness=None, scale = 1.0):
+    def draw(self, x, y, angle=0, rotation_center=None, offset=None, outline_color=None, outline_thickness=None, outline_fade = False, scale = 1.0):
         image = self.images[self.current_frame]
         if rotation_center is None:
             rotation_center = image.get_rect().center
@@ -94,46 +103,36 @@ class Animation:
             rotated_image = pygame.transform.scale(rotated_image, (int(rotated_image.get_width() * scale), int(rotated_image.get_height() * scale)))
             rotated_image_rect = rotated_image.get_rect(center = rotated_image_rect.center)
 
-        if outline_color and outline_thickness:            
-            outlined = self.draw_outline(rotated_image, outline_color, outline_thickness)
-            self.screen.blit(outlined, rotated_image_rect)
+        self.screen.blit(rotated_image, rotated_image_rect)
+
+        if outline_color and outline_thickness:  
+            # Use the provided outline_image or default to the main image if not provided      
+            outline_source = self.outline_image if self.outline_image else rotated_image
+            outlined = self.draw_outline(outline_source, outline_color, outline_thickness, offset, outline_fade)
+            outline_rect = outlined.get_rect(center = rotated_image_rect.center)
+            self.screen.blit(outlined, outline_rect)
+
+    def draw_outline(self, image, outline_color, outline_thickness, offset=None, fade = False):
+        offset = self.offset if offset is None else offset        
+        if fade:
+            current_time = time.time()
+            elapsed_time = current_time - self.start_time
+            fade_factor = math.sin(elapsed_time*5)
+
+            alpha_value = int((fade_factor + 1) / 2 * 255)
+            outline_color = (*outline_color[:3], alpha_value)
         else:
-            self.screen.blit(rotated_image, rotated_image_rect)
+            outline_color = (*outline_color[:3], 255)
 
-        #pygame.draw.rect(self.screen, (255,0,0), rotated_image_rect, 1)
-                    
-    
-
-    def get_outline(self, image,color=(0,0,0)):
-        rect = image.get_rect()
         mask = pygame.mask.from_surface(image)
-        outline = mask.outline(2)
-        outline_image = pygame.Surface(rect.size).convert_alpha()
-        outline_image.fill((0,0,0,0))
-        for point in outline:
-            outline_image.set_at(point,color)
-        return outline_image
-
-    def draw_outline(self, image, outline_color, outline_thickness):
-        
-        # Create a mask from the sprite
-        mask = pygame.mask.from_surface(image)
-        
-        # Get the outline points from the mask
         outline_points = mask.outline()
-        
-        # Create a new surface to draw the outlined sprite
         outlined_surface = pygame.Surface((image.get_width() + 2 * outline_thickness,
-                                        image.get_height() + 2 * outline_thickness),
+                                            image.get_height() + 2 * outline_thickness),
                                         pygame.SRCALPHA)
-        
-        # Draw the outline
+        offset
         for point in outline_points:
             pygame.draw.circle(outlined_surface, outline_color, (point[0] + outline_thickness, point[1] + outline_thickness), outline_thickness)
-        
-        # Draw the sprite over the outline
-        outlined_surface.blit(image, (outline_thickness, outline_thickness))
-        
+
         return outlined_surface
 
     def is_finished(self):        

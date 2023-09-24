@@ -11,8 +11,8 @@ class Bullet:
         self.screen = screen
         self.target_tile = target_tile
         self.offset = (0,0)
-        self.x = x
-        self.y = y
+        self.screen_x = x
+        self.screen_y = y
         self.angle = angle
         self.speed = speed
         self.damage = damage
@@ -28,11 +28,11 @@ class Bullet:
         if not self.is_alive:
             return
         # Update bullet position based on angle and speed
-        self.x += self.speed * math.cos(math.radians(self.angle))
-        self.y += self.speed * math.sin(math.radians(self.angle))
+        self.screen_x += self.speed * math.cos(math.radians(self.angle))
+        self.screen_y += self.speed * math.sin(math.radians(self.angle))
         target_x = self.target_tile.x * TILE_SIZE
         target_y = self.target_tile.y * TILE_SIZE
-        delta_x, delta_y = target_x - self.x, target_y - self.y
+        delta_x, delta_y = target_x - self.screen_x, target_y - self.screen_y
         distance = math.sqrt((delta_x)**2 + (delta_y)**2)
         if distance < self.speed:
             self.is_alive = False
@@ -61,6 +61,6 @@ class Bullet:
             return
                         
         if self.animation:
-            self.animation.draw(self.x, self.y, -self.angle)
+            self.animation.draw(self.screen_x, self.screen_y, -self.angle)
         else:
-            pygame.draw.circle(self.screen, (0,0,0), (self.x , self.y ), 2)
+            pygame.draw.circle(self.screen, (0,0,0), (self.screen_x , self.screen_y ), 2)

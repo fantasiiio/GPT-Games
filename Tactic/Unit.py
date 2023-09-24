@@ -25,12 +25,15 @@ class Unit:
         from config import TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y    
         self.target_screen_x = None  # Target position for movement
         self.target_screen_y = None
-        self.x = 0
-        self.y = 0
+        self.screen_x = 0
+        self.screen_y = 0
+        self.draw_x = 0
+        self.draw_y = 0
         self.tile = None
-
+        self.world_pos_x, self.world_pos_y = 0, 0
         if target_tile:
-            self.x, self.y = self.calc_screen_pos(target_tile.x, target_tile.y)  
+            self.world_pos_x, self.world_pos_y = target_tile.x * TILE_SIZE, target_tile.y * TILE_SIZE
+            self.screen_x, self.screen_y = self.calc_screen_pos((self.world_pos_x, self.world_pos_y))  
             self.tile = target_tile
             self.tile.unit = self
         self.animations = {}
@@ -51,6 +54,9 @@ class Unit:
         self.type = type
         self.settings = get_unit_settings(self.type)
         self.current_player = None
+        self.current_game_state = None
+        self.swapped = False
+        self.is_vehicle = False
 
         self.MOVE_SPEED = self.settings["Speed"]
         self.grid = grid
@@ -58,15 +64,16 @@ class Unit:
         self.max_action_points = self.settings["Max AP"]
         self.action_points = self.max_action_points  
         self.max_health = self.settings["Max HP"]
-        self.health = self.max_health
+        self.health = self.max_health / 2
         self.NUM_BULLETS = self.settings["Num Bullet Per Shot"]
         self.BULLET_SPEED = self.settings["Bullet Speed"]
         self.FIRING_RATE = self.settings["Firing Rate"]
         self.fire_range = self.settings["Max Attack Range"]
         self.attack_damage = self.settings["Damage"]
         self.seat_taken = 0
-        self.seats = self.settings["Seats"]
-        self.seat_left = self.seats		
+        if "Seats" in self.settings.keys():
+            self.seats = self.settings["Seats"]
+            self.seat_left = self.seats		
         self.move_cost = self.settings["Move Cost"]
         self.fire_cost = self.settings["Fire Cost"]        
 #position
@@ -82,6 +89,16 @@ class Unit:
 # Max_Attack_Range
 # Move_Cost
 # Fire_Cost
+    def get_stats(self):
+        stats = {}
+        stats["HP"] = self.health
+        stats["AP"] = self.action_points
+        stats["Damage"] = self.attack_damage
+        stats["Move Range"] = self.max_move
+        stats["Attack Range"] = self.fire_range
+        stats["Type"] = self.type
+        stats["Player"] = self.player
+        return stats
 
     def draw_actions_menu(self):
         font = pygame.font.SysFont(None, 25)
@@ -92,7 +109,7 @@ class Unit:
 
         # First, calculate the rects for each action based on their positions
         for index, action in enumerate(self.actions):
-            action_pos = (self.x, self.y - 30 - index * 30)
+            action_pos = (self.draw_x, self.draw_y - 30 - index * 30)
             text_surface = font.render(action, True, (255, 255, 255))
             rect = text_surface.get_rect(topleft=action_pos)
             self.action_rects.append(rect)
@@ -112,7 +129,7 @@ class Unit:
 
         # Draw each action text with appropriate color based on hover state
         for index, action in enumerate(self.actions):
-            action_pos = (self.x, self.y - 30 - index * 30)
+            action_pos = (self.draw_x, self.draw_y - 30 - index * 30)
             if self.is_disabled or (action == "Fire" and not self.can_attack):                
                 text_surface = font.render(f"{action}", True, (100, 100, 100))
             elif self.action_rects[index].collidepoint(mouse_pos):
@@ -144,6 +161,7 @@ class Unit:
             self.grid.selected_tile = free_tile
             self.tile.unit = self
             self.current_action = None
+            return last_passenger
 
     def take_seat(self, unit):
         if self.seat_left == 0:
@@ -156,9 +174,9 @@ class Unit:
         return True      
     
 
-    def calc_screen_pos(self,tile_x, tile_y):
-        screen_x = tile_x * TILE_SIZE + self.grid.offset[0]
-        screen_y = tile_y * TILE_SIZE + self.grid.offset[1]
+    def calc_screen_pos(self, world_pos):
+        screen_x = world_pos[0] + self.grid.get_camera_screen_position()[0]
+        screen_y = world_pos[1] + self.grid.get_camera_screen_position()[1]
         return screen_x, screen_y
         
 
@@ -168,9 +186,9 @@ class Unit:
         # Snap mouse position to grid
         grid_x = (self.mouse_x // TILE_SIZE) * TILE_SIZE 
         grid_y = (self.mouse_y // TILE_SIZE) * TILE_SIZE       
-        self.x = grid_x
-        self.y = grid_y
-        self.tower.update((self.x, self.y), self.tower.angle if self.tower.angle else 0) 
+        self.screen_x = grid_x
+        self.screen_y = grid_y
+        self.tower.update((self.screen_x, self.screen_y), self.tower.angle if self.tower.angle else 0) 
         
         if inputs.mouse.clicked[0] and self.grid.selected_tile and not self.grid.selected_tile.unit: 
             self.place_on_tiles(self.grid.selected_tile)

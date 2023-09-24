@@ -20,18 +20,18 @@ class Instructions:
         lines = self.read_md_file()
         y_offset = 10  # Starting y-position for the first label
         for line in lines:
-            font_size = 20  # Default font size
+            font_size = 30  # Default font size
             text_color = (255, 255, 255)  # Default text color (white)
             
             # Handle headers
             if line.startswith("### "):
-                font_size = 30
+                font_size = 40
                 line = line[4:].strip()
             elif line.startswith("## "):
-                font_size = 40
+                font_size = 50
                 line = line[3:].strip()
             elif line.startswith("# "):
-                font_size = 50
+                font_size = 60
                 line = line[2:].strip()
 
             line = self.wrap_text_to_pixel_width(line, pygame.font.SysFont(None, font_size), self.screen_width - 60)            
@@ -91,11 +91,11 @@ class Instructions:
             lines.append(' '.join(current_line))
 
             # Add tab only to lines after the first one in each paragraph
-            wrapped_paragraph = '\n\t'.join(lines)
+            wrapped_paragraph = '\n'.join(lines)
             wrapped_paragraphs.append(wrapped_paragraph)
 
         wrapped_text = '\n'.join(wrapped_paragraphs)
-        return self.simulate_tab(wrapped_text)
+        return wrapped_text
         
     def simulate_tab(self, text, tab_size=4):
         return text.replace("\t", " " * tab_size)            

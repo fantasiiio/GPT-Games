@@ -155,10 +155,12 @@ class UIImage(UIElement):
         return pygame.Rect(x1, y1, x2 - x1 + 1, y2 - y1 + 1)                        
 
 class UILabel(UIImage):
-    def __init__(self, x, y, text,  parent=None, font_size=20, text_color=(255, 255, 255)):
+    def __init__(self, x, y, text,  parent=None, font_size=20, text_color=(255, 255, 255), font=None, outline_width=0, outline_color=(0,0,0)):
         super().__init__(x, y, None, parent, text_color) 
+        self.outline_width = outline_width
+        self.outline_color = outline_color
         self.text = text
-        self.font = pygame.font.Font(None, font_size)
+        self.font = pygame.font.Font(None, font_size) if not font else font
         self.text_color = text_color
         self.text_surface = self.font.render(self.text, True, self.text_color)
         self.rect = self.text_surface.get_rect(top=self.rect.top, left=self.rect.left)
@@ -172,7 +174,27 @@ class UILabel(UIImage):
         if not self.font:
             return
         #self.set_parent(self.parent)
-        screen.blit(self.text_surface, (self.rect.topleft[0], self.rect.topleft[1]))
+        if self.outline_width > 0:
+            self.draw_text_with_outline(self.text, screen, self.text_color, self.outline_color, self.outline_width)
+        else:
+            screen.blit(self.text_surface, (self.rect.topleft[0], self.rect.topleft[1]))
+
+    def draw_text_with_outline(self, text, screen, text_color=(255,255,255), outline_color=(0,0,0), outline_thickness=2, alpha_value=255):
+        # Create text surface
+        text_surface = self.font.render(text, True, text_color)
+        text_rect = text_surface.get_rect(top=self.rect.top, left=self.rect.left)
+        
+        # Create outline by drawing text multiple times around the original text
+        outline_alpha_color = (*outline_color[:3], alpha_value)
+        for i in range(-outline_thickness, outline_thickness+1):
+            for j in range(-outline_thickness, outline_thickness+1):
+                outline_surface = self.font.render(text, True, outline_alpha_color)
+                outline_rect = outline_surface.get_rect(top=self.rect.top+j, left=self.rect.left+i)
+                screen.blit(outline_surface, outline_rect)
+        
+        # Draw the original text
+        screen.blit(text_surface, text_rect)    
+
 
 class UIButton(UIElement):
     def __init__(self, x, y, width, height, text, font_size = 20, image=None, parent=None,color=(100, 100, 100), border_size=10, text_color=(255, 255, 255), hover_text_color=(255, 255, 0), callback=None):

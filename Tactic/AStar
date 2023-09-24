@@ -4,8 +4,8 @@ import numpy as np
 # Define the Node class (as previously detailed)
 class Node:
     def __init__(self, x, y, walkable=True):
-        self.x = x
-        self.y = y
+        self.screen_x = x
+        self.screen_y = y
         self.walkable = walkable
 
         self.parent = None
@@ -14,7 +14,7 @@ class Node:
         self.f = 0  # total cost (g + h)
 
     def __eq__(self, other):
-        return self.x == other.x and self.y == other.y
+        return self.screen_x == other.x and self.screen_y == other.y
 
 
 # Define helper functions (as previously detailed)

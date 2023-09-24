@@ -4,7 +4,8 @@ from GraphicUI import UIPanel, UIButton,UIImage, UILabel
 from config import unitSettings
 from rectpack import newPacker, PackingMode, SORT_AREA
 from rectpack.maxrects import MaxRectsBl
-
+import math
+import time
 
 class CashManager:
     def __init__(self, initial_cash, frame_rate=60):
@@ -111,7 +112,8 @@ class TeamBuilder:
         self.team_soldier_offset = 0
         self.team_vehicle_offset = 0
         self.cash_manager = CashManager(initial_cash=2000, frame_rate=30)
-        
+
+
         # Other state
         self.setting_display_order = [
             "Role",
@@ -528,17 +530,7 @@ class TeamBuilder:
             if self.team_unit_over != self.team_unit:
                 self.team_unit_over = self.team_unit
             return self.get_outline(self.team_unit.image, (255, 255, 255), 1)
-        
-    def get_outline(self, image, outline_color, outline_thickness):
-        mask = pygame.mask.from_surface(image)
-        outline_points = mask.outline()
-        outlined_surface = pygame.Surface((image.get_width() + 2 * outline_thickness,
-                                        image.get_height() + 2 * outline_thickness),
-                                        pygame.SRCALPHA)
-        for point in outline_points:
-            pygame.draw.circle(outlined_surface, outline_color, (point[0] + outline_thickness, point[1] + outline_thickness), outline_thickness)
-
-        return outlined_surface
+    
 
         
 if __name__ == "__main__":

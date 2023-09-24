@@ -14,116 +14,128 @@ class RandomEvents:
             {
                 "func": self.commanders_insight_team,
                 "restore": self.restore_commanders_insight_team,
-                "name": "Team Commander's Insight",
+                "name": "Commander's Insight",
                 "description": "Swap the positions of any two units on your team.",
                 "type": "good",
             },
             {
                 "func": self.remote_hack_team,
                 "restore": self.restore_remote_hack_team,
-                "name": "Team Remote Hack",
+                "name": "Remote Hack",
                 "description": "Take control of enemy mechanical units for one turn.",
                 "type": "good",
             },
             {
                 "func": self.divine_intervention_team,
                 "restore": self.restore_divine_intervention_team,
-                "name": "Team Divine Intervention",
+                "name": "Divine Intervention",
                 "description": "All units are healed back to full HP.",
                 "type": "good",
             },
             {
                 "func": self.weapon_jam_team,
                 "restore": self.restore_weapon_jam_team,
-                "name": "Team Weapon Jam",
+                "name": "Weapon Jam",
                 "description": "All units can't attack for the next turn.",
                 "type": "bad",
             },
             {
                 "func": self.skill_mastery_team,
                 "restore": self.restore_skill_mastery_team,
-                "name": "Team Skill Mastery",
-                "description": "All units gain double damage or defense for the next turn.",
+                "name": "Skill Mastery",
+                "description": "All units gain double damage for the next turn.",
                 "type": "good",
             },
             {
                 "func": self.artifact_team,
                 "restore": self.restore_artifact_team,
-                "name": "Team Artifact",
+                "name": "Artifact",
                 "description": "A powerful artifact affects all units on the map, giving a additionnal action point.",
                 "type": "good",
             },
             {
                 "func": self.sabotage_team,
                 "restore": self.restore_sabotage_team,
-                "name": "Team Sabotage",
+                "name": "Sabotage",
                 "description": "All units are disabled for one turn.",
                 "type": "bad",
             },
             {
                 "func": self.equipment_malfunction_team,
                 "restore": self.restore_equipment_malfunction_team,
-                "name": "Team Equipment Malfunction",
+                "name": "Equipment Malfunction",
                 "description": "All units' weapons become less effective for a turn.",
                 "type": "bad",
             },
             {
                 "func": self.friendly_fire_team,
                 "restore": self.restore_friendly_fire_team,
-                "name": "Team Friendly Fire",
+                "name": "Friendly Fire",
                 "description": "Units on your team accidentally attack other units on your team.",
                 "type": "bad",
             },
             {
-                "func": self.team_damage_boost,
-                "restore": self.restore_team_damage_boost,
-                "name": "Team Damage Boost",
+                "func": self.damage_boost,
+                "restore": self.restore_damage_boost,
+                "name": "Damage Boost",
                 "description": "Increases the damage of all units on your team for one turn.",
                 "type": "good",
             },
             {
-                "func": self.team_armor_plating,
-                "restore": self.restore_team_armor_plating,
-                "name": "Team Armor Plating",
+                "func": self.armor_plating,
+                "restore": self.restore_armor_plating,
+                "name": "Armor Plating",
                 "description": "Increases the HP of all units on your team for one turn.",
                 "type": "good",
             },
             {
-                "func": self.team_adrenaline_rush,
-                "restore": self.restore_team_adrenaline_rush,
-                "name": "Team Adrenaline Rush",
+                "func": self.adrenaline_rush,
+                "restore": self.restore_adrenaline_rush,
+                "name": "Adrenaline Rush",
                 "description": "All units on your team get extra action points (AP) for one turn.",
                 "type": "good",
             },
             {
-                "func": self.team_quick_feet,
-                "restore": self.restore_team_quick_feet,
-                "name": "Team Quick Feet",
+                "func": self.quick_feet,
+                "restore": self.restore_quick_feet,
+                "name": "Quick Feet",
                 "description": "Increases the Max Move Range of all units on your team for one turn.",
                 "type": "good",
             },
             {
-                "func": self.team_sniper_training,
-                "restore": self.restore_team_sniper_training,
-                "name": "Team Sniper Training",
+                "func": self.sniper_training,
+                "restore": self.restore_sniper_training,
+                "name": "Sniper Training",
                 "description": "Increases the Max Attack Range of all units on your team for one turn.",
                 "type": "good",
             },
             {
-                "func": self.team_fuel_shortage,
-                "restore": self.restore_team_fuel_shortage,
-                "name": "Team Fuel Shortage",
+                "func": self.fuel_shortage,
+                "restore": self.restore_fuel_shortage,
+                "name": "Fuel Shortage",
                 "description": "Increases the Move Cost of all units on your team for one turn.",
                 "type": "bad",
             },
             {
-                "func": self.team_gun_jam,
-                "restore": self.restore_team_gun_jam,
-                "name": "Team Gun Jam",
+                "func": self.gun_jam,
+                "restore": self.restore_gun_jam,
+                "name": "Gun Jam",
                 "description": "Increases the Fire Cost of all units on your team for one turn.",
                 "type": "bad",
             },
         ]
+
+    def apply_event_by_name(self, name):
+        choosen_event = None
+        for event in self.events:
+            if event["name"] == name:
+                choosen_event = event
+                break
+            
+        self.player1.apply_event(choosen_event["func"], choosen_event["restore"])
+        #self.player2.apply_event(choosen_event["func"], choosen_event["restore"])
+        return choosen_event             
+
 
     def random_event(self):
         event = random.choice(self.events)
@@ -136,9 +148,19 @@ class RandomEvents:
 
 
     def commanders_insight_team(self, my_units, enemy_units):
-        # Randomly select one unit from each side
-        unit1 = random.choice(my_units)
-        unit2 = random.choice(enemy_units)
+
+        # Filter units where is_vehicle is True
+        vehicle_units_my_side = [unit for unit in my_units if unit.is_vehicle]
+
+        # Randomly select a vehicle unit from each side
+        if vehicle_units_my_side:  # Check that both lists are not empty
+            unit1 = random.choice(vehicle_units_my_side)
+            while True:
+                unit2 = random.choice(vehicle_units_my_side)
+                if unit1 != unit2:
+                    break
+        else:
+            return
 
         # Swap their positions
         unit1.x, unit2.x = unit2.x, unit1.x
@@ -152,6 +174,9 @@ class RandomEvents:
         # Update the tile's unit reference
         unit1.tile.unit = unit1
         unit2.tile.unit = unit2
+
+        unit1.swapped = True
+        unit2.swapped = True                      
 
         # Store the swapped units for restoring later
         self.swapped_units = (unit1, unit2)
@@ -172,37 +197,47 @@ class RandomEvents:
         unit1.tile.unit = unit1
         unit2.tile.unit = unit2
 
+        unit1.swapped = False
+        unit2.swapped = False
+
         # Clear the swapped_units attribute
         self.swapped_units = None
 
 
     def remote_hack_team(self, my_units, enemy_units):
-        # Randomly select one unit from my side and one unit from the enemy side
-        my_unit = random.choice(my_units)
-        enemy_unit = random.choice(enemy_units)
+
+        # Filter units where is_vehicle is True
+        vehicle_units_enemy_side = [unit for unit in enemy_units if unit.is_vehicle]
+
+        # Randomly select a vehicle unit from each side
+        if vehicle_units_enemy_side:  # Check that both lists are not empty
+            enemy_unit = random.choice(vehicle_units_enemy_side)
+        else:
+            return            
 
         # Swap the control (player attribute)
-        my_unit.player, enemy_unit.player = enemy_unit.player, my_unit.player
+        enemy_unit.player = self.player1.number
+        self.player2.units.remove(enemy_unit)
+        self.player1.units.append(enemy_unit)
 
-        # Store the switched units for restoring later
-        self.switched_unit_my_side = my_unit
-        self.switched_unit_enemy_side = enemy_unit
+        enemy_unit.swapped = True
+        self.swapped_units = enemy_unit
 
     def restore_remote_hack_team(self, my_units, enemy_units):
-        # Revert the control swap
-        if self.switched_unit_my_side and self.switched_unit_enemy_side:
-            self.switched_unit_my_side.player, self.switched_unit_enemy_side.player = \
-                self.switched_unit_enemy_side.player, self.switched_unit_my_side.player
+        # Swap the control (player attribute)
+        enemy_unit = self.swapped_units
+        enemy_unit.player = self.player2.number
+        self.player1.units.remove(enemy_unit)
+        self.player2.units.append(enemy_unit)
 
-            # Clear the switched_unit attributes
-            self.switched_unit_my_side = None
-            self.switched_unit_enemy_side = None
+        enemy_unit.swapped = False
+        self.swapped_units = None
 
 
     def divine_intervention_team(self, my_units, enemy_units):
         for unit in my_units:
             unit.original_hp = unit.health
-            unit.health = unit.max_hp
+            unit.health = unit.max_health
 
 
     def restore_divine_intervention_team(self, my_units, enemy_units):
@@ -212,21 +247,23 @@ class RandomEvents:
 
     def skill_mastery_team(self, my_units, enemy_units):
         for unit in my_units:
-            unit.damage *= 2
+            unit.attack_damage *= 2
 
 
     def restore_skill_mastery_team(self, my_units, enemy_units):
         for unit in my_units:
-            unit.damage /= 2
+            unit.attack_damage /= 2
 
 
     def artifact_team(self, my_units, enemy_units):
         for unit in my_units:
+            unit.max_action_points += 1
             unit.action_points += 1
 
 
     def restore_artifact_team(self, my_units, enemy_units):
         for unit in my_units:
+            unit.max_action_points += 1
             unit.action_points -= 1
 
 
@@ -255,17 +292,17 @@ class RandomEvents:
 
     def equipment_malfunction_team(self, my_units, enemy_units):
         for unit in my_units:
-            unit.damage *= 0.5
+            unit.attack_damage *= 0.5
 
 
     def restore_equipment_malfunction_team(self, my_units, enemy_units):
         for unit in my_units:
-            unit.damage *= 2
+            unit.attack_damage *= 2
 
 
     def friendly_fire_team(self, my_units, enemy_units):
         for unit1, unit2 in zip(my_units, enemy_units):
-            unit2.health -= unit1.damage
+            unit2.health -= unit1.attack_damage
             if unit2.health <= 0:
                 unit2.health = 1
 
@@ -277,12 +314,12 @@ class RandomEvents:
 
     def damage_boost(self, my_units, enemy_units):
         for unit in my_units:
-            unit.Damage *= 1.5  # 50% increase in damage
+            unit.attack_damage *= 1.5  # 50% increase in damage
 
 
     def restore_damage_boost(self, my_units, enemy_units):
         for unit in my_units:
-            unit.Damage /= 1.5  # Restore original damage
+            unit.attack_damage /= 1.5  # Restore original damage
 
 
     def armor_plating(self, my_units, enemy_units):
@@ -297,12 +334,12 @@ class RandomEvents:
 
     def adrenaline_rush(self, my_units, enemy_units):
         for unit in my_units:
-            unit.AP += 2  # Add 2 action points
+            unit.action_points += 2  # Add 2 action points
 
 
     def restore_adrenaline_rush(self, my_units, enemy_units):
         for unit in my_units:
-            unit.AP -= 2  # Restore original action points
+            unit.action_points -= 2  # Restore original action points
 
 
     def quick_feet(self, my_units, enemy_units):

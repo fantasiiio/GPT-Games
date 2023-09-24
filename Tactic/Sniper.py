@@ -52,7 +52,7 @@ class Sniper(Unit):
 
         # First, calculate the rects for each action based on their positions
         for index, action in enumerate(self.actions):
-            action_pos = (self.x, self.y - 30 - index * 30)
+            action_pos = (self.screen_x, self.screen_y - 30 - index * 30)
             text_surface = font.render(action, True, (255, 255, 255))
             rect = text_surface.get_rect(topleft=action_pos)
             self.action_rects.append(rect)
@@ -72,7 +72,7 @@ class Sniper(Unit):
 
         # Draw each action text with appropriate color based on hover state
         for index, action in enumerate(self.actions):
-            action_pos = (self.x, self.y - 30 - index * 30)
+            action_pos = (self.screen_x, self.screen_y - 30 - index * 30)
 
             # Check if the mouse is hovering over this action
             if self.action_rects[index].collidepoint(mouse_pos):
@@ -101,17 +101,17 @@ class Sniper(Unit):
     def draw(self):
         if self.is_driver:
             return
-        self.animations[self.current_animation].draw(self.x, self.y, -self.angle)
+        self.animations[self.current_animation].draw(self.screen_x, self.screen_y, -self.angle)
         if self.current_animation == "Fire":
-            self.animations["GunEffect"].draw(self.x, self.y, -self.angle, (14,-15))
+            self.animations["GunEffect"].draw(self.screen_x, self.screen_y, -self.angle, (14,-15))
 
         rect = self.animations[self.current_animation].get_current_rect()
 
         for bullet in self.bullets:
             bullet.draw()
         # Assuming soldier_rect is the rectangle of the soldier sprite
-        status_bar_x = self.x + rect.left
-        status_bar_y = self.y   # 2 pixels gap
+        status_bar_x = self.screen_x + rect.left
+        status_bar_y = self.screen_y   # 2 pixels gap
 
         # Draw health status bar
         self.draw_status_bar(status_bar_x, status_bar_y, self.health, self.max_health, HEALTH_COLOR)
@@ -122,10 +122,10 @@ class Sniper(Unit):
         self.draw_points_as_squares(status_bar_x, points_y, self.action_points, self.max_action_points, POINTS_COLOR, MAX_SQUARES_PER_ROW)  
 
         if self.current_action == "choosing_move_target":
-            self.grid.highlight_tiles((self.x // TILE_SIZE, self.y // TILE_SIZE), min(self.max_move, self.action_points), (100, 00, 00, 128), self.current_action)       
+            self.grid.highlight_tiles((self.screen_x // TILE_SIZE, self.screen_y // TILE_SIZE), min(self.max_move, self.action_points), (100, 00, 00, 128), self.current_action)       
 
         if self.current_action == "choosing_fire_target":
-            self.grid.highlight_tiles((self.x // TILE_SIZE, self.y // TILE_SIZE), self.fire_range, (00, 100, 00, 128), self.current_action)       
+            self.grid.highlight_tiles((self.screen_x // TILE_SIZE, self.screen_y // TILE_SIZE), self.fire_range, (00, 100, 00, 128), self.current_action)       
 
 
         if self.current_action == "choosing_action":
@@ -153,9 +153,9 @@ class Sniper(Unit):
 
         # Calculate the distance to the target
         target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
-        squares_to_target = (target_x - self.x) / TILE_SIZE, (target_y - self.y) / TILE_SIZE
+        squares_to_target = (target_x - self.screen_x) / TILE_SIZE, (target_y - self.screen_y) / TILE_SIZE
         movement_cost = self.settings["Move Cost"]
-        self.angle = math.atan2(target_y - self.y, target_x - self.x) * 180 / math.pi
+        self.angle = math.atan2(target_y - self.screen_y, target_x - self.screen_x) * 180 / math.pi
         if movement_cost <= self.action_points:
             self.tile.unit = None
             self.tile = target_tile
@@ -170,14 +170,14 @@ class Sniper(Unit):
             self.target_x, self.target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
             self.current_animation = "Walk"
             self.animations["Walk"].play()
-            self.distance_to_target = math.sqrt((self.target_x - self.x)**2 + (self.target_y - self.y)**2)
+            self.distance_to_target = math.sqrt((self.target_x - self.screen_x)**2 + (self.target_y - self.screen_y)**2)
             if self.distance_to_target < self.min_distance:
                 self.min_distance = self.distance_to_target
             if(self.distance_to_target > 1):
                 # Unit's speed
                 speed = 2
-                self.dx = ((self.target_x - self.x) / self.distance_to_target) * speed
-                self.dy = ((self.target_y - self.y) / self.distance_to_target) * speed
+                self.dx = ((self.target_x - self.screen_x) / self.distance_to_target) * speed
+                self.dy = ((self.target_y - self.screen_y) / self.distance_to_target) * speed
                 speed= speed
 
     def fire(self, target_tile):
@@ -192,20 +192,20 @@ class Sniper(Unit):
         # Calculate the distance to the target
         target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
         movement_cost = 1
-        angle = math.atan2(target_y - self.y, target_x - self.x) * 180 / math.pi
+        angle = math.atan2(target_y - self.screen_y, target_x - self.screen_x) * 180 / math.pi
         if movement_cost <= self.action_points:
             self.gun_sound.play()
-            self.angle = math.atan2(target_y - self.y, target_x - self.x) * 180 / math.pi
+            self.angle = math.atan2(target_y - self.screen_y, target_x - self.screen_x) * 180 / math.pi
             self.action_points -= movement_cost
             self.animations["Fire"].play()
             self.animations["GunEffect"].play()
             self.target_x, self.target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
             self.current_animation = "Fire"
-            self.distance_to_target = math.sqrt((self.target_x - self.x)**2 + (self.target_y - self.y)**2)
+            self.distance_to_target = math.sqrt((self.target_x - self.screen_x)**2 + (self.target_y - self.screen_y)**2)
 
             speed = 15
             #target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
-            self.bullets.append(Bullet(self.x, self.y,  angle, self.screen, speed, target_tile, self.base_folder, "Bullet"))
+            self.bullets.append(Bullet(self.screen_x, self.screen_y,  angle, self.screen, speed, target_tile, self.base_folder, "Bullet"))
 
     def update(self, inputs):
         if self.is_driver:
@@ -263,18 +263,18 @@ class Sniper(Unit):
             animation.update()        
         
         if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive and self.current_action != "move_to_target" and self.current_action != "fire_to_target":
-            self.angle = math.atan2(inputs.mouse.pos[1] - self.y, inputs.mouse.pos[0] - self.x) * 180 / math.pi
+            self.angle = math.atan2(inputs.mouse.pos[1] - self.screen_y, inputs.mouse.pos[0] - self.screen_x) * 180 / math.pi
 
         if self.current_action == "move_to_target":
             self.current_animation == "Walk"
             # Update the unit's position
-            self.x += self.dx
-            self.y += self.dy
+            self.screen_x += self.dx
+            self.screen_y += self.dy
 
             # Check if the unit is close enough to the target to stop
-            if abs(self.x - self.target_x) < 1 and abs(self.y - self.target_y) < 1:
-                self.x = self.target_x
-                self.y = self.target_y
+            if abs(self.screen_x - self.target_x) < 1 and abs(self.screen_y - self.target_y) < 1:
+                self.screen_x = self.target_x
+                self.screen_y = self.target_y
                 self.animations["Walk"].stop()
                 self.current_animation = "Idle"
                 self.current_action = None

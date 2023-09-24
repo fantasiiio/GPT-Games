@@ -1,7 +1,7 @@
 import pygame
 from grid import Grid 
 from Inputs import Inputs
-from GraphicUI import UIPanel, UIButton,UIImage
+from GraphicUI import UIPanel, UIButton,UIImage, UILabel
 from Tank import Tank
 
 
@@ -26,9 +26,15 @@ class MainMenu:
         
         self.grid.move(self.grid_offset[0], self.grid_offset[1])
         
-        self.menu_panel = UIPanel(self.screen_width/2 - self.panel_width/2, 20, 
-                             self.panel_width, self.panel_height, image="panel.png", border_size=12)
+        self.menu_panel = UIPanel(self.screen_width/2 - self.panel_width/2, 120, 
+                             self.panel_width, self.panel_height, image="panel.png")
                              
+
+        self.top_panel = UIPanel(0, 0, 0, 0, color=(0,0,0))
+        font = pygame.font.Font('assets\\UI\\Army.ttf', 72)
+        self.player_label = UILabel(10, 20, f"Battle Grid", font=font, text_color=(232,217,194), outline_width=1)
+        self.player_label.rect.x = self.screen_width / 2 - self.player_label.rect.width / 2
+        self.top_panel.add_element(self.player_label)
 
         self.create_buttons()
 
@@ -116,6 +122,7 @@ class MainMenu:
         self.grid.draw_grid(self.inputs)
         self.tank.draw()
         self.menu_panel.draw(self.screen)
+        self.top_panel.draw(self.screen)
         pygame.display.flip()
         
     def run(self):

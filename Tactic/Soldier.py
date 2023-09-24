@@ -7,7 +7,7 @@ from Bullet import Bullet
 import pygame.mixer
 from Unit import Unit
 
-from config import  pick_random_name, get_unit_settings, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY, MAX_SQUARES_PER_ROW, SQUARE_SPACING, SQUARE_SIZE, BACKGROUND_COLOR, POINTS_COLOR, HEALTH_COLOR, STATUS_BAR_HEIGHT, STATUS_BAR_WIDTH
+from config import  GameState, pick_random_name, get_unit_settings, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY, MAX_SQUARES_PER_ROW, SQUARE_SPACING, SQUARE_SIZE, BACKGROUND_COLOR, POINTS_COLOR, HEALTH_COLOR, STATUS_BAR_HEIGHT, STATUS_BAR_WIDTH
 
 
 class Soldier(Unit):
@@ -47,44 +47,6 @@ class Soldier(Unit):
         self.last_action = None
         self.last_action_target = None
 
-    def draw_actions_menu(self):       
-        font = pygame.font.SysFont(None, 25)
-        mouse_pos = pygame.mouse.get_pos()  # Get the current mouse position
-
-        # Initialize the list to store action rects
-        self.action_rects = []
-
-        # First, calculate the rects for each action based on their positions
-        for index, action in enumerate(self.actions):
-            action_pos = (self.x, self.y - 30 - index * 30)
-            text_surface = font.render(action, True, (255, 255, 255))
-            rect = text_surface.get_rect(topleft=action_pos)
-            self.action_rects.append(rect)
-
-        # Calculate the encompassing rectangle
-        if self.action_rects:
-            self.action_menu_rect = self.action_rects[0].copy()
-            for action_rect in self.action_rects[1:]:
-                self.action_menu_rect.union_ip(action_rect)
-
-            # Inflate the encompassing rectangle for padding
-            padding = 10
-            self.action_menu_rect.inflate_ip(padding * 2, padding * 2)
-
-            # Draw the encompassing rectangle
-            pygame.draw.rect(self.screen, (50, 50, 50), self.action_menu_rect)
-
-        # Draw each action text with appropriate color based on hover state
-        for index, action in enumerate(self.actions):
-            action_pos = (self.x, self.y - 30 - index * 30)
-
-            # Check if the mouse is hovering over this action
-            if self.action_rects[index].collidepoint(mouse_pos):
-                text_surface = font.render(action, True, (255, 255, 0))  # Hover color
-            else:
-                text_surface = font.render(action, True, (255, 255, 255))  # Default color
-
-            self.screen.blit(text_surface, action_pos)
 
     def draw_actions_menu(self):  # Added soldier_name as a parameter
         soldier_name = self.name
@@ -94,14 +56,14 @@ class Soldier(Unit):
 
         # Initialize the list to store action rects
         self.action_rects = []
-        action_pos = (self.x, self.y - 30 - (len(self.actions)) * 30)        
+        action_pos = (self.draw_x, self.draw_y - 30 - (len(self.actions)) * 30)        
         title_surface = title_font.render(soldier_name, True, (0, 0, 255))
         title_rect = title_surface.get_rect(topleft=action_pos)
         self.action_rects.append(title_rect)
 
         # First, calculate the rects for each action based on their positions
         for index, action in enumerate(self.actions):
-            action_pos = (self.x, self.y - 30 - index * 30)  # Shifted down by 60 units to make space for soldier's name
+            action_pos = (self.draw_x, self.draw_y - 30 - index * 30)  # Shifted down by 60 units to make space for soldier's name
             text_surface = font.render(action, True, (255, 255, 255))
             rect = text_surface.get_rect(topleft=action_pos)
             self.action_rects.append(rect)
@@ -120,7 +82,7 @@ class Soldier(Unit):
             pygame.draw.rect(self.screen, (50, 50, 50), self.action_menu_rect)
 
         # Render and draw the soldier's name
-        action_pos = (self.x, self.y - 30 - (len(self.actions)) * 30)
+        action_pos = (self.draw_x, self.draw_y - 30 - (len(self.actions)) * 30)
         title_surface = title_font.render(soldier_name, True, (0, 0, 255))  # Blue color for distinction
         title_rect = title_surface.get_rect(topleft=action_pos)
         pygame.draw.rect(self.screen, (100, 100, 100), title_rect)  # Gray background for the title
@@ -128,7 +90,7 @@ class Soldier(Unit):
 
         # Draw each action text with appropriate color based on hover state
         for index, action in enumerate(self.actions):
-            action_pos = (self.x, self.y - 30 - (index) * 30)  # Adjusted for the title
+            action_pos = (self.draw_x, self.draw_y - 30 - (index) * 30)  # Adjusted for the title
 
             # Check if the mouse is hovering over this action
             if self.action_rects[index+1].collidepoint(mouse_pos):
@@ -155,32 +117,45 @@ class Soldier(Unit):
     def draw(self):
         if self.is_driver:
             return
-        if self.player != self.current_player:
-            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None, (255,0,0), 2)
-        else:
-            self.animations[self.current_animation].draw(self.x, self.y, -self.angle, None, None)
-        # self.animations[self.current_animation].draw(self.x, self.y, -self.angle)
+        
+        outline_color=None
+        outline_thickness=None
+        if self.swapped:
+            if self.player == self.current_player:
+                outline_color = (0, 255, 0)
+            else:
+                outline_color = (255, 0, 0)
+            outline_thickness = 5
+        elif self.player != self.current_player:
+            outline_color = (255, 0, 0)
+            outline_thickness = 2		
+		
+        self.animations[self.current_animation].draw(self.draw_x, self.draw_y, -self.angle, None, None, outline_color, outline_thickness, outline_fade=True)
+
+            
         if self.current_animation == "Fire":
-            self.animations["GunEffect"].draw(self.x, self.y, -self.angle, (14,-15))
+            self.animations["GunEffect"].draw(self.draw_x, self.draw_y, -self.angle, (14,-15))
 
         rect = self.animations[self.current_animation].get_current_rect()
 
         for bullet in self.bullets:
             bullet.draw()
-        # Assuming soldier_rect is the rectangle of the soldier sprite
-        status_bar_x = self.x + rect.left
-        status_bar_y = self.y + 32 + 16
+
+        # Assuming soldier_rect is the rectangle of the soldier sprite<
+        status_bar_x = self.draw_x + rect.left
+        status_bar_y = self.draw_y + 32 + 16
 
         # Draw health status bar
         self.draw_status_bar(status_bar_x, status_bar_y, self.health, self.max_health, HEALTH_COLOR)
         self.draw_status_bar(status_bar_x, status_bar_y + STATUS_BAR_HEIGHT, self.action_points, self.max_action_points, POINTS_COLOR)
 
 
+
         if self.current_action == "choosing_move_target":
-            self.grid.highlight_tiles((self.x // TILE_SIZE, self.y // TILE_SIZE), self.max_move, (00, 100, 00, 50), self.current_action)       
+            self.grid.highlight_tiles((self.draw_x // TILE_SIZE, self.draw_y // TILE_SIZE),self.max_move, (00, 100, 00, 50), self.current_action)       
 
         if self.current_action == "choosing_fire_target":
-            self.grid.highlight_tiles((self.x // TILE_SIZE, self.y // TILE_SIZE), self.fire_range, (100, 00, 00, 50), self.current_action)       
+            self.grid.highlight_tiles((self.draw_x // TILE_SIZE, self.draw_y // TILE_SIZE), self.fire_range, (100, 00, 00, 50), self.current_action)       
 
 
         if self.current_action == "choosing_action":
@@ -207,11 +182,11 @@ class Soldier(Unit):
 
         # Calculate the distance to the target
         target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
-        squares_to_target = (target_x - self.x) / TILE_SIZE, (target_y - self.y) / TILE_SIZE
+        squares_to_target = (target_x - self.screen_x) / TILE_SIZE, (target_y - self.screen_y) / TILE_SIZE
         movement_cost = self.settings["Move Cost"]
         if movement_cost <= self.action_points:
             self.target_point = (target_x + self.offset[0], target_y + self.offset[1])
-            self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
+            self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])
             self.angle = math.atan2(self.target_point[1] - self.origin_point[1] ,  self.target_point[0] - self.origin_point[0] ) * 180 / math.pi
             self.grid.selected_tile = target_tile
             self.target_tile = target_tile
@@ -219,7 +194,7 @@ class Soldier(Unit):
             self.target_x, self.target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
             self.current_animation = "Walk"
             self.animations[self.current_animation].play()
-            self.distance_to_target = math.sqrt((self.target_x - self.x)**2 + (self.target_y - self.y)**2)
+            self.distance_to_target = math.sqrt((self.target_x - self.screen_x)**2 + (self.target_y - self.screen_y)**2)
             if self.distance_to_target < self.min_distance:
                 self.min_distance = self.distance_to_target
 
@@ -247,27 +222,32 @@ class Soldier(Unit):
         # Calculate the distance to the target
         target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
         fire_cost = self.fire_cost
-        #angle = math.atan2(target_y - self.y, target_x - self.x) * 180 / math.pi
+        #angle = math.atan2(target_y - self.screen_y, target_x - self.screen_x) * 180 / math.pi
         if fire_cost <= self.action_points:
             self.bullets_fired = 0
             self.gun_sound.play()
             
             self.target_tile = target_tile
             self.target_point = (target_x + self.offset[0], target_y + self.offset[1])
-            self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
+            self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])
             self.angle = math.atan2(self.target_point[1] - self.origin_point[1] ,  self.target_point[0] - self.origin_point[0] ) * 180 / math.pi
             self.action_points -= fire_cost
             self.animations["Fire"].play()
             self.animations["GunEffect"].play()
             self.target_x, self.target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
             self.current_animation = "Fire"
-            self.distance_to_target = math.sqrt((self.target_x - self.x)**2 + (self.target_y - self.y)**2)
+            self.distance_to_target = math.sqrt((self.target_x - self.screen_x)**2 + (self.target_y - self.screen_y)**2)
 
     def bullet_reach_target(self, bullet):
         pass
 
     def update(self, inputs):
-        if self.is_driver:
+        if self.current_game_state == GameState.UNIT_PLACEMENT:
+            self.place_unit(inputs)
+            return
+        if self.is_driver or self.current_player != self.player:
+            self.draw_x = self.screen_x + self.grid.get_camera_screen_position()[0]
+            self.draw_y = self.screen_y + self.grid.get_camera_screen_position()[1]
             return
         self.hover_menu = self.action_menu_rect and self.action_menu_rect.collidepoint(inputs.mouse.pos)
         # Handle left mouse click events.
@@ -337,7 +317,7 @@ class Soldier(Unit):
         point_y = self.target_tile.y*TILE_SIZE + self.offset[1]
         current_time = pygame.time.get_ticks()
         if self.current_action == "fire_to_target" and not finished_shooting and self.bullets_fired < self.NUM_BULLETS and current_time - self.last_fired > self.FIRING_RATE:
-            shoot_position = self.x, self.y
+            shoot_position = self.screen_x, self.screen_y
             angle = math.atan2((self.target_tile.y*TILE_SIZE) - shoot_position[1] , (self.target_tile.x*TILE_SIZE) - shoot_position[0]) * 180 / math.pi
 
             self.bullets.append(Bullet(shoot_position[0],shoot_position[1],angle, self.screen ,self.BULLET_SPEED, self.target_tile, self.base_folder, damage=self.attack_damage / self.NUM_BULLETS))
@@ -345,7 +325,7 @@ class Soldier(Unit):
             self.last_fired = current_time
 
 
-        self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
+        self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])
         self_selected = False
         if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive:
             self_selected = True            
@@ -366,24 +346,22 @@ class Soldier(Unit):
 
         if self.current_action == "move_to_target":
             self.target_point = (point_x, point_y)
-            self.origin_point = (self.x + self.offset[0], self.y + self.offset[1])
+            self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])
             self.distance_to_target = math.sqrt((self.target_point[0] - self.origin_point[0])**2 + (self.target_point[1] - self.origin_point[1])**2)
             self.current_animation == "Walk"
-            self.x += self.velocity_x
-            self.y += self.velocity_y
+            self.screen_x += self.velocity_x
+            self.screen_y += self.velocity_y
             
             if self.distance_to_target < self.MOVE_SPEED:
 
-                self.x = self.target_x
-                self.y = self.target_y
+                self.screen_x = self.target_x
+                self.screen_y = self.target_y
                 self.animations["Walk"].stop()
                 self.current_animation = "Idle"
                 self.current_action = None
-                if self.grid.selected_tile.unit and (self.grid.selected_tile.unit.type == "Tank" or self.grid.selected_tile.unit.type == "Boat" or self.grid.selected_tile.unit.type == "Helicopter"):
-                    self.grid.selected_tile.unit.take_seat(self)
-                    self.tile = self.target_tile
-
-
+        
+        self.draw_x = self.screen_x + self.grid.get_camera_screen_position()[0]
+        self.draw_y = self.screen_y + self.grid.get_camera_screen_position()[1]   
                     
         if finished_shooting and self.current_action == "fire_to_target":
             self.current_action = None
@@ -404,10 +382,10 @@ class Soldier(Unit):
         
         background_surface.fill(dark_gray)       
         # Blit the semi-transparent surface on the screen at the top-left corner of the cell
-        self.screen.blit(background_surface, (self.x + padding, self.y + padding))
+        self.screen.blit(background_surface, (self.screen_x + padding, self.screen_y + padding))
 
         # Blit the text over the semi-transparent rectangle
-        self.screen.blit(number_surface, (self.x + padding, self.y + padding))
+        self.screen.blit(number_surface, (self.screen_x + padding, self.screen_y + padding))
 
     def process_events(self, event):
         pass
