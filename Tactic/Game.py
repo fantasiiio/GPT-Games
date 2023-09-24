@@ -15,6 +15,7 @@ from Inputs import Inputs
 from MusicPlayer import MusicPlayer
 from Boat import Boat
 from Item import Item
+from Animation import Animation
 
 pygame.mixer.init()
 
@@ -32,7 +33,9 @@ class StrategyGame:
         #self.manager = pygame_gui.UIManager((self.grid.grid_width, self.grid.grid_height))
         self.grid = Grid(pygame, self.screen, "assets\\maps\\terrain1.tmx")
         self.item_list = []
-        self.item_list.append(Item(self.screen, self.grid, "coin", self.grid.tiles[4][4], "assets\\maps\\coin.png"))
+        self.coin_animation = Animation(self.screen, "assets\\images","", "Coin", -1, (32,32), 0, frame_duration=100) 
+
+        self.item_list.append(Item(self.screen, self.grid, "coin", self.grid.tiles[4][4], self.coin_animation))
         self.players = {1: Player(1, True), 2: Player(2, False)}
         self.players[1].enemy = self.players[2]
         self.players[2].enemy = self.players[1]
@@ -50,8 +53,9 @@ class StrategyGame:
         self.placing_unit_index = 0
         self.current_player = 1
         self.ignore_next_click = False
+        self.grid.set_camera_world_position(-self.grid.grid_width/2, -self.grid.grid_height/2)
+
         #self.grid.set_camera_screen_position (-self.grid.grid_width/2, -self.grid.grid_height/2)
-        self.grid.set_camera_world_position(0,0)
         if not init_pygame:
             self.game_state = GameState.UNIT_PLACEMENT
             self.place_next_unit()
@@ -277,6 +281,7 @@ class StrategyGame:
             self.grid.update(self.inputs)
             self.grid.draw_grid(self.inputs)
             for item in self.item_list:
+                item.update()
                 item.draw()
 
             for player in self.players.values():

@@ -246,8 +246,8 @@ class Soldier(Unit):
             self.place_unit(inputs)
             return
         if self.is_driver or self.current_player != self.player:
-            self.draw_x = self.screen_x + self.grid.get_camera_screen_position()[0]
-            self.draw_y = self.screen_y + self.grid.get_camera_screen_position()[1]
+            self.draw_x = self.world_pos_x + self.grid.get_camera_screen_position()[0]
+            self.draw_y = self.world_pos_y + self.grid.get_camera_screen_position()[1]  
             return
         self.hover_menu = self.action_menu_rect and self.action_menu_rect.collidepoint(inputs.mouse.pos)
         # Handle left mouse click events.
@@ -360,8 +360,8 @@ class Soldier(Unit):
                 self.current_animation = "Idle"
                 self.current_action = None
         
-        self.draw_x = self.screen_x + self.grid.get_camera_screen_position()[0]
-        self.draw_y = self.screen_y + self.grid.get_camera_screen_position()[1]   
+        self.draw_x = self.world_pos_x + self.grid.get_camera_screen_position()[0]
+        self.draw_y = self.world_pos_y + self.grid.get_camera_screen_position()[1]   
                     
         if finished_shooting and self.current_action == "fire_to_target":
             self.current_action = None

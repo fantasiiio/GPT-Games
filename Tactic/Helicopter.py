@@ -17,6 +17,8 @@ class HelicopterBlades():
         self.offset = (0,0)
         #self.parent_angle = 0
         self.angle = 0
+        self.world_pos_x = 0
+        self.world_pos_y = 0        
         self.animations["Idle"] = Animation(self.screen,base_folder,"Helicopter_blades_", "Idle", 0, (0,-10),90)
         self.animations["Slow"] = Animation(self.screen,base_folder,"blades_", "Move_slow", -1, (0,-10),90, frame_duration=50)
         self.animations["Fast"] = Animation(self.screen,base_folder,"blades_", "Move_fast", -1, (0,-10),90, frame_duration=50)
@@ -107,10 +109,10 @@ class HelicopterBlades():
         self.shoot_position = self.get_shoot_positions(rotated_corners, 0, 10)
         # pygame.draw.circle(self.screen, (0,0,0), self.shoot_position, 2)
         # pygame.draw.circle(self.screen, (0,0,0), self.shoot_positions[1], 2)
-        self.screen_x = parent_pos[0] + self.offset[0]
-        self.screen_y = parent_pos[1] + self.offset[1]
-        self.draw_x = self.screen_x + self.parent.grid.get_camera_screen_position()[0]
-        self.draw_y = self.screen_y + self.parent.grid.get_camera_screen_position()[1] 
+        self.world_pos_x = parent_pos[0] + self.offset[0]
+        self.world_pos_y = parent_pos[1] + self.offset[1]
+        self.draw_x = self.world_pos_x + self.parent.grid.get_camera_screen_position()[0]
+        self.draw_y = self.world_pos_y + self.parent.grid.get_camera_screen_position()[1] 
 
         for animation in self.animations.values():
             animation.update() 
@@ -391,9 +393,9 @@ class Helicopter(Unit):
 
         # If there's no driver, just update the tower's position and angle and exit.
         if self.seat_taken == 0:
-            self.draw_x = self.screen_x + self.grid.get_camera_screen_position()[0]
-            self.draw_y = self.screen_y + self.grid.get_camera_screen_position()[1]               
-            self.tower.update((self.screen_x, self.screen_y), self.tower.angle if self.tower.angle else 0) 
+            self.draw_x = self.world_pos_x + self.grid.get_camera_screen_position()[0]
+            self.draw_y = self.world_pos_y + self.grid.get_camera_screen_position()[1]                
+            self.tower.update((self.world_pos_x, self.world_pos_y), self.tower.angle if self.tower.angle else 0) 
             return
 
         # Check if the mouse is hovering over the action menu.
@@ -531,8 +533,8 @@ class Helicopter(Unit):
                 self.current_animation = "Idle"
                 self.current_action = None
         
-        self.draw_x = self.screen_x + self.grid.get_camera_screen_position()[0]
-        self.draw_y = self.screen_y + self.grid.get_camera_screen_position()[1]   
+        self.draw_x = self.world_pos_x + self.grid.get_camera_screen_position()[0]
+        self.draw_y = self.world_pos_y + self.grid.get_camera_screen_position()[1]   
                     
         if finished_shooting and self.current_action == "fire_to_target":
             self.current_action = None

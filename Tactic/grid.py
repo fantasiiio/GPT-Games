@@ -59,8 +59,6 @@ class Grid:
     def get_camera_screen_position(self):
         return (self.camera_world_position[0] + self.screen.get_rect().width/2, self.camera_world_position[1] + self.screen.get_rect().height/2)
     
-    def get_camera_world_position(self):
-        return (self.camera_world_position[0] , self.camera_world_position[1])
 
     def set_camera_world_position(self, x, y):
         # Calculate the boundaries based on the grid size and tile size
@@ -242,7 +240,7 @@ class Grid:
                     self.selected_tile = None  
         if inputs.mouse.clicked[1]:
             self.clicked_position = inputs.mouse.pos
-            self.camera_start = self.get_camera_world_position()  
+            self.camera_start = self.camera_world_position
             self.camera_start = self.camera_start
         elif inputs.mouse.button[1]:
             if self.clicked_position:
