@@ -33,7 +33,7 @@ class Unit:
         self.world_pos_x, self.world_pos_y = 0, 0
         if target_tile:
             self.world_pos_x, self.world_pos_y = target_tile.x * TILE_SIZE, target_tile.y * TILE_SIZE
-            self.screen_x, self.screen_y = self.calc_screen_pos((self.world_pos_x, self.world_pos_y))  
+            self.screen_x, self.screen_y = self.calc_screen_pos(self.world_pos_x, self.world_pos_y)  
             self.tile = target_tile
             self.tile.unit = self
         self.animations = {}
@@ -174,9 +174,9 @@ class Unit:
         return True      
     
 
-    def calc_screen_pos(self, world_pos):
-        screen_x = world_pos[0] + self.grid.get_camera_screen_position()[0]
-        screen_y = world_pos[1] + self.grid.get_camera_screen_position()[1]
+    def calc_screen_pos(self, world_pos_x, world_pos_y):
+        screen_x = world_pos_x + self.grid.get_camera_screen_position()[0]
+        screen_y = world_pos_y + self.grid.get_camera_screen_position()[1]
         return screen_x, screen_y
         
 

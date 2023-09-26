@@ -16,6 +16,7 @@ class Soldier(Unit):
         super().__init__(target_tile, player, grid, base_folder, screen, "Soldier-Pistol", action_finished)
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
         self.death_sound = pygame.mixer.Sound("assets\\sounds\\dying2.wav")
+        self.yes_sir_sound = pygame.mixer.Sound("assets\\sounds\\sir-yes-sir.wav")
         self.screen = screen
 
         self.name = pick_random_name()
@@ -152,10 +153,10 @@ class Soldier(Unit):
 
 
         if self.current_action == "choosing_move_target":
-            self.grid.highlight_tiles((self.draw_x // TILE_SIZE, self.draw_y // TILE_SIZE),self.max_move, (00, 100, 00, 50), self.current_action)       
+            self.grid.highlight_tiles((self.world_pos_x // TILE_SIZE, self.world_pos_y // TILE_SIZE),self.max_move, (00, 100, 00, 50), self.current_action)       
 
         if self.current_action == "choosing_fire_target":
-            self.grid.highlight_tiles((self.draw_x // TILE_SIZE, self.draw_y // TILE_SIZE), self.fire_range, (100, 00, 00, 50), self.current_action)       
+            self.grid.highlight_tiles((self.world_pos_x // TILE_SIZE, self.world_pos_y // TILE_SIZE), self.fire_range, (100, 00, 00, 50), self.current_action)       
 
 
         if self.current_action == "choosing_action":
@@ -181,20 +182,21 @@ class Soldier(Unit):
         """Set the target destination for the unit."""
 
         # Calculate the distance to the target
-        target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
-        squares_to_target = (target_x - self.screen_x) / TILE_SIZE, (target_y - self.screen_y) / TILE_SIZE
+        #target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
+        target_world_x, target_world_y = target_tile.x * self.grid.tile_size, target_tile.y * self.grid.tile_size
         movement_cost = self.settings["Move Cost"]
         if movement_cost <= self.action_points:
-            self.target_point = (target_x + self.offset[0], target_y + self.offset[1])
-            self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])
+            self.yes_sir_sound.play()
+            self.target_point = (target_world_x + self.offset[0], target_world_y + self.offset[1])
+            self.origin_point = (self.world_pos_x + self.offset[0], self.world_pos_y + self.offset[1])
             self.angle = math.atan2(self.target_point[1] - self.origin_point[1] ,  self.target_point[0] - self.origin_point[0] ) * 180 / math.pi
             self.grid.selected_tile = target_tile
             self.target_tile = target_tile
             self.action_points -= movement_cost
-            self.target_x, self.target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
+            self.target_x, self.target_y = target_world_x, target_world_y 
             self.current_animation = "Walk"
             self.animations[self.current_animation].play()
-            self.distance_to_target = math.sqrt((self.target_x - self.screen_x)**2 + (self.target_y - self.screen_y)**2)
+            self.distance_to_target = math.sqrt((self.target_x - self.world_pos_x)**2 + (self.target_y - self.world_pos_y)**2)
             if self.distance_to_target < self.min_distance:
                 self.min_distance = self.distance_to_target
 
@@ -260,7 +262,7 @@ class Soldier(Unit):
             elif self.current_action == "choosing_move_target":
                 touching = False
                 for tile in self.grid.highlighted_tiles:
-                    if tile.rect.collidepoint(inputs.mouse.pos):
+                    if tile.get_screen_rect().collidepoint(inputs.mouse.pos):
                         touching = True
                         self.last_action = "move_to_target"
                         self.last_action_target = tile
@@ -272,7 +274,7 @@ class Soldier(Unit):
             elif self.current_action == "choosing_fire_target":
                 touching = False
                 for tile in self.grid.highlighted_tiles:
-                    if tile.rect.collidepoint(inputs.mouse.pos):
+                    if tile.get_screen_rect().collidepoint(inputs.mouse.pos):
                         touching = True
                         if tile.unit and tile.unit.player != self.player:
                             self.last_action = "fire_to_target"
@@ -292,8 +294,6 @@ class Soldier(Unit):
                             elif action == "Fire":
                                 if self.can_attack:
                                     self.current_action = "choosing_fire_target"
-                            elif action == "Build":
-                                pass
 
                 else:
                     self.current_action = None     
@@ -317,7 +317,7 @@ class Soldier(Unit):
         point_y = self.target_tile.y*TILE_SIZE + self.offset[1]
         current_time = pygame.time.get_ticks()
         if self.current_action == "fire_to_target" and not finished_shooting and self.bullets_fired < self.NUM_BULLETS and current_time - self.last_fired > self.FIRING_RATE:
-            shoot_position = self.screen_x, self.screen_y
+            shoot_position = self.world_pos_x, self.world_pos_y
             angle = math.atan2((self.target_tile.y*TILE_SIZE) - shoot_position[1] , (self.target_tile.x*TILE_SIZE) - shoot_position[0]) * 180 / math.pi
 
             self.bullets.append(Bullet(shoot_position[0],shoot_position[1],angle, self.screen ,self.BULLET_SPEED, self.target_tile, self.base_folder, damage=self.attack_damage / self.NUM_BULLETS))
@@ -325,7 +325,7 @@ class Soldier(Unit):
             self.last_fired = current_time
 
 
-        self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])
+        self.origin_point = (self.world_pos_x + self.offset[0], self.world_pos_y + self.offset[1])
         self_selected = False
         if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive:
             self_selected = True            
@@ -346,16 +346,16 @@ class Soldier(Unit):
 
         if self.current_action == "move_to_target":
             self.target_point = (point_x, point_y)
-            self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])
+            self.origin_point = (self.world_pos_x + self.offset[0], self.world_pos_y + self.offset[1])
             self.distance_to_target = math.sqrt((self.target_point[0] - self.origin_point[0])**2 + (self.target_point[1] - self.origin_point[1])**2)
             self.current_animation == "Walk"
-            self.screen_x += self.velocity_x
-            self.screen_y += self.velocity_y
+            self.world_pos_x += self.velocity_x
+            self.world_pos_y += self.velocity_y
             
             if self.distance_to_target < self.MOVE_SPEED:
 
-                self.screen_x = self.target_x
-                self.screen_y = self.target_y
+                self.world_pos_x = self.target_x
+                self.world_pos_y = self.target_y
                 self.animations["Walk"].stop()
                 self.current_animation = "Idle"
                 self.current_action = None
@@ -400,13 +400,6 @@ class Soldier(Unit):
         self.death_sound.play()
         self.animations["Die"].play()
         self.current_animation = "Die"
-
-    def build(self, target_tile, structure_type):
-        """Build a structure on a target tile."""
-        if self.action_points > 0 and not target_tile.structure:
-            new_structure = Structure(target_tile.x, target_tile.y, structure_type)
-            target_tile.structure = new_structure
-            self.action_points -= 3  # Assume building costs 3 action points
 
     def draw_points_as_squares(self, x, y, current_points, max_points, color, max_squares_per_row):
         rows = (max_points + max_squares_per_row - 1) // max_squares_per_row  # Calculate the total number of rows required

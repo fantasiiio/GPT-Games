@@ -16,6 +16,7 @@ from MusicPlayer import MusicPlayer
 from Boat import Boat
 from Item import Item
 from Animation import Animation
+from PlankAndBall import PlankAndBall
 
 pygame.mixer.init()
 
@@ -54,6 +55,12 @@ class StrategyGame:
         self.current_player = 1
         self.ignore_next_click = False
         self.grid.set_camera_world_position(-self.grid.grid_width/2, -self.grid.grid_height/2)
+        self.playing_mini_game = False
+        self.mini_game_score = {}
+        popup_width, popup_height = 640, 480
+        self.popup_surface = pygame.Surface((popup_width, popup_height))        
+
+
 
         #self.grid.set_camera_screen_position (-self.grid.grid_width/2, -self.grid.grid_height/2)
         if not init_pygame:
@@ -76,6 +83,7 @@ class StrategyGame:
             "Move Range",
             "Attack Range",
         ]
+
 
     def format_stats(self, data):
         formatted_str = f"Player{data['Player']}: {data['Type']}\n\n"
@@ -155,7 +163,7 @@ class StrategyGame:
 
     def init_ui(self):
         # Create UI panel
-        self.ui_panel = UIPanel(0, 0, self.grid.grid_width, 100, color=(0,0,0))
+        self.ui_panel = UIPanel(0, 0, self.screen.get_width(), 100, color=(0,0,0))
         
         # Create labels
         self.state_label = UILabel(10, 10, "", self.ui_panel, font_size=60)
@@ -166,8 +174,8 @@ class StrategyGame:
         self.end_turn_button = UIButton(0, 10, 200, 60, 
             "End Turn", parent=self.ui_panel,image="Box03.png", font_size=40, callback=self.end_turn_button_clicked)
         
-        self.end_turn_button.rect.right = self.grid.grid_width - 10
-        self.end_turn_button.rect.bottom = self.grid.grid_height - 10
+        self.end_turn_button.rect.right = self.screen.get_width() - 10
+        self.end_turn_button.rect.bottom = self.screen.get_height() - 10
         self.end_turn_button.enabled = True
 
         self.ui_panel.add_element(self.state_label)
@@ -229,7 +237,10 @@ class StrategyGame:
         self.notify_all_units("game_state_changed", self.game_state)
 
     def end_turn_button_clicked(self, button):
-        self.grid.move_camera_to_tile(self.players[self.current_player].units[0].tile)
+        # mini_game.run_game()
+        # self.grid.move_camera_to_tile(self.players[self.current_player].units[0].tile)
+        self.playing_mini_game = True
+        self.mini_game = PlankAndBall(init_pygame=False, full_screen=False, screen=self.popup_surface)
         return
         if not self.random_event:
             random_event = RandomEvents(self.players[self.current_player], self.players[3-self.current_player])
@@ -266,8 +277,10 @@ class StrategyGame:
         running = True
         mouse_pos = (0, 0)
         while running:
-            self.screen.fill((0, 0, 0))               
+            self.screen.fill((0, 0, 0)) 
+
             self.inputs.update()
+            mini_game_events = []
             for event in pygame.event.get():
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if event.button == 1:  # Left click
@@ -276,6 +289,7 @@ class StrategyGame:
                     running = False
 
                 self.ui_panel.handle_event(event)
+                mini_game_events.append(event)
 
             self.grid.update_camera()
             self.grid.update(self.inputs)
@@ -301,13 +315,21 @@ class StrategyGame:
             self.update_stats_panel()
             if self.grid.selected_tile and self.grid.selected_tile.unit:            
                 self.stats_panel.draw(self.screen)
+
+            if self.playing_mini_game:
+                mini_game_running, self.mini_game_score[self.current_player] = self.mini_game.draw_game()
+                self.screen.blit(self.popup_surface, (self.screen.get_width() / 2 - self.popup_surface.get_width() / 2, self.screen.get_height() / 2 - self.popup_surface.get_height() / 2))
+                if not mini_game_running:
+                    self.playing_mini_game = False
+
+
             pygame.display.flip()
 
         if self.init_pygame:
             pygame.quit()    
 
 if __name__ == "__main__":
-    selected_team1 = ["Boat","Helicopter", "Tank", "Soldier", "Soldier"] 
-    selected_team2 = ["Boat","Helicopter", "Tank", "Soldier", "Soldier"] 
+    selected_team1 = ["Tank", "Tank", "Tank", "Tank", "Tank"] 
+    selected_team2 = ["Tank", "Tank", "Tank", "Tank", "Tank"] 
     game = StrategyGame(selected_team1, selected_team2)
     game.game_loop()

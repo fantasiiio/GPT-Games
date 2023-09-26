@@ -3,7 +3,8 @@ from pytmx.util_pygame import load_pygame
 from config import  GRAY
 import random
 class Tile:
-    def __init__(self, x, y):
+    def __init__(self, x, y, grid):
+        self.grid = grid
         self.x = x
         self.y = y
         self.unit = None
@@ -12,31 +13,10 @@ class Tile:
         self.image = None
         self.no_walk = False
         self.properties = {}
-        self.rect = pygame.Rect(x * 64, y * 64, 64, 64)
+        self.rect = pygame.Rect(x * self.grid.tile_size, y * self.grid.tile_size, self.grid.tile_size, self.grid.tile_size)
 
-
-
-    def split_rectangle(rect, x_splits, y_splits):
-
-        if x_splits <= 0 or y_splits <= 0:
-            raise ValueError("x_splits and y_splits must be positive integers.")
-
-        # Calculate the width and height of each smaller rectangle
-        width = rect.width // x_splits
-        height = rect.height // y_splits
-
-        # Generate the smaller rectangles
-        rectangles = []
-        for j in range(y_splits):
-            row = []
-            for i in range(x_splits):
-                x_pos = rect.x + i * width
-                y_pos = rect.y + j * height
-                row.append(pygame.Rect(x_pos, y_pos, width, height))
-            rectangles.append(row)
-
-        return rectangles
-
+    def get_screen_rect(self): 
+        return pygame.Rect(self.x * self.grid.tile_size + self.grid.get_camera_screen_position()[0], self.y * self.grid.tile_size + self.grid.get_camera_screen_position()[1], self.grid.tile_size, self.grid.tile_size)
 
 class Grid:
     def __init__(self, pygame, screen, file_name):
@@ -55,29 +35,31 @@ class Grid:
         self.camera_is_moving = False
         self.camera_start = (0,0)
         self.camera_world_position = (0,0)
+        self.camera_move_start_time = 0
+        self.camera_direction_vector = (0,0)
 
     def get_camera_screen_position(self):
         return (self.camera_world_position[0] + self.screen.get_rect().width/2, self.camera_world_position[1] + self.screen.get_rect().height/2)
     
 
     def set_camera_world_position(self, x, y):
-        # Calculate the boundaries based on the grid size and tile size
-        min_x = 0 - (self.grid_width - self.screen.get_width()/2)
-        min_y = 0 - (self.grid_height - self.screen.get_height()/2)
+        # # Calculate the boundaries based on the grid size and tile size
+        # min_x = 0 - (self.grid_width - self.screen.get_width()/2)
+        # min_y = 0 - (self.grid_height - self.screen.get_height()/2)
         
-        # Screen size (assuming you have these variables)
-        screen_width, screen_height = self.screen.get_size()
+        # # Screen size (assuming you have these variables)
+        # screen_width, screen_height = self.screen.get_size()
         
-        # If the camera view goes out of the grid, we set it to the boundary value
-        if x > -self.screen.get_width()/2:
-            x = -self.screen.get_width()/2
-        elif x < min_x:
-            x = min_x
+        # # If the camera view goes out of the grid, we set it to the boundary value
+        # if x > -self.screen.get_width()/2:
+        #     x = -self.screen.get_width()/2
+        # elif x < min_x:
+        #     x = min_x
 
-        if y > -self.screen.get_height()/2:
-            y = -self.screen.get_height()/2
-        elif y < min_y:
-            y = min_y
+        # if y > -self.screen.get_height()/2:
+        #     y = -self.screen.get_height()/2
+        # elif y < min_y:
+        #     y = min_y
         
         self.camera_world_position = (x, y)
 
@@ -102,7 +84,7 @@ class Grid:
         self.tiles_y = tmx_data.height
         self.grid_width = self.tiles_x * self.tile_size
         self.grid_height = self.tiles_y * self.tile_size
-        self.tiles = [[Tile(x, y) for y in range(tmx_data.height)] for x in range(tmx_data.width)]
+        self.tiles = [[Tile(x, y, self) for y in range(tmx_data.height)] for x in range(tmx_data.width)]
         for layer in tmx_data.visible_layers:
             for x, y, gid in layer:
                 tile = tmx_data.get_tile_image_by_gid(gid)
@@ -252,7 +234,6 @@ class Grid:
 
     def highlight_tiles(self, unit_position, range, color, action):
         self.highlighted_tiles = []
-        self.tile_size = 64  # assuming each tile is 64x64 pixels
 
         tiles = self.tiles_in_range_manhattan(unit_position[0], unit_position[1], range)
         for tile_pos in tiles:
@@ -274,7 +255,7 @@ class Grid:
                     highlight_surface.fill(highlight_color)
                     
                     # Draw the tile with the chosen color
-                    self.screen.blit(highlight_surface, (tile.x * self.tile_size, tile.y * self.tile_size))
+                    self.screen.blit(highlight_surface, (tile.x * self.tile_size + self.get_camera_screen_position()[0], tile.y * self.tile_size + self.get_camera_screen_position()[1]))
        
 
 
@@ -328,67 +309,97 @@ class Grid:
             return 4 * t ** 3
         return 1 - pow(-2 * t + 2, 3) / 2
 
+    def ease_in_out_cubic2(self, t, b, c, d):
+        t /= d / 2
+        if t < 1:
+            return c / 2 * t * t * t + b
+        t -= 2
+        return c / 2 * (t * t * t + 2) + b
+
     def magnitude(self, vector):
         return (vector[0] ** 2 + vector[1] ** 2) ** 0.5
 
     def update_camera(self):
         if not self.camera_is_moving:
-            return self.get_camera_screen_position() 
-        # Calculate current distance traveled
-        current_distance = self.magnitude((self.get_camera_screen_position() [0] - self.camera_start[0], self.get_camera_screen_position() [1] - self.camera_start[1]))
+            return self.camera_world_position 
 
-        # Calculate t based on current distance and total distance
-        t = current_distance / self.camera_target_total_distance if self.camera_target_total_distance > 0 else 1
+        move_duration = 2000
+        current_time = self.pygame.time.get_ticks()
+        delta_time = current_time - self.camera_move_start_time
 
-        # Stop the animation if t >= 1
-        if t >= 1:
-            t = 1
+        if delta_time >= move_duration:
+            delta_time = move_duration
             self.camera_is_moving = False
 
         # Get the eased_t value
-        eased_t = self.ease_in_out_cubic(t)
+        eased_t = self.ease_in_out_cubic2(delta_time,0, 1,  move_duration)
 
-        # Update camera position       
-        new_x = self.camera_start[0] + (self.camera_target[0] - self.camera_start[0]) * eased_t
-        new_y = self.camera_start[1] + (self.camera_target[1] - self.camera_start[1]) * eased_t
-        self.set_camera_world_position(new_x, new_y)
+        dx_scaled = self.camera_direction_vector[0] * eased_t
+        dy_scaled = self.camera_direction_vector[1] * eased_t
+
+        # Update camera position
+        new_x = self.camera_start[0] - dx_scaled
+        new_y = self.camera_start[1] - dy_scaled
+
+        self.set_camera_screen_position(new_x, new_y)
         return (new_x, new_y)
 
     def move_camera_to(self, target):
         self.camera_is_moving = True
-        self.camera_start = (0, 0) 
+        self.camera_start = self.get_camera_screen_position() 
         self.camera_target = target
-        self.camera_target_total_distance = self.magnitude((target[0] - self.camera_start[0], target[1] - self.camera_start[1]))
-        self.set_camera_world_position(self.camera_start[0], self.camera_start[1])
+        self.camera_move_start_time = self.pygame.time.get_ticks()
+        self.camera_direction_vector = (target[0] + self.camera_start[0], target[1] + self.camera_start[1])
+        #self.set_camera_world_position(self.camera_start[0], self.camera_start[1])
 
     def move_camera_to_tile(self, tile):
-        self.move_camera_to((tile.x * self.tile_size, tile.y * self.tile_size))
+        self.move_camera_to((tile.x * self.tile_size + self.get_camera_screen_position()[0], tile.y * self.tile_size + self.get_camera_screen_position()[1]))
 
     def draw_grid(self, inputs):
         """Draw a simple grid on the screen."""
-        for x in range(0, self.tiles_x):
-            for y in range(0, self.tiles_y):
-                image = self.tiles[x][y].image
-                if self.tiles[x][y].image:
-                    self.screen.blit(image, (x * image.get_width() + self.get_camera_screen_position()  [0], y * image.get_height() + self.get_camera_screen_position()  [1]))
-                
-                self.pygame.draw.rect(self.screen, GRAY, (x*self.tile_size+ self.get_camera_screen_position()  [0], y*self.tile_size+ self.get_camera_screen_position()  [1], self.tile_size, self.tile_size), 1)
-                if self.mouse_over_tile and self.mouse_over_tile.x == x and self.mouse_over_tile.y == y:
-                    self.pygame.draw.rect(self.screen, (255, 255, 255), (x*self.tile_size+ self.get_camera_screen_position()  [0], y*self.tile_size+ self.get_camera_screen_position()  [1], self.tile_size, self.tile_size), 2)
-                if self.selected_tile and self.selected_tile.x == x and self.selected_tile.y == y:
-                    self.pygame.draw.rect(self.screen, (0, 0, 255), (x*self.tile_size+ self.get_camera_screen_position()  [0], y*self.tile_size+ self.get_camera_screen_position()  [1], self.tile_size, self.tile_size), 2)
+        camera_pos = self.get_camera_screen_position()
+        cam_x, cam_y = camera_pos[0], camera_pos[1]
+        screen_width, screen_height = self.screen.get_size()
         
+        min_x = int(max(0, -cam_x // self.tile_size))
+        min_y = int(max(0, -cam_y // self.tile_size))
+        max_x = int(min(self.tiles_x, (-cam_x + screen_width) // self.tile_size + 1))
+        max_y = int(min(self.tiles_y, (-cam_y + screen_height) // self.tile_size + 1))
+
         selected_tile = self.selected_tile
+        selected_tile_coords = (selected_tile.x, selected_tile.y) if selected_tile else None
+
+        for x in range(min_x, max_x):
+            for y in range(min_y, max_y):
+                tile = self.tiles[x][y]
+                image = tile.image
+                tile_pos_x = x * self.tile_size + cam_x
+                tile_pos_y = y * self.tile_size + cam_y
+                
+                if image:
+                    self.screen.blit(image, (tile_pos_x, tile_pos_y))
+
+                self.pygame.draw.rect(self.screen, GRAY, (tile_pos_x, tile_pos_y, self.tile_size, self.tile_size), 1)
+
+                if self.mouse_over_tile and (self.mouse_over_tile.x, self.mouse_over_tile.y) == (x, y):
+                    self.pygame.draw.rect(self.screen, (255, 255, 255), (tile_pos_x, tile_pos_y, self.tile_size, self.tile_size), 2)
+                
+                if selected_tile_coords and selected_tile_coords == (x, y):
+                    self.pygame.draw.rect(self.screen, (0, 0, 255), (tile_pos_x, tile_pos_y, self.tile_size, self.tile_size), 2)
+
         if selected_tile and selected_tile.unit and selected_tile.unit.current_action == "choosing_move_target":
             x, y = inputs.mouse.pos
-            clicked_tile = self.get_tile_from_coords(x, y)        
+            clicked_tile = self.get_tile_from_coords(x, y)
             path = self.manhattan_path((selected_tile.x, selected_tile.y), (clicked_tile.x, clicked_tile.y))
+            
             touching = False
             for tile in self.highlighted_tiles:
                 if tile.x == path[-1][0] and tile.y == path[-1][1]:
                     touching = True
+                    
             if touching:
-                self.draw_path(path, (0, 100, 0, 150))                    
+                self.draw_path(path, (0, 100, 0, 150))
+                   
 
     def get_adjacent_tile(self, unit, direction):
         """

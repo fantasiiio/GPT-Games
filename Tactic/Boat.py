@@ -201,7 +201,7 @@ class Boat(Unit):
                 self_selected = True
             if self_selected:
                 bar_width = (SQUARE_SIZE+SQUARE_SPACING) * self.seats
-                self.draw_points_as_squares(self.draw_x + 64 - bar_width, self.draw_y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)                            
+                self.draw_points_as_squares(self.draw_x + self.grid.tile_size - bar_width, self.draw_y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)                            
         
         rect = self.animations[self.current_animation].get_current_rect()
 
@@ -217,7 +217,7 @@ class Boat(Unit):
 
 
         bar_width = (SQUARE_SIZE+SQUARE_SPACING) * self.seats
-        self.draw_points_as_squares(self.draw_x + 64 - bar_width, self.draw_y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)
+        self.draw_points_as_squares(self.draw_x + self.grid.tile_size - bar_width, self.draw_y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)
 
         if self.current_action == "choosing_move_target":
             self.grid.highlight_tiles((self.draw_x // TILE_SIZE, self.draw_y // TILE_SIZE),self.max_move, (00, 100, 00, 50), self.current_action)       
@@ -338,7 +338,7 @@ class Boat(Unit):
             elif self.current_action == "choosing_move_target":
                 touching = False
                 for tile in self.grid.highlighted_tiles:
-                    if tile.rect.collidepoint(inputs.mouse.pos):
+                    if tile.get_screen_rect().collidepoint(inputs.mouse.pos):
                         touching = True
                         self.move(tile)
                         self.current_action = "move_to_target"
@@ -348,7 +348,7 @@ class Boat(Unit):
             elif self.current_action == "choosing_fire_target":
                 touching = False
                 for tile in self.grid.highlighted_tiles:
-                    if tile.rect.collidepoint(inputs.mouse.pos):
+                    if tile.get_screen_rect().collidepoint(inputs.mouse.pos):
                         touching = True
                         if tile.unit and tile.unit.player != self.player:
                             self.fire(tile)

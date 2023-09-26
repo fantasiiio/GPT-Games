@@ -2,6 +2,7 @@ from menu import MainMenu
 from Game import StrategyGame
 from BuildTeam import TeamBuilder
 from instructions import Instructions
+from PlankAndBall import PlankAndBall
 import pygame
 
 class MainFrame():
@@ -44,6 +45,10 @@ class MainFrame():
             elif selected_menu_item == "Instructions":
                 instructions = Instructions(init_pygame=False, full_screen=False, screen=self.screen)
                 instructions.run()
+            elif selected_menu_item == "Mini Game":
+                mini_game = PlankAndBall(init_pygame=False, full_screen=False, screen=self.screen)
+                mini_game.run_game()
+
             elif selected_menu_item == "Quit":
                 running = False
 

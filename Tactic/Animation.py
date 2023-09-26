@@ -20,7 +20,8 @@ class Animation:
         self.offset = offset
         self.frames_count = 0
         self.outline_image = None
-
+        self.rotated_image_cache = {}
+        
         if outline_image:
             self.load_outline_image(outline_image)
 
@@ -63,32 +64,38 @@ class Animation:
 
         return rotated_image, rotated_rect
 
-    def blitRotate(self, image, pos, originPos, angle, offset = None):
+    def blitRotate(self, image, pos, originPos, angle, offset=None):
         offset = self.offset if offset is None else offset
         angle += self.offset_angle
-        # offset from pivot to center
-        image_rect = image.get_rect(topleft = (pos[0] - originPos[0], pos[1]-originPos[1]))
-        offset_center_to_pivot = pygame.math.Vector2(pos) - image_rect.center
-        
-        # roatated offset from pivot to center
-        rotated_offset = offset_center_to_pivot.rotate(-angle)
 
-        # rotated image center
+        # Compute this once and cache the results if the image size doesn't change.
+        max_dim = max(image.get_width(), image.get_height())
+        expanded_size = int(max_dim * 1.414)  # sqrt(2)
+
+        # Cache the rotated image and use that if angle doesn't change.
+        # rotated_image = your_cached_rotated_image
+
+        image_rect = image.get_rect(topleft=(pos[0] - originPos[0], pos[1] - originPos[1]))
+        offset_center_to_pivot = pygame.math.Vector2(pos) - image_rect.center
+
+        # Reuse if you can
+        rotated_offset = offset_center_to_pivot.rotate(-angle)
         rotated_image_center = (pos[0] - rotated_offset.x, pos[1] - rotated_offset.y)
 
-        # Create an expanded surface to ensure the entire image remains visible after rotation
-        expanded_size = int(max(image.get_width(), image.get_height()) * 1.414)  # 1.414 = sqrt(2) to handle diagonal size
-        new_surface = pygame.Surface((expanded_size, expanded_size), pygame.SRCALPHA, 32)
-        new_surface.blit(image, (expanded_size // 2 - image.get_width() // 2, 
-                                expanded_size // 2 - image.get_height() // 2))
+        # Check if we've already cached a rotated image for this angle
+        if angle not in self.rotated_image_cache:
+            new_surface = pygame.Surface((expanded_size, expanded_size), pygame.SRCALPHA, 32)
+            new_surface.blit(image, (expanded_size // 2 - image.get_width() // 2,
+                                    expanded_size // 2 - image.get_height() // 2))
+            rotated_image = pygame.transform.rotate(new_surface, angle)
+            self.rotated_image_cache[angle] = rotated_image  # Cache it for later
+        else:
+            rotated_image = self.rotated_image_cache[angle]
 
-
-        # get a rotated image
-        rotated_image = pygame.transform.rotate(new_surface, angle)
-        rotated_image_rect = rotated_image.get_rect(center = rotated_image_center)
-
+        rotated_image_rect = rotated_image.get_rect(center=rotated_image_center)
         rotated_image_rect.x += offset[0]
         rotated_image_rect.y += offset[1]
+
         return rotated_image, rotated_image_rect
 
 
@@ -105,12 +112,12 @@ class Animation:
 
         self.screen.blit(rotated_image, rotated_image_rect)
 
-        if outline_color and outline_thickness:  
-            # Use the provided outline_image or default to the main image if not provided      
-            outline_source = self.outline_image if self.outline_image else rotated_image
-            outlined = self.draw_outline(outline_source, outline_color, outline_thickness, offset, outline_fade)
-            outline_rect = outlined.get_rect(center = rotated_image_rect.center)
-            self.screen.blit(outlined, outline_rect)
+        # if outline_color and outline_thickness:  
+        #     # Use the provided outline_image or default to the main image if not provided      
+        #     outline_source = self.outline_image if self.outline_image else rotated_image
+        #     outlined = self.draw_outline(outline_source, outline_color, outline_thickness, offset, outline_fade)
+        #     outline_rect = outlined.get_rect(center = rotated_image_rect.center)
+        #     self.screen.blit(outlined, outline_rect)
 
     def draw_outline(self, image, outline_color, outline_thickness, offset=None, fade = False):
         offset = self.offset if offset is None else offset        
@@ -129,7 +136,6 @@ class Animation:
         outlined_surface = pygame.Surface((image.get_width() + 2 * outline_thickness,
                                             image.get_height() + 2 * outline_thickness),
                                         pygame.SRCALPHA)
-        offset
         for point in outline_points:
             pygame.draw.circle(outlined_surface, outline_color, (point[0] + outline_thickness, point[1] + outline_thickness), outline_thickness)
 

@@ -19,7 +19,7 @@ class MainMenu:
         
         self.inputs = Inputs()
         self.panel_width = 240
-        self.panel_height = 300
+        self.panel_height = 350
         self.grid = Grid(pygame, self.screen, "assets/maps/menu.tmx")
         self.grid_offset = (-(self.grid.tiles_x*64)/2 + self.screen_width/2, 
                             -(self.grid.tiles_y*64)/2 + self.screen_height/2 + 64*2)
@@ -82,6 +82,7 @@ class MainMenu:
                 "New Game": self.menu_clicked,
                 "Multiplayer": self.menu_clicked,
                 "Instructions": self.menu_clicked,
+                "Mini Game": self.menu_clicked,
                 "Quit": self.menu_clicked
             }
 
