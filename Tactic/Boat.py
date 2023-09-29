@@ -20,6 +20,8 @@ class BoatCanon:
         self.animations["Idle"] = Animation(self.screen,base_folder,"Boat_Canon_", "Idle", 0, (0,0), 90)
         self.animations["Fire"] = Animation(self.screen,base_folder,"Canon", "Fire", 0, (0,0), 90, 1400)
         self.animations["Shot"] = Animation(self.screen,base_folder,"Canon", "Shot", 0, (0,0), 90, 1400)
+        self.draw_x = 0
+        self.draw_y = 0
 
         #self.current_animation = "Fire"
         # self.animations["Fire"].play()
@@ -38,8 +40,13 @@ class BoatCanon:
                 outline_color = (255, 0, 0)
             outline_thickness = 5
         elif self.parent.player != self.parent.current_player:
-            outline_color = (255, 0, 0)
-            outline_thickness = 2
+            if self.parent.player != 1:
+                outline_color = (255, 0, 0)
+                outline_thickness = 2
+        elif self.parent.is_planning:
+            outline_color = (0, 255, 0)
+            outline_thickness = 4
+            outline_fade = True
 
         center = center[0], center[1] - 20
         if self.current_animation == "Fire":
@@ -47,56 +54,6 @@ class BoatCanon:
             self.animations["Fire"].draw(self.draw_x, self.draw_y, -self.angle, None,(46,-10), outline_color ,outline_thickness)
         else:
             self.animations[self.current_animation].draw(self.draw_x, self.draw_y, -self.angle, center,(0,0), outline_color ,outline_thickness)
-
-
-    def rotate_rect(self, rect, angle_degrees):
-        cx, cy = rect.center  # Center point of the rectangle
-        corners = [rect.topleft, rect.topright, rect.bottomright, rect.bottomleft]
-        
-        angle_radians = math.radians(angle_degrees)
-        rotated_corners = []
-
-        for x, y in corners:
-            # Rotate each corner around the center of the rectangle
-            new_x = cx + (x - cx) * math.cos(angle_radians) - (y - cy) * math.sin(angle_radians)
-            new_y = cy + (x - cx) * math.sin(angle_radians) + (y - cy) * math.cos(angle_radians)
-            rotated_corners.append((new_x, new_y))
-
-        return rotated_corners
-    
-
-    def get_shoot_positions(self, rotated_corners, distance_from_center=20, distance_from_axis=20):
-
-        # Top side is defined by the first two points in the rotated_corners
-        top_left = rotated_corners[0]
-        top_right = rotated_corners[1]
-        
-        # Calculate the center of the top side
-        center_x = (top_left[0] + top_right[0]) / 2
-        center_y = (top_left[1] + top_right[1]) / 2
-        
-        # Determine the direction vector of the top side
-        dx = top_right[0] - top_left[0]
-        dy = top_right[1] - top_left[1]
-        
-        # Normalize the direction vector
-        length = math.sqrt(dx*dx + dy*dy)
-        dx /= length
-        dy /= length
-        
-        # Determine the perpendicular vector to the direction vector
-        perp_dx = -dy
-        perp_dy = dx
-        
-        # Calculate the positions for the lights adjusting in both directions
-        light1_position = (center_x - dx * distance_from_center + perp_dx * distance_from_axis, 
-                        center_y - dy * distance_from_center + perp_dy * distance_from_axis)
-        
-        light2_position = (center_x + dx * distance_from_center - perp_dx * -distance_from_axis, 
-                        center_y + dy * distance_from_center - perp_dy * -distance_from_axis)
-        
-        return light1_position, light2_position
-
     
 
     def update(self, parent_pos, angle):
@@ -129,19 +86,19 @@ class BoatCanon:
 
 
 class Boat(Unit):
-    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Boat', screen=None, gun_sound_file="assets\\sounds\\machinegun2.wav", action_finished=None):
-        super().__init__(target_tile, player, grid, base_folder, screen, "Boat", action_finished)
+    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Boat', screen=None, gun_sound_file="assets\\sounds\\machinegun2.wav", action_finished=None, id=None):
+        super().__init__(target_tile, player, grid, base_folder, screen, "Boat", action_finished, id = id)
         self.engine_sound = pygame.mixer.Sound("assets\\sounds\\BoatEngine.wav")
         self.explosion_sound = pygame.mixer.Sound("assets\\sounds\\explosion 2.wav")
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
 
         self.actions = {"Move To", "Fire", "Get Out"}
-        self.tower = BoatCanon(base_folder, screen, self)
+        self.child = BoatCanon(base_folder, screen, self)
         self.screen = screen
         self.animations = {}
         self.current_animation = "Idle"
         self.offset = (32,32)
-        self.tower.offset = tuple(a + b for a, b in zip(self.tower.offset, self.offset))
+        self.child.offset = tuple(a + b for a, b in zip(self.child.offset, self.offset))
         self.load_animations(base_folder)
         self.animations["Idle"].play()
         self.velocity_x = 0
@@ -157,10 +114,10 @@ class Boat(Unit):
         self.all_sprites = pygame.sprite.LayeredUpdates()
         self.gun_sound_channel = None
         self.angle = 90
-        self.tower.angle = self.angle
+        self.child.angle = self.angle
         self.is_vehicle = True
 
-        # self.tower.animations["Fire"].play() 
+        # self.child.animations["Fire"].play() 
   
 
 
@@ -169,356 +126,3 @@ class Boat(Unit):
         self.animations["Broken"] = Animation(self.screen,base_folder,"Boat", "Broken", -1, self.offset, 90)
         self.explosion_animation = Animation(self.screen, "assets\\images\\Effects","Explosion_", "1", 0, self.offset, 0, frame_duration=25) 
         self.animations["Idle"].play()
-
-    
-    def draw(self):
-        outline_color=None
-        outline_thickness=None
-        if self.swapped:
-            if self.player == self.current_player:
-                outline_color = (0, 255, 0)
-            else:
-                outline_color = (255, 0, 0)
-            outline_thickness = 5
-        elif self.player != self.current_player:
-            outline_color = (255, 0, 0)
-            outline_thickness = 2
-
-        self.animations[self.current_animation].draw(self.draw_x, self.draw_y, -self.angle, None, None, outline_color, outline_thickness)
-        
-        self.tower.draw()
-
-        if self.explosion_animation.is_playing:
-            self.explosion_animation.draw(self.draw_x, self.draw_y, 0, None, None)
-
-        if not self.is_alive:
-            return
-        
-
-        if self.seat_taken == 0:
-            self_selected = False
-            if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive:
-                self_selected = True
-            if self_selected:
-                bar_width = (SQUARE_SIZE+SQUARE_SPACING) * self.seats
-                self.draw_points_as_squares(self.draw_x + self.grid.tile_size - bar_width, self.draw_y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)                            
-        
-        rect = self.animations[self.current_animation].get_current_rect()
-
-        for bullet in self.bullets:
-            bullet.draw()
-        # Assuming soldier_rect is the rectangle of the soldier sprite
-        status_bar_x = self.draw_x + rect.left
-        status_bar_y = self.draw_y + 32 + 16
-
-        # Draw health status bar
-        self.draw_status_bar(status_bar_x, status_bar_y, self.health, self.max_health, HEALTH_COLOR)
-        self.draw_status_bar(status_bar_x, status_bar_y + STATUS_BAR_HEIGHT, self.action_points, self.max_action_points, POINTS_COLOR) 
-
-
-        bar_width = (SQUARE_SIZE+SQUARE_SPACING) * self.seats
-        self.draw_points_as_squares(self.draw_x + self.grid.tile_size - bar_width, self.draw_y , self.seat_taken, self.seats, (0,200,0), (200,0,0) ,10)
-
-        if self.current_action == "choosing_move_target":
-            self.grid.highlight_tiles((self.draw_x // TILE_SIZE, self.draw_y // TILE_SIZE),self.max_move, (00, 100, 00, 50), self.current_action)       
-
-        if self.current_action == "choosing_fire_target":
-            self.grid.highlight_tiles((self.draw_x // TILE_SIZE, self.draw_y // TILE_SIZE), self.fire_range, (100, 00, 00, 50), self.current_action)       
-
-
-        if self.current_action == "choosing_action":
-            self.draw_actions_menu()        
-
-               
-    
-    def draw_status_bar(self, x, y, current_value, max_value, color):
-        # Calculate width of the filled portion
-        fill_width = int(STATUS_BAR_WIDTH * (current_value / max_value))
-        
-        # Draw the background (depleted section)
-        pygame.draw.rect(self.screen, BACKGROUND_COLOR, (x, y, STATUS_BAR_WIDTH, STATUS_BAR_HEIGHT))
-        
-        # Draw the filled portion
-        pygame.draw.rect(self.screen, color, (x, y, fill_width, STATUS_BAR_HEIGHT))
-    
-
-        
-    def move(self, target_tile):
-        if self.is_alive == False:
-            return      
-        
-        """Set the target destination for the unit."""
-
-        # Calculate the distance to the target
-        target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
-        squares_to_target = (target_x - self.screen_x) / TILE_SIZE, (target_y - self.screen_y) / TILE_SIZE
-        movement_cost = self.settings["Move Cost"]
-        if movement_cost <= self.action_points:
-            self.target_point = (target_x + self.offset[0], target_y + self.offset[1])
-            self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])
-            self.angle = math.atan2(self.target_point[1] - self.origin_point[1] ,  self.target_point[0] - self.origin_point[0] ) * 180 / math.pi
-            self.tile.unit = None
-            self.tile = target_tile
-            self.tile.unit = self
-            self.grid.selected_tile = target_tile
-            self.target_tile = target_tile
-            self.action_points -= movement_cost
-            self.target_x, self.target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
-            #self.current_animation = "Move"
-            self.engine_sound.play(loops=-1)
-            self.animations[self.current_animation].play()
-            self.distance_to_target = math.sqrt((self.target_x - self.screen_x)**2 + (self.target_y - self.screen_y)**2)
-            if self.distance_to_target < self.min_distance:
-                self.min_distance = self.distance_to_target
-
-            if(self.distance_to_target > self.MOVE_SPEED):
-                self.velocity_x = ((self.target_point[0] - self.origin_point[0]) / self.distance_to_target) * self.MOVE_SPEED
-                self.velocity_y = ((self.target_point[1] - self.origin_point[1]) / self.distance_to_target) * self.MOVE_SPEED
-
-
-
-    def fire(self, target_tile):
-        if self.is_alive == False:
-            return
-        
-        if target_tile.unit and target_tile.unit.is_alive == False:
-            return
-
-        """Set the target destination for the unit."""
-
-        # Calculate the distance to the target
-        target_x, target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
-        fire_cost = self.fire_cost
-        #angle = math.atan2(target_y - self.screen_y, target_x - self.screen_x) * 180 / math.pi
-        if fire_cost <= self.action_points:
-            #self.tower.angle = self.angle
-            self.bullets_fired = 0
-            self.gun_sound_channel  = self.gun_sound.play()
-
-            self.target_tile = target_tile
-            self.target_point = (target_x + self.offset[0], target_y + self.offset[1])
-            self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])
-            self.angle = math.atan2(self.target_point[1] - self.origin_point[1] ,  self.target_point[0] - self.origin_point[0] ) * 180 / math.pi
-            self.action_points -= fire_cost
-            self.tower.animations["Shot"].play()
-            self.tower.animations["Fire"].play() 
-            self.target_x, self.target_y = self.calc_screen_pos(target_tile.x, target_tile.y) 
-            self.tower.current_animation = "Fire"
-            self.distance_to_target = math.sqrt((self.target_x - self.screen_x)**2 + (self.target_y - self.screen_y)**2)
-
-    def bullet_reach_target(self, bullet):
-        pass
-
-    def update(self, inputs):
-        if self.current_game_state == GameState.UNIT_PLACEMENT:
-            self.place_unit(inputs)
-            return
-        # Update animations.
-        for animation in self.animations.values():
-            animation.update()       
-
-        self.explosion_animation.update()
-
-        # If there's no driver, just update the tower's position and angle and exit.
-        if self.seat_taken == 0:
-            self.draw_x = self.world_pos_x + self.grid.get_camera_screen_position()[0]
-            self.draw_y = self.world_pos_y + self.grid.get_camera_screen_position()[1]             
-            self.tower.update((self.world_pos_x, self.world_pos_y), self.tower.angle if self.tower.angle else 0) 
-            return
-
-        # Check if the mouse is hovering over the action menu.
-        self.hover_menu = self.action_menu_rect and self.action_menu_rect.collidepoint(inputs.mouse.pos)
-        # Handle left mouse click events.
-        if inputs.mouse.clicked[0]:  # Left click
-            # No current action and selected tile contains the unit and the unit is alive.
-            if self.current_action is None:
-                if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive:
-                    self.current_action = "choosing_action"
-            # Choosing a tile to move to.
-            elif self.current_action == "choosing_move_target":
-                touching = False
-                for tile in self.grid.highlighted_tiles:
-                    if tile.get_screen_rect().collidepoint(inputs.mouse.pos):
-                        touching = True
-                        self.move(tile)
-                        self.current_action = "move_to_target"
-                if not touching:
-                    self.current_action = None
-            # Choosing a target to fire at.
-            elif self.current_action == "choosing_fire_target":
-                touching = False
-                for tile in self.grid.highlighted_tiles:
-                    if tile.get_screen_rect().collidepoint(inputs.mouse.pos):
-                        touching = True
-                        if tile.unit and tile.unit.player != self.player:
-                            self.fire(tile)
-                            self.current_action = "fire_to_target"
-                if not touching:
-                    self.current_action = None
-            # Choosing an action from the menu.
-            elif self.current_action == "choosing_action":
-                if self.hover_menu and not self.is_disabled:
-                    for index, action in enumerate(self.actions):
-                        if self.action_rects[index].collidepoint(inputs.mouse.pos):
-                            if action == "Move To":
-                                self.current_action = "choosing_move_target"
-                            elif action == "Fire":
-                                if self.can_attack:
-                                    self.current_action = "choosing_fire_target"
-                            elif action == "Get Out":
-                                self.get_unit_out()
-                else:
-                    self.current_action = None     
-
-        # Right mouse click cancels the current action.
-        elif inputs.mouse.clicked[2]:  
-            self.current_action = None     
-        # Escape key also cancels the current action.
-        elif inputs.keyboard.clicked[pygame.K_ESCAPE]:
-                self.current_action = None
-
-
-        # Update the tower's position and angle.
-        current_time = pygame.time.get_ticks()
-
-
-        # Update bullet positions and check for hits.
-        all_reached_target = True
-        finished_shooting = False
-        for bullet in self.bullets:
-            bullet.update()
-            if not bullet.target_reached:
-                all_reached_target = False
-
-        if all_reached_target and self.current_action == "fire_to_target" and self.bullets_fired == self.NUM_BULLETS:
-            finished_shooting = True
-
-        # Shoot bullets at a specific firing rate.
-        point_x = self.target_tile.x*TILE_SIZE + self.offset[0]
-        point_y = self.target_tile.y*TILE_SIZE + self.offset[1]
-        if self.current_action == "fire_to_target" and not finished_shooting and self.bullets_fired < self.NUM_BULLETS and current_time - self.last_fired > self.FIRING_RATE:
-            shoot_positions = self.tower.shoot_positions
-            shoot_position = shoot_positions[self.canon_number]
-            shoot_position = shoot_position[0] - self.tower.offset[0], shoot_position[1] - self.tower.offset[1]
-            self.canon_number += 1
-            self.canon_number %= 2
-            angle = math.atan2((self.target_tile.y * TILE_SIZE) - shoot_position[1], (self.target_tile.x * TILE_SIZE) - shoot_position[0]) * 180 / math.pi
-
-            self.bullets.append(Bullet(shoot_position[0], shoot_position[1], angle, self.screen, self.BULLET_SPEED, self.target_tile, self.base_folder, damage=self.attack_damage / self.NUM_BULLETS))
-            self.bullets_fired += 1
-            self.last_fired = current_time
-        self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])
-        self_selected = False
-        if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive:
-            self_selected = True
-            if self.current_action == "choosing_fire_target":
-                self.target_point = (inputs.mouse.pos[0], inputs.mouse.pos[1])
-                self.tower.angle = -self.angle + math.atan2(self.target_point[1] - self.origin_point[1], self.target_point[0] - self.origin_point[0]) * 180 / math.pi
-            elif self.current_action == "fire_to_target" or self.current_action == "move_to_target":
-                self.target_point = (point_x, point_y)
-                self.tower.angle = -self.angle + math.atan2(self.target_point[1] - self.origin_point[1], self.target_point[0] - self.origin_point[0]) * 180 / math.pi
-            else:
-                self.tower.angle = 0                
-        else:
-            self.tower.angle = 0
-
-        self.tower.update((self.screen_x, self.screen_y), self.tower.angle + self.angle) 
-
-        # if inputs.mouse.button[1]:
-        #     self.angle = math.atan2(inputs.mouse.pos[1] - self.origin_point[1], inputs.mouse.pos[0] - self.origin_point[0]) * 180 / math.pi
-
-        # If moving to a target, update the unit's position.
-        if self.current_action == "move_to_target":
-            self.target_point = (point_x, point_y)
-            self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])
-            self.distance_to_target = math.sqrt((self.target_point[0] - self.origin_point[0])**2 + (self.target_point[1] - self.origin_point[1])**2)
-            self.current_animation == "Walk"
-            self.screen_x += self.velocity_x
-            self.screen_y += self.velocity_y
-            
-            if self.distance_to_target < self.MOVE_SPEED:
-                self.screen_x = self.target_x
-                self.screen_y = self.target_y
-                #self.animations[self.current_animation].stop()
-                self.engine_sound.stop()
-                self.current_animation = "Idle"
-                self.current_action = None
-        
-        self.draw_x = self.world_pos_x + self.grid.get_camera_screen_position()[0]
-        self.draw_y = self.world_pos_y + self.grid.get_camera_screen_position()[1]   
-                    
-        if finished_shooting and self.current_action == "fire_to_target":
-            self.current_action = None
-            self.current_animation = "Idle"
-            self.tower.current_animation = "Idle"
-
-
-    def draw_points_left(self):
-        # Draw each action text with appropriate color based on hover state
-        font = pygame.font.SysFont(None, 15)
-        dark_gray = (50, 50, 50, 128)  # Dark gray color
-        padding = 2  # Amount of space you want around the text inside the rectangle
-
-        number_surface = font.render(f"{int(self.action_points)}/{self.max_action_points} pts", True, (255, 255, 255))  # This will render the number in white color
-
-        background_surface = pygame.Surface((number_surface.get_width() + 2 * padding, 
-                                            number_surface.get_height() + 2 * padding), 
-                                            pygame.SRCALPHA)
-        
-        background_surface.fill(dark_gray)       
-        # Blit the semi-transparent surface on the screen at the top-left corner of the cell
-        self.screen.blit(background_surface, (self.screen_x + padding, self.screen_y + padding))
-
-        # Blit the text over the semi-transparent rectangle
-        self.screen.blit(number_surface, (self.screen_x + padding, self.screen_y + padding))
-
-    def find_free_tile(self, start_tile):
-
-        rows, cols = len(self.grid.tiles), len(self.grid.tiles[0])
-        directions = [(1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)]
-        visited = set()
-        queue = deque([start_tile])
-
-        while queue:
-            tile = queue.popleft()
-            if not tile.unit:
-                return tile
-
-            for dx, dy in directions:
-                new_x, new_y = tile.x + dx, tile.y + dy
-                if 0 <= new_x < rows and 0 <= new_y < cols:
-                    neighbor = self.grid.tiles[new_x][new_y]
-                    if neighbor not in visited:
-                        visited.add(neighbor)
-                        queue.append(neighbor)
-
-        return None  # No free tile found
-
-        
-    def process_events(self, event):
-        pass
-        
-    def take_damage(self, damage):
-        self.health -= damage
-        if self.health <= 0:
-            self.die()
-
-        
-    def die(self):
-        self.is_alive = False
-        self.current_animation = "Broken"
-        self.explosion_animation.play()
-        self.explosion_sound.play()
-
-    def draw_points_as_squares(self, x, y, current_points, max_points, color1, color2, max_squares_per_row):
-        for i in range(max_points):
-            row = i // max_squares_per_row
-            col = i % max_squares_per_row
-            
-            square_x = x + col * (SQUARE_SIZE + SQUARE_SPACING)
-            square_y = y + row * (SQUARE_SIZE + SQUARE_SPACING)
-            
-            if i < current_points:
-                pygame.draw.rect(self.screen, color1, (square_x, square_y, SQUARE_SIZE, SQUARE_SIZE))
-            else:
-                pygame.draw.rect(self.screen, color2, (square_x, square_y, SQUARE_SIZE, SQUARE_SIZE))    

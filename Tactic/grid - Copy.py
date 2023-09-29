@@ -2,9 +2,10 @@ import pygame
 from pytmx.util_pygame import load_pygame
 from config import  GRAY
 import random
+
 class Tile:
-    def __init__(self, x, y, grid):
-        self.grid = grid
+    def __init__(self, x, y, tiles):
+        self.tiles = tiles
         self.x = x
         self.y = y
         self.unit = None
@@ -13,10 +14,10 @@ class Tile:
         self.image = None
         self.no_walk = False
         self.properties = {}
-        self.rect = pygame.Rect(x * self.grid.tile_size, y * self.grid.tile_size, self.grid.tile_size, self.grid.tile_size)
+        self.rect = pygame.Rect(x * self.tiles.tile_size, y * self.tiles.tile_size, self.tiles.tile_size, self.tiles.tile_size)
 
     def get_screen_rect(self): 
-        return pygame.Rect(self.x * self.grid.tile_size + self.grid.get_camera_screen_position()[0], self.y * self.grid.tile_size + self.grid.get_camera_screen_position()[1], self.grid.tile_size, self.grid.tile_size)
+        return pygame.Rect(self.x * self.tiles.tile_size + self.tiles.get_camera_screen_position()[0], self.y * self.tiles.tile_size + self.tiles.get_camera_screen_position()[1], self.tiles.tile_size, self.tiles.tile_size)
 
 class Grid:
     def __init__(self, pygame, screen, file_name):
@@ -25,8 +26,8 @@ class Grid:
         self.tiles = None
         self.selected_tile = None
         self.tile_size = 0
-        self.grid_width = 0
-        self.grid_height = 0
+        self.tiles_width = 0
+        self.tiles_height = 0
         self.load_tmx_map(file_name)
         self.mouse_over_tile = None
         self.highlighted_tiles = []
@@ -37,20 +38,21 @@ class Grid:
         self.camera_world_position = (0,0)
         self.camera_move_start_time = 0
         self.camera_direction_vector = (0,0)
+        self.mouse_over_UI = False
 
     def get_camera_screen_position(self):
         return (self.camera_world_position[0] + self.screen.get_rect().width/2, self.camera_world_position[1] + self.screen.get_rect().height/2)
     
 
     def set_camera_world_position(self, x, y):
-        # # Calculate the boundaries based on the grid size and tile size
-        # min_x = 0 - (self.grid_width - self.screen.get_width()/2)
-        # min_y = 0 - (self.grid_height - self.screen.get_height()/2)
+        # # Calculate the boundaries based on the self.tiles size and tile size
+        # min_x = 0 - (self.tiles_width - self.screen.get_width()/2)
+        # min_y = 0 - (self.tiles_height - self.screen.get_height()/2)
         
         # # Screen size (assuming you have these variables)
         # screen_width, screen_height = self.screen.get_size()
         
-        # # If the camera view goes out of the grid, we set it to the boundary value
+        # # If the camera view goes out of the self.tiles, we set it to the boundary value
         # if x > -self.screen.get_width()/2:
         #     x = -self.screen.get_width()/2
         # elif x < min_x:
@@ -82,8 +84,8 @@ class Grid:
         self.tile_size = tmx_data.tilewidth
         self.tiles_x = tmx_data.width
         self.tiles_y = tmx_data.height
-        self.grid_width = self.tiles_x * self.tile_size
-        self.grid_height = self.tiles_y * self.tile_size
+        self.tiles_width = self.tiles_x * self.tile_size
+        self.tiles_height = self.tiles_y * self.tile_size
         self.tiles = [[Tile(x, y, self) for y in range(tmx_data.height)] for x in range(tmx_data.width)]
         for layer in tmx_data.visible_layers:
             for x, y, gid in layer:
@@ -142,6 +144,7 @@ class Grid:
 
     def get_manathan_range(self, start_x, start_y, end_x, end_y):
         return abs(start_x - end_x) + abs(start_y - end_y)
+
     def tiles_in_range_manhattan(self, x, y, r):
         r = int(r)
         max_x = self.tiles_x
@@ -154,7 +157,7 @@ class Grid:
                     tiles.append((new_x, new_y))
         return tiles
 
-    def position_is_in_grid(self, x, y):
+    def position_is_in_tiles(self, x, y):
         if x < 0 or y < 0:
             return False
         if x >= self.tiles_x or y >= self.tiles_y:
@@ -239,6 +242,8 @@ class Grid:
                 #self.draw_text_with_border(self.screen, f"Cost: {action_cost}", font, action_pos[0], action_pos[1], (255, 255, 255), (0, 0, 0), 2)
 
     def update(self, inputs):
+        if self.mouse_over_UI:
+            return
         selected_tile = self.selected_tile
         x, y = inputs.mouse.pos
         self.mouse_over_tile = self.get_tile_from_coords(x, y)
@@ -268,7 +273,7 @@ class Grid:
 
         tiles = self.tiles_in_range_manhattan(unit_position[0], unit_position[1], range)
         for tile_pos in tiles:
-            if self.position_is_in_grid(tile_pos[0], tile_pos[1]):  # corrected typo: posision -> position
+            if self.position_is_in_self.tiles(tile_pos[0], tile_pos[1]):  # corrected typo: posision -> position
                 tile = self.tiles[int(tile_pos[0])][int(tile_pos[1])]
                 if self.is_passable(tile.x, tile.y, action):
                     self.highlighted_tiles.append(tile)
@@ -386,8 +391,8 @@ class Grid:
     def move_camera_to_tile(self, tile):
         self.move_camera_to((tile.x * self.tile_size + self.get_camera_screen_position()[0], tile.y * self.tile_size + self.get_camera_screen_position()[1]))
 
-    def draw_grid(self, inputs):
-        """Draw a simple grid on the screen."""
+    def draw_tiles(self, inputs):
+        """Draw a simple self.tiles on the screen."""
         camera_pos = self.get_camera_screen_position()
         cam_x, cam_y = camera_pos[0], camera_pos[1]
         screen_width, screen_height = self.screen.get_size()
@@ -448,7 +453,7 @@ class Grid:
             x += self.tile_size
 
         # Ensure the coordinates are within the map boundaries
-        if 0 <= x < self.grid_width and 0 <= y < self.grid_height:
+        if 0 <= x < self.tiles_width and 0 <= y < self.tiles_height:
             return self.tiles[x // self.tile_size][y // self.tile_size]
         else:
             return None                    
@@ -533,6 +538,7 @@ class Grid:
                     return point
         # If it reaches here, the path is a straight line
         return path[-1]
+
     def draw_selected_perimeter(self):
         line_width = 5
         #transformed_shape = piece_cache[piece.shape_id][piece.orientation][piece.mirror]['transformed_shape']
@@ -545,7 +551,7 @@ class Grid:
                         neighbor_x, neighbor_y = j + dx, i + dy
                         
                         # Check if the neighboring cell is outside the piece
-                        if 0 <= neighbor_x < len(row) and 0 <= neighbor_y < self. grid_width:
+                        if 0 <= neighbor_x < len(row) and 0 <= neighbor_y < self. self.tiles_width:
                             if self.tiles[neighbor_y][neighbor_x].unit is not None:
                                 is_empty_inside = False
                             is_empty_inside = self.tiles[neighbor_y][neighbor_x] == 0

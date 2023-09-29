@@ -1,8 +1,8 @@
 import pygame
 
 class UIElement:
-    def __init__(self, x, y, width, height, parent = None,image=None, color=(200, 200, 200), border_size=10):
-        self.id = None
+    def __init__(self, x, y, width, height, parent = None,image=None, color=(200, 200, 200), border_size=10, id=None):
+        self.id = id
         self.image = None if not image else pygame.image.load(image)  # Replace with the path to your button image
         self.color = color
         self.border_size = border_size
@@ -175,7 +175,7 @@ class UILabel(UIImage):
             return
         #self.set_parent(self.parent)
         if self.outline_width > 0:
-            self.draw_text_with_outline(self.text, screen, self.text_color, self.outline_color, self.outline_width)
+            self.draw_text_with_outline(self.rect.topleft[0], self.rect.topleft[1], self.text, screen, self.text_color, self.outline_color, self.outline_width)
         else:
             screen.blit(self.text_surface, (self.rect.topleft[0], self.rect.topleft[1]))
 
@@ -269,34 +269,169 @@ class UIPanel(UIElement):
         self.elements = []  # List to hold child UI elements
 
     def add_element(self, element):
-        """Add a UI element to the panel."""
-        # Adjust the position of the element relative to the panel
-        # element.rect.x += self.rect.x
-        # element.rect.y += self.rect.y
-        element.set_parent(self)  # Set the element's parent to this panel
+        element.set_parent(self)
         self.elements.append(element)
-        self.content_height = self.get_elements_height()
+
 
     def remove_element(self, element):
-        """Remove a UI element from the panel."""
         if element in self.elements:
             self.elements.remove(element)
-            self.content_height = self.get_elements_height()
-
-    def draw(self, screen):
-        super().draw(screen)  # Draw the panel itself
-
-        # Draw child elements
-        for element in self.elements:
-            element.draw(screen)
 
     def handle_event(self, event):
         for element in self.elements:
             element.handle_event(event)
 
-    def get_elements_height(self):
-        """Get the total height of all child elements."""
-        return sum([element.rect.height for element in self.elements])
+    def draw(self, screen):
+        super().draw(screen)
+        for element in self.elements:
+            element.draw(screen)
+             
+
+import pygame
+
+class ListItem(UIElement):
+    def __init__(self, x, y, width, height, text, color, font, icon=None, id = None):
+        super().__init__(x, y, width, height, None, None, (0, 0, 0), 0, id = id)
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.color = color
+        self.icon = icon
+        self.font = font
+        self.checked = False
+        self.disabled = False
+        self.hovered = False
+        self.selected = False
+
+    def draw(self, surface):
+        icon_offset = 30  # The space reserved for the icon, whether it exists or not
+
+        if self.icon and self.checked:
+            # Draw the icon at the left-most part of the ListItem
+            icon_rect = self.icon.get_rect()
+            # Vertically align the icon by adjusting the y-coordinate
+            icon_rect.midleft = (self.rect.x + 10, self.rect.centery)
+        
+            surface.blit(self.icon, icon_rect)
+
+        if self.selected:
+            pygame.draw.rect(surface, (255, 255, 255), self.rect, 2)
+
+        color = self.color
+        if self.hovered:
+            color = (255, 255, 0)
+
+        if self.disabled:
+            color = (150, 150, 150)
+
+        # Draw the text next to the icon
+        text_surface = self.font.render(self.text, True, color)
+        text_rect = text_surface.get_rect()
+
+        # Vertically align the text by adjusting the y-coordinate
+        text_rect.midleft = (icon_offset + self.rect.x + 10, self.rect.centery)
+        
+        surface.blit(text_surface, text_rect)
+
+class UIList(UIElement):
+    def __init__(self, x, y, width, height, items = [], text_color=(255, 255, 255), item_selected_callback=None):
+        super().__init__(x, y, width, height, None, None, (0, 0, 0), 0)
+        self.item_selected_callback = item_selected_callback
+        self.rect = pygame.Rect(x, y, width, height)
+        self.items = items  # This should be a list of ListItem objects now
+        self.items = []  # This will contain ListItem items
+        self.selected_item = None
+        self.text_color = text_color
+        self.item_height = 50  # Height of each item
+        self.font = pygame.font.Font(None, 36)
+        self._rebuild_ui()
+        self.hovered_item = None
+        self.read_only = False
+
+    def set_read_only(self, read_only):
+        self.read_only = read_only
+
+    def reset_all(self):
+        for item in self.items:
+            item.checked = False
+            item.disabled = False
+            item.hovered = False
+            item.selected = False
+
+
+    def add_item(self, text, icon=None, color=(255, 255, 255), id = None):
+        new_item = ListItem(0, len(self.items) * self.item_height, self.rect.width, self.item_height, text, color, self.font, icon, id=id)
+        new_item.set_parent(self)
+        self.items.append(new_item)
+        #self._rebuild_ui()
+
+    def get_selected_item(self):
+        return self.selected_item
+
+    def _rebuild_ui(self):
+        self.items.clear()
+        for index, item in enumerate(self.items):
+            list_item = ListItem(0, index * self.item_height, self.rect.width, self.item_height, item.text, item.color, self.font, item.icon)
+            list_item.id = item  # Assigning the item itself as the ID for the ListItem
+            self.add_item(list_item)
+
+    def _item_selected(self, list_item):
+        self.selected_item = list_item.id
+        for item in self.items:
+            if isinstance(item, ListItem):
+                item.selected = item.id == self.selected_item
+                self.item_selected_callback(item)  # Call the callback function with the selected item
+
+    def remove_item(self, id):
+        self.items = [item for item in self.items if item.id != id]
+        self.items = self.items
+        #self._rebuild_ui()
+
+    def check_item(self, id, checked=True):
+        for item in self.items:
+            if item.id == id:
+                item.checked = checked
+
+    def select_item(self, id):
+        for item in self.items:
+            if item.id == id:
+                self._item_selected(item)
+
+    def enable_item(self, id, enabled=True):
+        for item in self.items:
+            if item.id == id:
+                item.disabled = not enabled
+
+    def get_item_by_id(self, id):
+        for item in self.items:
+            if item.id == id:
+                return item
+        return None
+
+    def handle_event(self, event):
+        if self.read_only:
+            return
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_pos = event.pos  # Get the mouse position from the event
+            for item in self.items:
+                if item.rect.collidepoint(mouse_pos):  # Check if mouse is over this item
+                    if not item.disabled:
+                        self._item_selected(item)  # If so, trigger item selection
+
+        if event.type == pygame.MOUSEMOTION:
+            mouse_pos = event.pos
+            self.hovered_item = None  # Reset hovered item
+            for item in self.items:
+                if item.rect.collidepoint(mouse_pos):
+                    self.hovered_item = item  # Set the hovered item
+                    break
+
+    def draw(self, screen):
+        for item in self.items:
+            item.draw(screen) 
+            item.hovered = item == self.hovered_item
+
+
 
 class ScrollBar(UIElement):
     def __init__(self, x, y, width, height, parent_panel, image=None, color=(50, 50, 50), border_size=10):

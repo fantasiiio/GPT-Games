@@ -1,6 +1,5 @@
 import os
 from Animation import Animation
-from Structure import Structure
 import math
 import pygame
 from Bullet import Bullet
@@ -12,8 +11,8 @@ from config import  GameState, pick_random_name, get_unit_settings, TILE_SIZE, G
 
 class Soldier(Unit):
     
-    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Gunner', screen=None, gun_sound_file="assets\\sounds\\pistol.wav", action_finished=None):
-        super().__init__(target_tile, player, grid, base_folder, screen, "Soldier-Pistol", action_finished)
+    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Gunner', screen=None, gun_sound_file="assets\\sounds\\pistol.wav", action_finished=None, id=None):
+        super().__init__(target_tile, player, grid, base_folder, screen, "Soldier-Pistol", action_finished, id = id)
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
         self.death_sound = pygame.mixer.Sound("assets\\sounds\\dying2.wav")
         self.yes_sir_sound = pygame.mixer.Sound("assets\\sounds\\sir-yes-sir.wav")
@@ -121,6 +120,7 @@ class Soldier(Unit):
         
         outline_color=None
         outline_thickness=None
+        outline_fade = False
         if self.swapped:
             if self.player == self.current_player:
                 outline_color = (0, 255, 0)
@@ -129,11 +129,23 @@ class Soldier(Unit):
             outline_thickness = 5
         elif self.player != self.current_player:
             outline_color = (255, 0, 0)
-            outline_thickness = 2		
-		
-        self.animations[self.current_animation].draw(self.draw_x, self.draw_y, -self.angle, None, None, outline_color, outline_thickness, outline_fade=True)
+            if self.player != 1:
+                outline_color = (255, 0, 0)
+                outline_thickness = 2
+        elif self.is_planning :
+            outline_color = (0, 255, 0)
+            outline_thickness = 4
+            outline_fade = True
+        elif self.current_action == "waiting":
+            outline_color = (0, 255, 0)
+            outline_thickness = 2
 
-            
+        self.animations[self.current_animation].draw(self.draw_x, self.draw_y, -self.angle, None, None, outline_color, outline_thickness, outline_fade)
+
+
+        if len(self.planned_actions) > 0:
+            self.draw_planned_actions()
+
         if self.current_animation == "Fire":
             self.animations["GunEffect"].draw(self.draw_x, self.draw_y, -self.angle, (14,-15))
 
@@ -159,21 +171,9 @@ class Soldier(Unit):
             self.grid.highlight_tiles((self.world_pos_x // TILE_SIZE, self.world_pos_y // TILE_SIZE), self.fire_range, (100, 00, 00, 50), self.current_action)       
 
 
-        if self.current_action == "choosing_action":
+        if self.current_action == "choosing_action" and self.current_game_state == GameState.PLANNING:
             self.draw_actions_menu()
 
-        
-        
-
-    def draw_status_bar(self, x, y, current_value, max_value, color):
-        # Calculate width of the filled portion
-        fill_width = int(STATUS_BAR_WIDTH * (current_value / max_value))
-        
-        # Draw the background (depleted section)
-        pygame.draw.rect(self.screen, BACKGROUND_COLOR, (x, y, STATUS_BAR_WIDTH, STATUS_BAR_HEIGHT))
-        
-        # Draw the filled portion
-        pygame.draw.rect(self.screen, color, (x, y, fill_width, STATUS_BAR_HEIGHT))
 
     def move(self, target_tile):
         if self.is_alive == False:
@@ -240,8 +240,6 @@ class Soldier(Unit):
             self.current_animation = "Fire"
             self.distance_to_target = math.sqrt((self.target_x - self.screen_x)**2 + (self.target_y - self.screen_y)**2)
 
-    def bullet_reach_target(self, bullet):
-        pass
 
     def update(self, inputs):
         if self.current_game_state == GameState.UNIT_PLACEMENT:
@@ -252,11 +250,13 @@ class Soldier(Unit):
             self.draw_y = self.world_pos_y + self.grid.get_camera_screen_position()[1]  
             return
         self.hover_menu = self.action_menu_rect and self.action_menu_rect.collidepoint(inputs.mouse.pos)
+        mouse_over_my_tile = self.tile.get_screen_rect().collidepoint(inputs.mouse.pos)
         # Handle left mouse click events.
+        
         if inputs.mouse.clicked[0]:  # Left click
             # No current action and selected tile contains the unit and the unit is alive.
-            if self.current_action is None:
-                if self.grid.selected_tile and self.grid.selected_tile.unit == self and self.is_alive:
+            if self.current_action is None and mouse_over_my_tile and self.is_alive:
+                if self.grid.selected_tile and self.grid.selected_tile.unit == self:
                     self.current_action = "choosing_action"
             # Choosing a tile to move to.
             elif self.current_action == "choosing_move_target":
@@ -265,10 +265,12 @@ class Soldier(Unit):
                     if tile.get_screen_rect().collidepoint(inputs.mouse.pos):
                         touching = True
                         self.last_action = "move_to_target"
+                        self.current_action = "waiting"
+                        self.planned_actions.append(("Move", tile))
                         self.last_action_target = tile
-                        #self.action_finished(self)
-                        self.move(tile)
-                        self.current_action = "move_to_target"  
+                        self.action_finished(self)
+                        #self.move(tile)
+                        #self.current_action = "move_to_target"  
                 if not touching:
                     self.current_action = None
             elif self.current_action == "choosing_fire_target":
@@ -278,10 +280,11 @@ class Soldier(Unit):
                         touching = True
                         if tile.unit and tile.unit.player != self.player:
                             self.last_action = "fire_to_target"
+                            self.planned_actions.append(("Attack", tile))
                             self.last_action_target = tile
-                            #self.action_finished(self)
-                            self.fire(tile)
-                            self.current_action = "fire_to_target"                               
+                            self.action_finished(self)
+                            #self.fire(tile)
+                            #self.current_action = "fire_to_target"                               
                 if not touching:
                     self.current_action = None
 
@@ -298,9 +301,10 @@ class Soldier(Unit):
                 else:
                     self.current_action = None     
 
+        # Right mouse click cancels the current action.
         elif inputs.mouse.clicked[2]:  
-                self.current_action = None     
-
+            self.current_action = None     
+        # Escape key also cancels the current action.
         elif inputs.keyboard.clicked[pygame.K_ESCAPE]:
                 self.current_action = None
 
@@ -386,9 +390,6 @@ class Soldier(Unit):
 
         # Blit the text over the semi-transparent rectangle
         self.screen.blit(number_surface, (self.screen_x + padding, self.screen_y + padding))
-
-    def process_events(self, event):
-        pass
 
     def take_damage(self, damage):
         self.health -= damage

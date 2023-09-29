@@ -8,11 +8,12 @@ import math
 import time
 
 class PlankAndBall:
-    def __init__(self, init_pygame=True, full_screen=False, screen=None):
+    def __init__(self, init_pygame=True, full_screen=False, screen=None, offset = (0,0)):
+        self.offset = offset
         self.window_width = 0
         self.window_height = 0
         self.render_surface = None
-        self.init_graphics(init_pygame, full_screen, screen, 640,480)        
+        self.init_graphics(init_pygame, full_screen, screen, 640,600)        
         # self.render_surface = self.screen if render_surface is None else render_surface
         # Set up the window
         pygame.display.set_caption("Pygame + Box2D")
@@ -23,7 +24,7 @@ class PlankAndBall:
         self.progress_bar_x = (self.window_width - self.progress_bar_length) // 2
         self.progress_bar_y = 50
         self.elapsed_time = 0
-        self.total_time = 10
+        self.total_time = 100
         self.border_thickness = 4
 
         # Set up Box2D world
@@ -69,9 +70,20 @@ class PlankAndBall:
             ),
         )
 
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        mouse_x -= self.offset[0]
+        mouse_y -= self.offset[1]
+        self.mouse_joint = self.world.CreateMouseJoint(
+        bodyA=self.anchor_body,
+        bodyB=self.plank_body,
+        target=(mouse_x, mouse_y),
+        maxForce=10000.0 * self.plank_body.mass  # Increased maxForce
+        )
+        self.plank_body.awake = True
+
+
         self.game_started = False
         # Set up mouse joint
-        self.mouse_joint = None
 
         # Game loop
         self.score = 0
@@ -157,23 +169,11 @@ class PlankAndBall:
             for event in mini_game_events if mini_game_events else pygame.event.get():
                 if event.type == QUIT:
                     self.running = False
-                elif event.type == MOUSEBUTTONDOWN:
-                    if self.mouse_joint is None:
-                        mouse_x, mouse_y = event.pos[0], event.pos[1]
-                        self.mouse_joint = self.world.CreateMouseJoint(
-                            bodyA=self.anchor_body,
-                            bodyB=self.plank_body,
-                            target=(mouse_x, mouse_y),
-                            maxForce=3000.0 * self.plank_body.mass  # Increased maxForce
-                        )
-                        self.plank_body.awake = True
-                elif event.type == MOUSEBUTTONUP:
-                    if self.mouse_joint:
-                        self.world.DestroyJoint(self.mouse_joint)
-                        self.mouse_joint = None
 
         if self.mouse_joint:
             mouse_x, mouse_y = pygame.mouse.get_pos()
+            mouse_x -= self.offset[0]
+            mouse_y -= self.offset[1]
             self.mouse_joint.target = b2Vec2(mouse_x, mouse_y)
 
 
@@ -223,8 +223,6 @@ class PlankAndBall:
         else:
             # Step the simulation
             #time_step = 1.0 / 60.0
-            velocity_iterations = 6
-            position_iterations = 2
             frame_time =(current_time - self.last_time) * 10
             
             if current_time - self.fps_last_time >= 1:
@@ -235,8 +233,9 @@ class PlankAndBall:
 
             self.display_fps(self.render_surface, self.fps)                
 
-
-            self.world.Step(frame_time,1,1)
+            velocity_iterations = 10
+            position_iterations = 10
+            self.world.Step(frame_time,velocity_iterations, position_iterations)
             self.last_time = current_time
             self.game_started = True
             # Apply gravity manually to the ball

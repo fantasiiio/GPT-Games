@@ -112,12 +112,12 @@ class Animation:
 
         self.screen.blit(rotated_image, rotated_image_rect)
 
-        # if outline_color and outline_thickness:  
-        #     # Use the provided outline_image or default to the main image if not provided      
-        #     outline_source = self.outline_image if self.outline_image else rotated_image
-        #     outlined = self.draw_outline(outline_source, outline_color, outline_thickness, offset, outline_fade)
-        #     outline_rect = outlined.get_rect(center = rotated_image_rect.center)
-        #     self.screen.blit(outlined, outline_rect)
+        if outline_color and outline_thickness:  
+            # Use the provided outline_image or default to the main image if not provided      
+            outline_source = self.outline_image if self.outline_image else rotated_image
+            outlined = self.draw_outline(outline_source, outline_color, outline_thickness, offset, outline_fade)
+            outline_rect = outlined.get_rect(center = rotated_image_rect.center)
+            self.screen.blit(outlined, outline_rect)
 
     def draw_outline(self, image, outline_color, outline_thickness, offset=None, fade = False):
         offset = self.offset if offset is None else offset        

@@ -344,39 +344,39 @@ class RandomEvents:
 
     def quick_feet(self, my_units, enemy_units):
         for unit in my_units:
-            unit.Max_Move_Range += 2  # Increase move range by 2
+            unit.max_move += 2  # Increase move range by 2
 
 
     def restore_quick_feet(self, my_units, enemy_units):
         for unit in my_units:
-            unit.Max_Move_Range -= 2  # Restore original move range
+            unit.max_move -= 2  # Restore original move range
 
 
     def sniper_training(self, my_units, enemy_units):
         for unit in my_units:
-            unit.Max_Attack_Range += 2  # Increase attack range by 2
+            unit.max_attack_range += 2  # Increase attack range by 2
 
 
     def restore_sniper_training(self, my_units, enemy_units):
         for unit in my_units:
-            unit.Max_Attack_Range -= 2  # Restore original attack range
+            unit.max_attack_range -= 2  # Restore original attack range
 
 
     def fuel_shortage(self, my_units, enemy_units):
         for unit in my_units:
-            unit.Move_Cost += 1  # Increase move cost by 1
+            unit.move_cost += 1  # Increase move cost by 1
 
 
     def restore_fuel_shortage(self, my_units, enemy_units):
         for unit in my_units:
-            unit.Move_Cost -= 1  # Restore original move cost
+            unit.move_cost -= 1  # Restore original move cost
 
 
     def gun_jam(self, my_units, enemy_units):
         for unit in my_units:
-            unit.Fire_Cost += 1  # Increase fire cost by 1
+            unit.fire_cost += 1  # Increase fire cost by 1
 
 
     def restore_gun_jam(self, my_units, enemy_units):
         for unit in my_units:
-            unit.Fire_Cost -= 1  # Restore original fire cost
+            unit.fire_cost -= 1  # Restore original fire cost

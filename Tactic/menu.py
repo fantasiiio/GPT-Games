@@ -40,7 +40,7 @@ class MainMenu:
 
         self.tank = Tank(self.grid.tiles[35][26], 2, self.grid, screen=self.screen)
         self.tank.angle = 180
-        self.tank.tower.angle = 180
+        self.tank.child.angle = 180
         
         silence_sound = pygame.mixer.Sound("assets\\sounds\\silence.wav")
         self.tank.max_action_points = 50
@@ -88,7 +88,7 @@ class MainMenu:
 
             y_offset = 20  # Initial vertical offset
             for label, callback in button_map.items():
-                button = UIButton(20, y_offset, 200, 50, label, 40, "Box03.png", border_size=23, callback=callback)
+                button = UIButton(20, y_offset, 200, 50, label, 40, "assets\\UI\\Box03.png", border_size=23, callback=callback)
                 y_offset += 60  # Increment vertical offset for the next button
                 self.menu_panel.add_element(button)
 

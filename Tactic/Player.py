@@ -6,6 +6,7 @@ class Player:
         self.enemy = None  # Reference to the enemy player#
         self.name = f"Player {number}"
         self.current_event = None
+        self.ready = False
         
     def add_unit(self, unit):
         """Add a unit to the player's list of units."""

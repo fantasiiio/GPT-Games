@@ -88,7 +88,7 @@ class TeamBuilder:
         self.team_panel = UIPanel(20, self.units_panel.rect.bottom, self.units_panel_width, self.team_panel_height, image="panel.png", border_size=self.border_size)
         self.info_panel = UIPanel(self.units_panel_width+15, self.top_panel.rect.bottom, self.MAIN_WIDTH-self.units_panel_width - 40, self.units_panel_height, image="panel.png", border_size=self.border_size)
         self.unit_properties_panel = UIPanel(self.team_panel.rect.right, self.team_panel.rect.top, self.MAIN_WIDTH - self.team_panel.rect.right - 25, self.team_panel.rect.height, image="panel.png", border_size=self.border_size)
-        self.finish_button = UIButton(self.unit_properties_panel.rect.right - self.button_width, self.team_panel.rect.bottom + 5, self.button_width, 50, "Finish", font_size=40, callback=self.button_callback, image="Box03.png", border_size=23)
+        self.finish_button = UIButton(self.unit_properties_panel.rect.right - self.button_width, self.team_panel.rect.bottom + 5, self.button_width, 50, "Finish", font_size=40, callback=self.button_callback, image="assets\\UI\\Box03.png", border_size=23)
         remind_text = "Don't forget to add a driver and a gunner for each vehicle" 
         remind_text_image =  self.add_text(self.team_panel, remind_text, (20, 20), font_size=30)
         remind_text_image.rect.bottom = self.team_panel.rect.bottom - 40
