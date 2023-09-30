@@ -354,12 +354,12 @@ class RandomEvents:
 
     def sniper_training(self, my_units, enemy_units):
         for unit in my_units:
-            unit.max_attack_range += 2  # Increase attack range by 2
+            unit.fire_range += 2  # Increase attack range by 2
 
 
     def restore_sniper_training(self, my_units, enemy_units):
         for unit in my_units:
-            unit.max_attack_range -= 2  # Restore original attack range
+            unit.fire_range -= 2  # Restore original attack range
 
 
     def fuel_shortage(self, my_units, enemy_units):

@@ -10,17 +10,20 @@ class Inputs:
             self.pos = (0, 0)
             self.button = [False, False, False]  # Left, Middle, Right
             self.clicked = [False, False, False]
+            self.released = [False, False, False]
             self.ignore_next_click = False
         def update(self):
             self.pos = pygame.mouse.get_pos()
             buttons = pygame.mouse.get_pressed()
             for button in range(len(buttons)):
                 self.clicked[button] = False
-                if not self.ignore_next_click and not self.button[button] and buttons[button]:
+                self.released[button] = False
+                if not self.button[button] and buttons[button]:
                     # Button was just pressed
                     self.clicked[button] = True
                 if self.button[button] and not buttons[button]:
                     # Button was just released
+                    self.released[button] = True
                     self.ignore_next_click = False
             self.button = [bool(button) for button in buttons]
             #print(f"{self.clicked[0]},{self.button[0]}")            

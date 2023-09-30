@@ -34,17 +34,18 @@ class StrategyGame:
         self.selected_team[2] = selected_team2
         pygame.display.set_caption('Strategy Game')
         #self.manager = pygame_gui.UIManager((self.grid.grid_width, self.grid.grid_height))
-        self.grid = Grid(pygame, self.screen, "assets\\maps\\terrain1.tmx")
+        self.grid = Grid(pygame, self.screen, "assets\\maps\\terrain2.tmx")
         self.item_list = []
         self.coin_animation = Animation(self.screen, "assets\\images","", "Coin", -1, (32,32), 0, frame_duration=100) 
 
         self.item_list.append(Item(self.screen, self.grid, "coin", self.grid.tiles[4][4], self.coin_animation))
-        self.players = {1: Player(1, True), 2: PlayerAI(2)}
+        self.players = {1: Player(1, True), 2: PlayerAI(2, self.grid, self.end_turn_button_clicked)}
         self.players[1].enemy = self.players[2]
         self.players[2].enemy = self.players[1]
         self.music_folder = 'assets\\music'
         self.music_player = MusicPlayer(self.music_folder)
-        self.whoosh_sound = pygame.mixer.Sound("assets\\sounds\\start.wav")
+        self.whoosh_sound = pygame.mixer.Sound("assets\\sounds\\silence.wav")
+        #self.whoosh_sound = pygame.mixer.Sound("assets\\sounds\\start.wav")
         self.event_good_sound = pygame.mixer.Sound("assets\\sounds\\event_good.wav")
         self.event_bad_sound = pygame.mixer.Sound("assets\\sounds\\event_bad.wav")
         self.stump_sound = pygame.mixer.Sound("assets\\sounds\\stomp.wav")
@@ -73,7 +74,7 @@ class StrategyGame:
         self.unit_queue = []
         self.queue_panel = None
         self.queue_label = None
-
+        self.can_do_action_units = []
         # if not init_pygame:
         #     self.game_state = GameState.UNIT_PLACEMENT
         #     self.place_next_unit()
@@ -93,13 +94,6 @@ class StrategyGame:
             "Move Range",
             "Attack Range",
         ]
-
-    def get_units_can_do_action(self, player):
-        units = []
-        for unit in self.players[player].units:
-            if unit.can_do_actions():
-                units.append(unit)
-        return units
 
     def get_next_state(self, current_state):
         next_states = {None: GameState.UNIT_PLACEMENT,
@@ -240,9 +234,6 @@ class StrategyGame:
         for unit in self.selected_team[1]:
             self.queue_list.add_item(f"{index}-{unit}", self.green_check_image, id = index)
             index+= 1
-        # queue_list.add_item('Item 1')
-        # queue_list.add_item('Item 2', self.green_check_image)
-        # queue_list.add_item('Item 3')
 
         self.queue_panel.add_element(self.queue_list)
 
@@ -287,7 +278,7 @@ class StrategyGame:
         if self.placing_unit_index > 0:
             self.players[1].units[self.placing_unit_index].is_planning = False
         
-        units = self.get_units_can_do_action(1)
+        units = self.can_do_action_units
         if self.placing_unit_index == len(units):
             return
 
@@ -307,8 +298,9 @@ class StrategyGame:
             item.checked = True
             item.disabled = True
 
-    def action_finished(self, unit):
-        if self.placing_unit_index == len(self.selected_team[1]):
+    def action_finished(self, unit):      
+          
+        if self.placing_unit_index == (len(self.can_do_action_units) if self.can_do_action_units else len(self.selected_team[1])):
             self.end_turn_button_clicked(None)
 
         if self.game_state == GameState.UNIT_PLACEMENT:
@@ -324,6 +316,7 @@ class StrategyGame:
 
     def change_player(self):
         self.current_player = 3 -self.current_player
+        self.grid.current_player = self.current_player
         self.notify_all_units("player_changed", self.current_player)
 
     def change_state(self):
@@ -365,9 +358,9 @@ class StrategyGame:
         elif self.game_state == GameState.PLANNING:
             self.placing_unit_index = 0
             if self.current_player == 1:
-                can_do_action_units =  self.get_units_can_do_action(1)
+                self.can_do_action_units =  self.players[1].get_units_can_do_action()
                 for unit in self.players[1].units:
-                    if unit not in can_do_action_units:
+                    if unit not in self.can_do_action_units:
                         self.queue_list.enable_item(unit.id, False)
                 self.planify_next_unit()
                 
@@ -380,7 +373,7 @@ class StrategyGame:
         self.inputs.mouse.clicked[0] = False
         self.inputs.mouse.ignore_next_click = True        
         self.end_turn_button.enabled = False
-        self.players[1].ready = True
+        self.players[self.current_player].ready = True
         self.change_state()
 
     def handle_mouse_click(self, pos):
@@ -392,39 +385,6 @@ class StrategyGame:
                 return i
         return -1
 
-    def AI_planning(self):
-        for ai_unit in self.get_units_can_do_action(2):
-            closest_enemy = min(self.players[1].units, key=lambda unit: self.grid.get_manathan_range(ai_unit.position, unit.position))
-            
-            # Step 2: Find path to the closest enemy
-            path = self.grid.find_path(ai_unit.position, closest_enemy.position)
-            next_straight_point  = self.grid.get_next_straight_point(path)
-            next_point_within_range = self.grid.get_next_point_within_max_range(path[0], next_straight_point, ai_unit.move_range)
-            range = self.grid.get_manathan_range(ai_unit.position, next_point_within_range)
-            if range <= ai_unit.attack_range:
-                path = path[:path.index(next_point_within_range)]
-
-            # Step 3: Move towards the enemy
-            if path:
-                steps_to_take = min(len(path) - 1, ai_unit.move_range)
-                ai_unit.position = path[steps_to_take]
-                
-            # Step 4: Check if the enemy is in attack range
-            if distance(ai_unit.position, closest_enemy.position) <= ai_unit.attack_range:
-                # Attack
-                closest_enemy.health -= ai_unit.attack_damage
-            
-
-    def play_AI(self):
-        if self.game_state == GameState.UNIT_PLACEMENT and not self.players[2].ready:
-            self.players[2].ready = True
-            self.players[2].place_units(self.grid, self.selected_team[2], 6, self.screen, self.end_turn_button_clicked)            
-            self.change_state()            
-        elif self.game_state == GameState.RANDOM_EVENT and not self.players[2].ready:
-            self.players[2].ready = True
-            self.change_state()
-        elif self.game_state == GameState.PLANNING:
-            self.AI_planning()
 
     def game_loop(self):
         running = True
@@ -438,7 +398,7 @@ class StrategyGame:
             self.end_turn_button.enabled = not self.players[1].ready
 
             if self.current_player == 2:
-                self.play_AI()
+                self.players[2].play_AI(self.game_state)
 
             self.inputs.update()
             mini_game_events = []

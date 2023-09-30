@@ -242,8 +242,10 @@ class Soldier(Unit):
 
 
     def update(self, inputs):
-        if self.current_game_state == GameState.UNIT_PLACEMENT:
+        if self.current_game_state == GameState.UNIT_PLACEMENT or self.dragging:            
             self.place_unit(inputs)
+            if not inputs.mouse.button[0]:
+                self.dragging = False
             return
         if self.is_driver or self.current_player != self.player:
             self.draw_x = self.world_pos_x + self.grid.get_camera_screen_position()[0]
@@ -252,7 +254,6 @@ class Soldier(Unit):
         self.hover_menu = self.action_menu_rect and self.action_menu_rect.collidepoint(inputs.mouse.pos)
         mouse_over_my_tile = self.tile.get_screen_rect().collidepoint(inputs.mouse.pos)
         # Handle left mouse click events.
-        
         if inputs.mouse.clicked[0]:  # Left click
             # No current action and selected tile contains the unit and the unit is alive.
             if self.current_action is None and mouse_over_my_tile and self.is_alive:
@@ -289,6 +290,9 @@ class Soldier(Unit):
                     self.current_action = None
 
             elif self.current_action == "choosing_action":
+                if mouse_over_my_tile:
+                    self.dragging = True
+                    self.start_drag_tile = self.tile
                 if self.hover_menu and not self.is_disabled:
                     for index, action in enumerate(self.actions):
                         if self.action_rects[index+1].collidepoint(inputs.mouse.pos):

@@ -1,3 +1,4 @@
+from collections import deque
 import pygame
 from pytmx.util_pygame import load_pygame
 from config import  GRAY
@@ -37,6 +38,7 @@ class Grid:
         self.camera_world_position = (0,0)
         self.camera_move_start_time = 0
         self.camera_direction_vector = (0,0)
+        self.current_player = 1
 
     def get_camera_screen_position(self):
         return (self.camera_world_position[0] + self.screen.get_rect().width/2, self.camera_world_position[1] + self.screen.get_rect().height/2)
@@ -105,7 +107,7 @@ class Grid:
 
     def get_tile_from_coords(self,x, y):
         tile_x = (x-self.get_camera_screen_position()[0]) // self.tile_size
-        tile_y = (y-self.get_camera_screen_position()  [1]) // self.tile_size
+        tile_y = (y-self.get_camera_screen_position()[1]) // self.tile_size
         if tile_x < 0 or tile_y < 0 or tile_x >= self.tiles_x or tile_y >= self.tiles_y:
             return None
         # Return the corresponding tile object (this assumes you have a 2D list of tiles representing your map)
@@ -290,6 +292,27 @@ class Grid:
        
 
 
+    def can_place_unit(self, unit_type, tile, player):
+        # Check if a unit is already present on the tile
+        if tile.unit:
+            return False
+        
+        # Check for terrain compatibility
+        if tile.properties:
+            terrain_type = tile.properties.get("type")
+            if terrain_type == "water" and unit_type != "Boat":
+                return False
+            if terrain_type == "grass" and unit_type == "Boat":
+                return False
+        
+        # Check if the player is allowed to place a unit on this part of the map
+        middle_x = self.tiles_x // 2
+        if player == 1 and tile.x >= middle_x:
+            return False
+        if player == 2 and tile.x < middle_x:
+            return False
+
+        return True
 
     def is_passable(self, x, y, action):
 
@@ -430,6 +453,23 @@ class Grid:
                     
             if touching:
                 self.draw_path(path, (0, 100, 0, 150))
+
+
+        # Darken the area where the current player cannot place units
+        middle_x = self.tiles_x // 2
+        if self.current_player == 1:
+            start_x = middle_x * self.tile_size + self.get_camera_screen_position()[0]
+            width = self.grid_width - start_x
+        elif self.current_player == 2:
+            start_x = self.get_camera_screen_position()[0]
+            width = middle_x * self.tile_size
+
+        height = self.grid_height
+
+        darken_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+        darken_surface.fill((0, 0, 0, 128))  # RGBA
+        self.screen.blit(darken_surface, (start_x, 0))
+
                    
 
     def get_adjacent_tile(self, unit, direction):
@@ -486,9 +526,7 @@ class Grid:
         
         # Helper function to check if a given cell is within self.tiles boundaries and is accessible
         def is_valid(x, y, visited):
-            tile = self.tiles[x][y]
-            return not tile.properties or not tile.properties["type"] == "grass"
-                        # Initialize starting and ending points
+             return 0 <= x < rows and 0 <= y < cols and (x, y) not in visited
         
         if start is None or end is None:
             return []
@@ -516,23 +554,63 @@ class Grid:
                     
         return []
 
-    def get_next_straight_point(path):
+
+    def get_farthest_walkable_point(self, path, max_range):
         if not path or len(path) < 2:
             return None
-        
+
         start = path[0]
-        for idx, point in enumerate(path[1:], 1):
-            dx1, dy1 = point[0] - start[0], point[1] - start[1]
+        furthest_point = start  # Initialize to the start point
+        distance_covered = 0
+
+        rows, cols = len(self.tiles), len(self.tiles[0])
+
+        for idx, point in enumerate(path[1:]):
+            dx, dy = point[0] - start[0], point[1] - start[1]
+            norm_dx = dx // abs(dx) if dx != 0 else 0
+            norm_dy = dy // abs(dy) if dy != 0 else 0
+
+            x, y = start
+            obstructed = False
+
+            # Initialize last_valid_point to start, will update this as we move along
+            last_valid_point = start
+
+            # Check all tiles along the line from start to this point to see if they are walkable
+            while (x, y) != point:
+                x += norm_dx
+                y += norm_dy
+
+                if x < 0 or y < 0 or x >= rows or y >= cols:
+                    obstructed = True
+                    furthest_point = last_valid_point
+                    break
+
+                    tile = self.tiles[y][x]
+                    if tile.properties is not None:
+                        no_walk = tile.properties.get('no_walk', "False")
+                        if no_walk == "True":
+                            obstructed = True
+                            furthest_point = last_valid_point
+                            break
+
+                # Update last_valid_point as we've found a new valid point
+                last_valid_point = (x, y)
             
-            if idx + 1 < len(path):
-                next_point = path[idx + 1]
-                dx2, dy2 = next_point[0] - point[0], next_point[1] - point[1]
-                
-                # Check if the direction changes
-                if dx1 != dx2 or dy1 != dy2:
-                    return point
-        # If it reaches here, the path is a straight line
-        return path[-1]
+            if obstructed:
+                break  # Path is obstructed, so we stop
+
+            # If we are here, this point is walkable. Update furthest_point.
+            furthest_point = point  
+            distance_covered += 1  # Update the distance covered
+
+            # Check if max_range has been reached
+            if distance_covered >= max_range:
+                break
+
+        return furthest_point  # Return the furthest point found that is walkable and within max_range
+
+
     def draw_selected_perimeter(self):
         line_width = 5
         #transformed_shape = piece_cache[piece.shape_id][piece.orientation][piece.mirror]['transformed_shape']

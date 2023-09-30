@@ -79,20 +79,10 @@ class Unit:
         self.fire_cost = self.settings["Fire Cost"]
         self.planned_actions = []
         self.dahsed_line = None   
-        self.is_planning = False     
-#position
-# max_hp
-# hp
-# damage
-# AP
-# can_attack
-# is_disabled
-# resources
-# damage
-# Max_Move_Range
-# Max_Attack_Range
-# Move_Cost
-# Fire_Cost
+        self.is_planning = False
+        self.dragging = False             
+        self.start_drag_tile = None
+
     def draw_planned_actions(self):
         font = pygame.font.SysFont(None, 25)
         for index, action in enumerate(self.planned_actions):
@@ -216,23 +206,47 @@ class Unit:
 
 
     def place_unit(self, inputs):
-        if self.tile:
+        if self.tile and not self.dragging:
             return
+
         self.mouse_x, self.mouse_y = inputs.mouse.pos
-        # Snap mouse position to grid
-        grid_x = (self.mouse_x // TILE_SIZE) * TILE_SIZE 
-        grid_y = (self.mouse_y // TILE_SIZE) * TILE_SIZE       
-        self.screen_x = grid_x
-        self.screen_y = grid_y
-        self.draw_x = grid_x
-        self.draw_y = grid_y  
+
+        tile = self.grid.get_tile_from_coords(self.mouse_x, self.mouse_y)
+        self.world_pos_x = tile.x * TILE_SIZE
+        self.world_pos_y = tile.y * TILE_SIZE
+        self.draw_x = self.world_pos_x + self.grid.get_camera_screen_position()[0]
+        self.draw_y = self.world_pos_y + self.grid.get_camera_screen_position()[1]
+        grid_x = self.draw_x
+        grid_y = self.draw_y
+        self.screen_x = self.draw_x
+        self.screen_y = self.draw_y
+
+
         if hasattr(self, "child"):
             self.child.draw_x = grid_x + self.child.offset[0]    
             self.child.draw_y = grid_y + self.child.offset[1]      
         
+
         if inputs.mouse.clicked[0] and self.grid.selected_tile and not self.grid.selected_tile.unit: 
+            if not self.grid.can_place_unit(self.type, self.grid.selected_tile, 1):
+                return
             self.place_on_tiles(self.grid.selected_tile)
             self.action_finished(self)
+
+        if self.dragging:
+            tile = self.grid.get_tile_from_coords(self.mouse_x, self.mouse_y)            
+            self.grid.highlight_tiles((self.start_drag_tile.x, self.start_drag_tile.y),self.max_move, (00, 100, 00, 50), self.current_action)       
+
+            if inputs.mouse.released[0]:
+                if not tile:
+                    return
+
+                if not tile.unit or (tile.unit and tile.unit.player == self.player and tile.unit.type != "Soldier" and tile.unit.seat_left > 0):
+                    self.planned_actions.append(("Move", tile))
+                else:
+                    self.planned_actions.append(("Attack", tile))
+
+                self.action_finished(self)
 
     def on_message(self, event, value):
         if event == "game_state_changed":
@@ -309,6 +323,10 @@ class Unit:
 
         if self.current_game_state == GameState.UNIT_PLACEMENT:
             self.place_unit(inputs)
+            if self.tile:
+                self.draw_x = self.world_pos_x + self.grid.get_camera_screen_position()[0]
+                self.draw_y = self.world_pos_y + self.grid.get_camera_screen_position()[1]               
+
             return
         # Update animations.
         for animation in self.animations.values():

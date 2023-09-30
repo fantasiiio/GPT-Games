@@ -7,7 +7,7 @@ class Player:
         self.name = f"Player {number}"
         self.current_event = None
         self.ready = False
-        
+
     def add_unit(self, unit):
         """Add a unit to the player's list of units."""
         self.units.append(unit)
@@ -43,3 +43,10 @@ class Player:
         self.current_event['restore'](self.units, self.enemy.units)  # Restore the unit's state
         self.current_event = None  # Clear the current event
         return True
+
+    def get_units_can_do_action(self):
+        units = []
+        for unit in self.units:
+            if unit.can_do_actions():
+                units.append(unit)
+        return units        
