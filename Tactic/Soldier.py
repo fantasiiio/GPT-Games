@@ -44,6 +44,8 @@ class Soldier(Unit):
         self.dy = 0
         self.target_x = 0
         self.target_y = 0
+        self.velocity_x = 0
+        self.velocity_y = 0
         self.last_action = None
         self.last_action_target = None
 
@@ -186,6 +188,7 @@ class Soldier(Unit):
         target_world_x, target_world_y = target_tile.x * self.grid.tile_size, target_tile.y * self.grid.tile_size
         movement_cost = self.settings["Move Cost"]
         if movement_cost <= self.action_points:
+            self.current_action = "move_to_target"
             self.yes_sir_sound.play()
             self.target_point = (target_world_x + self.offset[0], target_world_y + self.offset[1])
             self.origin_point = (self.world_pos_x + self.offset[0], self.world_pos_y + self.offset[1])
@@ -228,7 +231,7 @@ class Soldier(Unit):
         if fire_cost <= self.action_points:
             self.bullets_fired = 0
             self.gun_sound.play()
-            
+            self.current_action = "fire_to_target"
             self.target_tile = target_tile
             self.target_point = (target_x + self.offset[0], target_y + self.offset[1])
             self.origin_point = (self.screen_x + self.offset[0], self.screen_y + self.offset[1])

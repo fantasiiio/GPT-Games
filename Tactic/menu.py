@@ -27,7 +27,7 @@ class MainMenu:
         self.grid.move(self.grid_offset[0], self.grid_offset[1])
         
         self.menu_panel = UIPanel(self.screen_width/2 - self.panel_width/2, 120, 
-                             self.panel_width, self.panel_height, image="panel.png")
+                             self.panel_width, self.panel_height, image="assets/UI/panel.png")
                              
 
         self.top_panel = UIPanel(0, 0, 0, 0, color=(0,0,0))
@@ -79,8 +79,8 @@ class MainMenu:
 
     def create_buttons(self):
             button_map = {
-                "New Game": self.menu_clicked,
-                "Multiplayer": self.menu_clicked,
+                "Single Player": self.menu_clicked,
+                "Multi-Player": self.menu_clicked,
                 "Instructions": self.menu_clicked,
                 "Mini Game": self.menu_clicked,
                 "Quit": self.menu_clicked
@@ -120,7 +120,7 @@ class MainMenu:
         
     def render(self):
         self.screen.fill((60, 60, 60))  
-        self.grid.draw_grid(self.inputs)
+        self.grid.draw_grid(self.inputs, False)
         self.tank.draw()
         self.menu_panel.draw(self.screen)
         self.top_panel.draw(self.screen)

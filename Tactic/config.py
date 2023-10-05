@@ -10,6 +10,9 @@ TILES_Y = 20
 GRID_WIDTH = TILE_SIZE * TILES_X
 GRID_HEIGHT = TILE_SIZE * TILES_Y
 screen = None
+server_ip = "127.0.0.1"
+server_port = 65432
+
 
 STATUS_BAR_WIDTH = 60  # or the width of your soldier sprite
 STATUS_BAR_HEIGHT = 6  # adjust based on preference

@@ -7,13 +7,13 @@ from config import GameState
 import random
 
 class PlayerAI(Player):
-    def __init__(self, number, grid, end_turn_clicked):
+    def __init__(self, number, grid, end_turn_clicked, selected_team=None, screen=None):
         super().__init__(number, False)
         self.end_turn_clicked = end_turn_clicked
         self.grid = grid
         self.players = {1: Player(1, False), 2: Player(2, False)}
-        self.selected_team = {}  # Fill this with your teams
-        self.screen = None  # Your screen object
+        self.selected_team = selected_team  # Fill this with your teams
+        self.screen = screen  # Your screen object
         self.game_state = None  # Current game state
 
     def find_closest_enemy(self, ai_unit, enemy_units):
@@ -62,6 +62,9 @@ class PlayerAI(Player):
             self.end_turn_clicked(None)
         elif self.game_state == GameState.PLANNING:
             self.AI_planning()
+        elif self.game_state == GameState.EXECUTION:
+            self.ready = True
+            self.end_turn_clicked(None)
 
     def place_units(self, team, max_distance=3, screen=None, end_turn_clicked=None):
         first_unit_placed = False
@@ -75,15 +78,15 @@ class PlayerAI(Player):
             if not first_unit_tile:
                 tile_fount = False
                 while not tile_fount:
-                    tile = self.grid.get_random_tile()
-                    tiles = self.grid.tiles_in_range_manhattan(tile.x, tile.y, max_distance)
+                    first_unit_tile = self.grid.get_random_tile()
+                    tiles = self.grid.tiles_in_range_manhattan(first_unit_tile.x, first_unit_tile.y, max_distance)
                     free_tiles_count = 0
                     for t_x, t_y in tiles:
                         tile = self.grid.tiles[t_x][t_y]
-                        if self.grid.self.grid.can_place_unit(unit_type, tile, 2):
+                        if self.grid.can_place_unit(unit_type, tile, 2):
                             free_tiles_count+=1
                     tile_fount = free_tiles_count >= len(team)
-                first_unit_tile = tile
+                tile = first_unit_tile
             else:
                 tile_fount = False                
                 while not tile_fount:
@@ -109,6 +112,7 @@ class PlayerAI(Player):
             elif unit_type == "Boat":
                 unit = Boat(tile, self.number, self.grid, screen=screen)
 
+            unit.current_player = self.number
             self.add_unit(unit)
 
         self.end_turn_clicked(None)

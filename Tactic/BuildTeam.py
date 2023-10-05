@@ -1,11 +1,16 @@
+import threading
+import json
+from queue import Queue
+from Connection import Connection
 import pygame
 from pygame.locals import QUIT, MOUSEBUTTONUP
-from GraphicUI import UIPanel, UIButton,UIImage, UILabel
+from GraphicUI import UIPanel, UIButton,UIImage, UILabel, UITextBox
 from config import unitSettings
 from rectpack import newPacker, PackingMode, SORT_AREA
 from rectpack.maxrects import MaxRectsBl
 import math
 import time
+import uuid
 
 class CashManager:
     def __init__(self, initial_cash, frame_rate=60):
@@ -30,13 +35,34 @@ class CashManager:
     def get_cash(self):
         return self.cash
 
+class PlayerLight:
+    def __init__(self):
+        self.name = None
+        self.is_ready = False
+        self.guid = None
+        self.load_player_data()
+
+    def load_player_data(self):
+        # Generate or retrieve player UUID
+        try:
+            with open("player.json", "r") as f:
+                player_uuid = json.load(f)["uuid"]
+        except FileNotFoundError:
+            player_uuid = str(uuid.uuid4())
+            with open("player.json", "w") as f:
+                json.dump({"uuid": player_uuid}, f)
+
+    def update(self):
+        with open("player.json", "w") as f:
+            json.dump({"uuid": self.guid}, f)        
+
 class TeamBuilder:
     
     def __init__(self,  player = 1, init_pygame=True, full_screen=False, screen=None):
         self.current_player = player
         # Constants
         self.MAIN_WIDTH = 1500
-        self.MAIN_HEIGHT = 1000 
+        self.MAIN_HEIGHT = 1200 
         self.init_graphics(init_pygame, full_screen, screen, self.MAIN_WIDTH, self.MAIN_HEIGHT)
 
         self.global_id = 1
@@ -45,6 +71,7 @@ class TeamBuilder:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 20)
         self.all_rects = None
+        self.client_conn = Connection(use_singleton=True)._instance
 
         self.offsets = {
             'Tank': (0, 64),
@@ -78,26 +105,34 @@ class TeamBuilder:
         self.units_panel_height = 400
         self.units_panel_width = 800
         self.team_panel_height = 500
+
         self.button_width = 200
         self.top_panel = UIPanel(0, 0, self.screen_width, 70, border_size=self.border_size)
-        self.player_label = self.state_label = UILabel(10, 30, f"Player {self.current_player}", self.top_panel, font_size=60)
-        self.player_label.rect.x = self.screen_width / 2 - self.player_label.rect.width / 2
-        self.top_panel.add_element(self.player_label)
+        self.team_label =  UILabel(0, 5, f"Team Name:", self.top_panel, font_size=60)
+        self.team_label.rect.x = self.screen_width / 2 - self.team_label.rect.width / 2
+        self.team_label.rect.x -= 200
+        self.top_panel.add_element(self.team_label)
+        self.player_name_txt = UITextBox(self.team_label.rect.right + 10, 5, 400, 60, "", image="assets\\UI\\PanelElement02.png", border_size=7, font_size=60, end_edit_callback=self.player_name_changed)
+        self.top_panel.add_element(self.player_name_txt)
 
-        self.units_panel = UIPanel(20, self.top_panel.rect.bottom, self.units_panel_width, self.units_panel_height, image="panel.png", border_size=self.border_size)
-        self.team_panel = UIPanel(20, self.units_panel.rect.bottom, self.units_panel_width, self.team_panel_height, image="panel.png", border_size=self.border_size)
-        self.info_panel = UIPanel(self.units_panel_width+15, self.top_panel.rect.bottom, self.MAIN_WIDTH-self.units_panel_width - 40, self.units_panel_height, image="panel.png", border_size=self.border_size)
-        self.unit_properties_panel = UIPanel(self.team_panel.rect.right, self.team_panel.rect.top, self.MAIN_WIDTH - self.team_panel.rect.right - 25, self.team_panel.rect.height, image="panel.png", border_size=self.border_size)
+
+        self.units_panel = UIPanel(20, self.top_panel.rect.bottom, self.units_panel_width, self.units_panel_height, image="assets\\UI\\panel.png", border_size=self.border_size)
+        self.team_panel = UIPanel(20, self.units_panel.rect.bottom, self.units_panel_width, self.team_panel_height, image="assets\\UI\\panel.png", border_size=self.border_size)
+        self.info_panel = UIPanel(self.units_panel_width+15, self.top_panel.rect.bottom, self.MAIN_WIDTH-self.units_panel_width - 40, self.units_panel_height, image="assets\\UI\\panel.png", border_size=self.border_size)
+        self.unit_properties_panel = UIPanel(self.team_panel.rect.right, self.team_panel.rect.top, self.MAIN_WIDTH - self.team_panel.rect.right - 25, self.team_panel.rect.height, image="assets\\UI\\panel.png", border_size=self.border_size)
         self.finish_button = UIButton(self.unit_properties_panel.rect.right - self.button_width, self.team_panel.rect.bottom + 5, self.button_width, 50, "Finish", font_size=40, callback=self.button_callback, image="assets\\UI\\Box03.png", border_size=23)
         remind_text = "Don't forget to add a driver and a gunner for each vehicle" 
         remind_text_image =  self.add_text(self.team_panel, remind_text, (20, 20), font_size=30)
         remind_text_image.rect.bottom = self.team_panel.rect.bottom - 40
+        
+        self.network_status_label = UILabel(self.finish_button.rect.left -200, self.finish_button.rect.top, "", font_size=30)
         self.main_panel = UIPanel(self.screen_width / 2 - self.MAIN_WIDTH / 2, self.screen_height / 2 - self.MAIN_HEIGHT / 2, self.MAIN_WIDTH, self.MAIN_HEIGHT, image=None, border_size=self.border_size)
         self.main_panel.add_element(self.units_panel)
         self.main_panel.add_element(self.team_panel)
         self.main_panel.add_element(self.info_panel)
         self.main_panel.add_element(self.unit_properties_panel)
         self.main_panel.add_element(self.finish_button)
+        self.main_panel.add_element(self.network_status_label)
         self.main_panel.add_element(self.top_panel)
 
         self.container = (self.team_panel.rect.width - self.border_size*2, self.team_panel.rect.height - self.border_size*2)
@@ -112,7 +147,7 @@ class TeamBuilder:
         self.team_soldier_offset = 0
         self.team_vehicle_offset = 0
         self.cash_manager = CashManager(initial_cash=2000, frame_rate=30)
-
+        self.player_light = None
 
         # Other state
         self.setting_display_order = [
@@ -141,6 +176,62 @@ class TeamBuilder:
         
         # Populate units
         self.populate_units()
+        self.player_dict = {}
+        self.init_network()
+
+    def player_name_changed(self, text):        
+        self.player_light.name = text
+        if self.client_conn.match:
+            self.client_conn.match.broadcast_command("player_name", {"player": self.guid, "name": text})
+
+    def listen_for_messages(self, connection):
+        while connection.is_connected:
+            command_type, data = connection.receive_command()
+            self.incoming_messages.put((command_type, data))
+
+    def init_network(self):
+        self.client_conn = Connection(use_singleton=True)._instance
+        self.player_dict[self.client_conn] = PlayerLight()
+        self.player_light = self.player_dict[self.client_conn]
+        self.incoming_messages = Queue()
+        # Create a new thread for listening to messages
+        listener_thread = threading.Thread(target=self.listen_for_messages, args=(self.client_conn,))
+        listener_thread.daemon = True
+        listener_thread.start()        
+
+    def update_network_status(self):
+        connection = Connection(use_singleton=True)._instance
+        if not connection.is_connected:
+            self.network_status_label.set_text("Not connected")
+        else:
+            if connection.match:
+                self.ready_count = 0
+                for player_connection in connection.match.get_others():
+                    if player_connection not in self.player_dict:
+                        self.player_dict[player_connection] = PlayerLight()
+                    self.player_dict[player_connection].name = player_connection.name
+                    self.player_dict[player_connection].is_ready = player_connection.ready
+                    if player_connection.ready:
+                        self.ready_count += 1
+                others = connection.match.get_other_players()
+                if others[0].ready:
+                    self.network_status_label.set_text(f"Other Player Ready")
+                else:
+                    self.network_status_label.set_text(f"Waiting for {others[0].name}")
+        
+        self.network_status_label.rect.right = self.finish_button.rect.left - 20
+            
+
+
+
+
+    def update_connection_status(self):
+        if self.client_conn.connected:
+            self.state_label.text = "Connected"
+            self.state_label.text_color = (0, 255, 0)
+        else:
+            self.state_label.text = "Not Connected"
+            self.state_label.text_color = (255, 0, 0)
 
     def init_graphics(self, init_pygame, full_screen, screen, width, height):
         self.init_pygame = init_pygame
@@ -216,12 +307,26 @@ class TeamBuilder:
                 selected_team.append(unit_type)
         return selected_team
             
+    def process_command(self, command_type, data):
+        if command_type == "ready":
+            self.player_dict[data["player"]].is_ready = True
+        elif command_type == "unready":
+            self.player_dict[data["player"]].is_ready = False
+        elif command_type == "start_game":
+            self.running = False
+        elif command_type == "player_light":
+            self.player_dict[data["player"]] = data["name"]
+
+
     def run(self):
         
         self.running = True
         
         while self.running:
-        
+            if self.client_conn.is_connected:
+                while not self.incoming_messages.empty():
+                    command_type, data = self.incoming_messages.get()   
+                    self.process_command(command_type, data)     
             # Background
             self.vertical_gradient(self.screen, (100, 100, 100), (50, 50, 50))  
             self.main_panel.draw(self.screen)
@@ -250,7 +355,8 @@ class TeamBuilder:
                 self.screen.blit(self.outline, self.unit_over.rect)
             if self.dragged_unit:
                 self.dragged_unit.draw(self.screen)
-
+            
+            self.update_network_status()
             # Update cash
             self.cash_manager.update()
             current_cash = self.cash_manager.get_cash()
@@ -373,8 +479,9 @@ class TeamBuilder:
             gradient.rgb = tuple(new_rgb)
             pygame.draw.line(surface, gradient, (0, i), (surface.get_width(), i))
             
-    def button_callback(self, button):
-        self.running = False
+    def button_callback(self, button):        
+        #self.running = False
+        self.client_conn.send_command("ready", {"player": self.current_player})
         
     def remove_from_packer(self, unit):
         packer_rect = (max(unit.bounding_rect.width, 50) + 10, unit.bounding_rect.height, unit.id)    
@@ -531,7 +638,26 @@ class TeamBuilder:
                 self.team_unit_over = self.team_unit
             return self.get_outline(self.team_unit.image, (255, 255, 255), 1)
     
+    def get_outline(self, image, outline_color, outline_thickness, fade = False):       
+        if fade:
+            current_time = time.time()
+            elapsed_time = current_time - self.start_time
+            fade_factor = math.sin(elapsed_time*5)
 
+            alpha_value = int((fade_factor + 1) / 2 * 255)
+            outline_color = (*outline_color[:3], alpha_value)
+        else:
+            outline_color = (*outline_color[:3], 255)
+
+        mask = pygame.mask.from_surface(image)
+        outline_points = mask.outline()
+        outlined_surface = pygame.Surface((image.get_width() + 2 * outline_thickness,
+                                            image.get_height() + 2 * outline_thickness),
+                                        pygame.SRCALPHA)
+        for point in outline_points:
+            pygame.draw.circle(outlined_surface, outline_color, (point[0] + outline_thickness, point[1] + outline_thickness), outline_thickness)
+
+        return outlined_surface
         
 if __name__ == "__main__":
     app = TeamBuilder()

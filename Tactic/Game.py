@@ -39,7 +39,7 @@ class StrategyGame:
         self.coin_animation = Animation(self.screen, "assets\\images","", "Coin", -1, (32,32), 0, frame_duration=100) 
 
         self.item_list.append(Item(self.screen, self.grid, "coin", self.grid.tiles[4][4], self.coin_animation))
-        self.players = {1: Player(1, True), 2: PlayerAI(2, self.grid, self.end_turn_button_clicked)}
+        self.players = {1: Player(1, True), 2: PlayerAI(2, self.grid, self.end_turn_button_clicked, self.selected_team, self.screen)}
         self.players[1].enemy = self.players[2]
         self.players[2].enemy = self.players[1]
         self.music_folder = 'assets\\music'
@@ -174,29 +174,13 @@ class StrategyGame:
                 self.state_label2.rect.x = self.ui_panel.rect.width / 2 - self.state_label2.rect.width / 2
 
     def update_stats_panel(self):
+
         if self.grid.selected_tile and self.grid.selected_tile.unit:
             unit = self.grid.selected_tile.unit
             formated_stats = self.format_stats(unit.get_stats())
             self.unit_info_label.set_text(formated_stats)
         else:
             self.unit_info_label.set_text("")
-
-    # Function to update the queue_panel
-    # def update_queue_panel(self):
-    #     formatted_queue = self.format_queue()
-    #     self.queue_label.set_text(formatted_queue)
-
-    # Function to format queue into a string
-
-    # def format_queue(self):
-    #     queue_str = "Queue:\n\n "
-    #     for unit in self.unit_queue:
-    #         if isinstance(unit, str):
-    #             queue_str += f"{unit}\n"
-    #         else:
-    #             queue_str += f"{unit.name}\n"
-    #     return queue_str.rstrip(', ')
-
 
     def init_ui(self):
         # Create UI panel
@@ -289,8 +273,30 @@ class StrategyGame:
         planning_unit.is_planning = True
 
         self.queue_list.select_item(planning_unit.id)
-        self.grid.move_camera_to_tile(planning_unit.tile)           
+        #self.grid.move_camera_to_tile(planning_unit.tile) 
 
+
+    # Called one time for both players
+    def execute_actions(self):
+        for key, player in self.players.items():
+            for unit in player.units:
+                while len(unit.planned_actions) > 0:
+                    unit.execute_next_action()
+
+
+    def wait_all_actions_finished(self):
+        any_unfinished = False
+        for key, player in self.players.items():
+            if not player.all_units_finished():
+                any_unfinished = True
+                # for unit in player.units:
+                #     if not unit.finished:
+                #         unit.update(self.inputs)
+                #         unit.draw()
+
+        if not any_unfinished:
+            self.current_player = 2
+            self.change_state()
 
     def check_unit_in_list(self, unit):
         item = self.queue_list.get_item_by_id(unit.id)
@@ -320,6 +326,8 @@ class StrategyGame:
         self.notify_all_units("player_changed", self.current_player)
 
     def change_state(self):
+        if self.changing_game_state:
+            return
         self.last_time_state_changed = time.time()
         if(self.game_state):
             self.state_change_wait_time = 1
@@ -329,6 +337,11 @@ class StrategyGame:
         self.changing_game_state = True
         if self.players[1].ready and self.players[2].ready:
             self.next_state = self.get_next_state(self.game_state)
+
+    def wait_all_player_ready(self):
+        if self.players[1].ready and self.players[2].ready:
+            self.current_player = 2
+            self.change_state()
 
     def state_changed(self):
         self.changing_game_state = False
@@ -349,23 +362,36 @@ class StrategyGame:
             self.notify_all_units("game_state_changed", self.game_state)
 
         if self.game_state == GameState.RANDOM_EVENT:
+            if self.current_player == 1:
+                self.players[1].ready = True
+                self.players[2].ready = False
             self.apply_random_event()
         elif self.game_state == GameState.UNIT_PLACEMENT:
             self.placing_unit_index = 0
             if self.current_player == 1:
-                #self.unit_queue = self.selected_team[1]
+                self.players[1].ready = False
+                self.players[2].ready = False
                 self.place_next_unit()
         elif self.game_state == GameState.PLANNING:
             self.placing_unit_index = 0
             if self.current_player == 1:
+                self.players[1].ready = False
+                self.players[2].ready = False                
                 self.can_do_action_units =  self.players[1].get_units_can_do_action()
                 for unit in self.players[1].units:
                     if unit not in self.can_do_action_units:
                         self.queue_list.enable_item(unit.id, False)
                 self.planify_next_unit()
+        elif self.game_state == GameState.EXECUTION:
+            if self.current_player == 1:
+                self.players[1].ready = True
+                self.players[2].ready = True
+                self.execute_actions()
+        elif self.game_state == GameState.OUTCOME:
+            if self.current_player == 1:
+                self.players[1].ready = False
+                self.players[2].ready = True
                 
-
-
         self.update_state_label()
 
 
@@ -400,6 +426,12 @@ class StrategyGame:
             if self.current_player == 2:
                 self.players[2].play_AI(self.game_state)
 
+            if not self.changing_game_state:
+                if self.game_state == GameState.EXECUTION:
+                    self.wait_all_actions_finished()
+                elif self.game_state == GameState.OUTCOME:
+                    self.wait_all_player_ready()
+
             self.inputs.update()
             mini_game_events = []
             for event in pygame.event.get():
@@ -417,7 +449,7 @@ class StrategyGame:
 
             self.grid.update_camera()
             self.grid.update(self.inputs)
-            self.grid.draw_grid(self.inputs)
+            self.grid.draw_grid(self.inputs, self.game_state == GameState.UNIT_PLACEMENT)
             for item in self.item_list:
                 item.update()
                 item.draw()
@@ -450,6 +482,7 @@ class StrategyGame:
 
 
             pygame.display.flip()
+            self.end_turn_button.enabled = not self.players[1].ready
 
         if self.init_pygame:
             pygame.quit()    

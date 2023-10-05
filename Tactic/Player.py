@@ -49,4 +49,7 @@ class Player:
         for unit in self.units:
             if unit.can_do_actions():
                 units.append(unit)
-        return units        
+        return units   
+
+    def all_units_finished(self):
+        return all(unit.current_action is None for unit in self.units)         

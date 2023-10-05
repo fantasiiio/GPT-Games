@@ -409,7 +409,7 @@ class Grid:
     def move_camera_to_tile(self, tile):
         self.move_camera_to((tile.x * self.tile_size + self.get_camera_screen_position()[0], tile.y * self.tile_size + self.get_camera_screen_position()[1]))
 
-    def draw_grid(self, inputs):
+    def draw_grid(self, inputs, darken_other_side = True):
         """Draw a simple grid on the screen."""
         camera_pos = self.get_camera_screen_position()
         cam_x, cam_y = camera_pos[0], camera_pos[1]
@@ -455,20 +455,21 @@ class Grid:
                 self.draw_path(path, (0, 100, 0, 150))
 
 
-        # Darken the area where the current player cannot place units
-        middle_x = self.tiles_x // 2
-        if self.current_player == 1:
-            start_x = middle_x * self.tile_size + self.get_camera_screen_position()[0]
-            width = self.grid_width - start_x
-        elif self.current_player == 2:
-            start_x = self.get_camera_screen_position()[0]
-            width = middle_x * self.tile_size
+        if darken_other_side:
+            # Darken the area where the current player cannot place units
+            middle_x = self.tiles_x // 2
+            if self.current_player == 1:
+                start_x = middle_x * self.tile_size + self.get_camera_screen_position()[0]
+                width = self.grid_width - start_x
+            elif self.current_player == 2:
+                start_x = self.get_camera_screen_position()[0]
+                width = middle_x * self.tile_size
 
-        height = self.grid_height
+            height = self.grid_height
 
-        darken_surface = pygame.Surface((width, height), pygame.SRCALPHA)
-        darken_surface.fill((0, 0, 0, 128))  # RGBA
-        self.screen.blit(darken_surface, (start_x, 0))
+            darken_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+            darken_surface.fill((0, 0, 0, 128))  # RGBA
+            self.screen.blit(darken_surface, (start_x, 0))
 
                    
 

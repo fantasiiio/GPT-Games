@@ -1,23 +1,23 @@
 import pygame
 import math
-from pygame.math import Vector2
+from Vector2D import Vector2D
 
 class DashedLine:
     offset = 0
 
 import math
 import pygame
-from pygame.math import Vector2
+
 
 class DashedLine:
     offset = 0
 
     @staticmethod
     def draw(screen, start_pos, end_pos, dash_length, color, width=1):
-        start_pos = Vector2(start_pos)
-        end_pos = Vector2(end_pos)
+        start_pos = Vector2D(start_pos[0], start_pos[1])
+        end_pos = Vector2D(end_pos[0], end_pos[1])
         delta = end_pos - start_pos
-        length = delta.length()
+        length = delta.__abs__()
         dash_count = int(math.floor(length / dash_length))
         
         # Offset the starting point

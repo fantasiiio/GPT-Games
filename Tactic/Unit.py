@@ -110,6 +110,15 @@ class Unit:
             elif action[0] == "Fire":
                 DashedLine.draw(self.screen, (from_screen_pos[0], from_screen_pos[1]), (to_scrren_pos[0], to_scrren_pos[1]), 20, (255,0,0), 3)
 
+    def execute_next_action(self):
+        next_action = None if len(self.planned_actions)==0 else self.planned_actions.pop(0)
+        if next_action is None:
+            return
+        if next_action[0] == "Move":
+            self.move(next_action[1])
+        elif next_action[0] == "Fire":
+            self.fire(next_action[1])
+
     def get_stats(self):
         stats = {}
         stats["HP"] = self.health
@@ -245,6 +254,9 @@ class Unit:
                     self.planned_actions.append(("Move", tile))
                 else:
                     self.planned_actions.append(("Attack", tile))
+
+                self.dragging = False
+                self.place_on_tiles(self.tile)
 
                 self.action_finished(self)
 
