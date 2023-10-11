@@ -3,7 +3,7 @@ from Bullet import Bullet
 from Animation import Animation
 from Unit import Unit
 import math
-from config import GameState, get_unit_settings, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY, MAX_SQUARES_PER_ROW, SQUARE_SPACING, SQUARE_SIZE, BACKGROUND_COLOR, POINTS_COLOR, HEALTH_COLOR, STATUS_BAR_HEIGHT, STATUS_BAR_WIDTH
+from config import *
 import pygame
 
 
@@ -86,10 +86,10 @@ class BoatCanon:
 
 
 class Boat(Unit):
-    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Boat', screen=None, gun_sound_file="assets\\sounds\\machinegun2.wav", action_finished=None, id=None):
+    def __init__(self, target_tile, player, grid, base_folder=f"{base_path}\\assets\\images\\Boat", screen=None, gun_sound_file=f"{base_path}\\assets\\sounds\\machinegun2.wav", action_finished=None, id=None):
         super().__init__(target_tile, player, grid, base_folder, screen, "Boat", action_finished, id = id)
-        self.engine_sound = pygame.mixer.Sound("assets\\sounds\\BoatEngine.wav")
-        self.explosion_sound = pygame.mixer.Sound("assets\\sounds\\explosion 2.wav")
+        self.engine_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\BoatEngine.wav")
+        self.explosion_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\explosion 2.wav")
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
 
         self.actions = {"Move To", "Fire", "Get Out"}
@@ -122,7 +122,7 @@ class Boat(Unit):
 
 
     def load_animations(self, base_folder):
-        self.animations["Idle"] = Animation(self.screen,base_folder,"Boat_base_", "Idle", -1, self.offset, 90, frame_duration = 300, outline_image="assets\\images\\Boat\\boat.png")
+        self.animations["Idle"] = Animation(self.screen,base_folder,"Boat_base_", "Idle", -1, self.offset, 90, frame_duration = 300, outline_image=f"{base_path}\\assets\\images\\Boat\\boat.png")
         self.animations["Broken"] = Animation(self.screen,base_folder,"Boat", "Broken", -1, self.offset, 90)
-        self.explosion_animation = Animation(self.screen, "assets\\images\\Effects","Explosion_", "1", 0, self.offset, 0, frame_duration=25) 
+        self.explosion_animation = Animation(self.screen, f"{base_path}\\assets\\images\\Effects","Explosion_", "1", 0, self.offset, 0, frame_duration=25) 
         self.animations["Idle"].play()

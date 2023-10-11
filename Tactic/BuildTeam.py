@@ -4,8 +4,8 @@ from queue import Queue
 from Connection import Connection
 import pygame
 from pygame.locals import QUIT, MOUSEBUTTONUP
-from GraphicUI import UIPanel, UIButton,UIImage, UILabel, UITextBox
-from config import unitSettings
+from GraphicUI import UIContainer, UIButton,UIImage, UILabel, UITextBox
+from config import *
 from rectpack import newPacker, PackingMode, SORT_AREA
 from rectpack.maxrects import MaxRectsBl
 import math
@@ -39,22 +39,23 @@ class PlayerLight:
     def __init__(self):
         self.name = None
         self.is_ready = False
-        self.guid = None
         self.load_player_data()
 
     def load_player_data(self):
+        pass
         # Generate or retrieve player UUID
-        try:
-            with open("player.json", "r") as f:
-                player_uuid = json.load(f)["uuid"]
-        except FileNotFoundError:
-            player_uuid = str(uuid.uuid4())
-            with open("player.json", "w") as f:
-                json.dump({"uuid": player_uuid}, f)
+        # try:
+        #     with open(f"{base_path}\\data\\player.json", "r") as f:
+        #         player_uuid = json.load(f)["uuid"]
+        # except FileNotFoundError:
+        #     player_uuid = str(uuid.uuid4())
+        #     with open(f"{base_path}\\data\\player.json", "w") as f:
+        #         json.dump({"uuid": player_uuid}, f)
 
     def update(self):
-        with open("player.json", "w") as f:
-            json.dump({"uuid": self.guid}, f)        
+        pass
+        # with open(f"{base_path}\\data\\player.json", "w") as f:
+        #     json.dump({"uuid": self.guid}, f)        
 
 class TeamBuilder:
     
@@ -102,40 +103,40 @@ class TeamBuilder:
         }
 
         self.border_size = 12
-        self.units_panel_height = 400
-        self.units_panel_width = 800
-        self.team_panel_height = 500
+        self.units_container_height = 400
+        self.units_container_width = 800
+        self.team_container_height = 500
 
         self.button_width = 200
-        self.top_panel = UIPanel(0, 0, self.screen_width, 70, border_size=self.border_size)
-        self.team_label =  UILabel(0, 5, f"Team Name:", self.top_panel, font_size=60)
+        self.top_container = UIContainer(0, 0, self.screen_width, 70, border_size=self.border_size)
+        self.team_label =  UILabel(0, 5, f"Team Name:", self.top_container, font_size=60)
         self.team_label.rect.x = self.screen_width / 2 - self.team_label.rect.width / 2
         self.team_label.rect.x -= 200
-        self.top_panel.add_element(self.team_label)
-        self.player_name_txt = UITextBox(self.team_label.rect.right + 10, 5, 400, 60, "", image="assets\\UI\\PanelElement02.png", border_size=7, font_size=60, end_edit_callback=self.player_name_changed)
-        self.top_panel.add_element(self.player_name_txt)
+        self.top_container.add_element(self.team_label)
+        self.player_name_txt = UITextBox(self.team_label.rect.right + 10, 5, 400, 60, "", image=f"{base_path}\\assets\\UI\\panelElement02.png", border_size=7, font_size=60, end_edit_callback=self.player_name_changed)
+        self.top_container.add_element(self.player_name_txt)
 
 
-        self.units_panel = UIPanel(20, self.top_panel.rect.bottom, self.units_panel_width, self.units_panel_height, image="assets\\UI\\panel.png", border_size=self.border_size)
-        self.team_panel = UIPanel(20, self.units_panel.rect.bottom, self.units_panel_width, self.team_panel_height, image="assets\\UI\\panel.png", border_size=self.border_size)
-        self.info_panel = UIPanel(self.units_panel_width+15, self.top_panel.rect.bottom, self.MAIN_WIDTH-self.units_panel_width - 40, self.units_panel_height, image="assets\\UI\\panel.png", border_size=self.border_size)
-        self.unit_properties_panel = UIPanel(self.team_panel.rect.right, self.team_panel.rect.top, self.MAIN_WIDTH - self.team_panel.rect.right - 25, self.team_panel.rect.height, image="assets\\UI\\panel.png", border_size=self.border_size)
-        self.finish_button = UIButton(self.unit_properties_panel.rect.right - self.button_width, self.team_panel.rect.bottom + 5, self.button_width, 50, "Finish", font_size=40, callback=self.button_callback, image="assets\\UI\\Box03.png", border_size=23)
+        self.units_container = UIContainer(20, self.top_container.rect.bottom, self.units_container_width, self.units_container_height, image=f"{base_path}\\assets\\UI\\panel.png", border_size=self.border_size)
+        self.team_container = UIContainer(20, self.units_container.rect.bottom, self.units_container_width, self.team_container_height, image=f"{base_path}\\assets\\UI\\panel.png", border_size=self.border_size)
+        self.info_container = UIContainer(self.units_container_width+15, self.top_container.rect.bottom, self.MAIN_WIDTH-self.units_container_width - 40, self.units_container_height, image=f"{base_path}\\assets\\UI\\panel.png", border_size=self.border_size)
+        self.unit_properties_container = UIContainer(self.team_container.rect.right, self.team_container.rect.top, self.MAIN_WIDTH - self.team_container.rect.right - 25, self.team_container.rect.height, image=f"{base_path}\\assets\\UI\\panel.png", border_size=self.border_size)
+        self.finish_button = UIButton(self.unit_properties_container.rect.right - self.button_width, self.team_container.rect.bottom + 5, self.button_width, 50, "Finish", font_size=40, callback=self.button_callback, image=f"{base_path}\\assets\\UI\\Box03.png", border_size=23)
         remind_text = "Don't forget to add a driver and a gunner for each vehicle" 
-        remind_text_image =  self.add_text(self.team_panel, remind_text, (20, 20), font_size=30)
-        remind_text_image.rect.bottom = self.team_panel.rect.bottom - 40
+        remind_text_image =  self.add_text(self.team_container, remind_text, (20, 20), font_size=30)
+        remind_text_image.rect.bottom = self.team_container.rect.bottom - 40
         
         self.network_status_label = UILabel(self.finish_button.rect.left -200, self.finish_button.rect.top, "", font_size=30)
-        self.main_panel = UIPanel(self.screen_width / 2 - self.MAIN_WIDTH / 2, self.screen_height / 2 - self.MAIN_HEIGHT / 2, self.MAIN_WIDTH, self.MAIN_HEIGHT, image=None, border_size=self.border_size)
-        self.main_panel.add_element(self.units_panel)
-        self.main_panel.add_element(self.team_panel)
-        self.main_panel.add_element(self.info_panel)
-        self.main_panel.add_element(self.unit_properties_panel)
-        self.main_panel.add_element(self.finish_button)
-        self.main_panel.add_element(self.network_status_label)
-        self.main_panel.add_element(self.top_panel)
+        self.main_container = UIContainer(self.screen_width / 2 - self.MAIN_WIDTH / 2, self.screen_height / 2 - self.MAIN_HEIGHT / 2, self.MAIN_WIDTH, self.MAIN_HEIGHT, image=None, border_size=self.border_size)
+        self.main_container.add_element(self.units_container)
+        self.main_container.add_element(self.team_container)
+        self.main_container.add_element(self.info_container)
+        self.main_container.add_element(self.unit_properties_container)
+        self.main_container.add_element(self.finish_button)
+        self.main_container.add_element(self.network_status_label)
+        self.main_container.add_element(self.top_container)
 
-        self.container = (self.team_panel.rect.width - self.border_size*2, self.team_panel.rect.height - self.border_size*2)
+        self.container = (self.team_container.rect.width - self.border_size*2, self.team_container.rect.height - self.border_size*2)
         self.packer = newPacker(mode=PackingMode.Offline, pack_algo=MaxRectsBl, sort_algo=SORT_AREA, rotation=False)
         self.packer.add_bin(*self.container)
 
@@ -177,27 +178,27 @@ class TeamBuilder:
         # Populate units
         self.populate_units()
         self.player_dict = {}
-        self.init_network()
+        #self.init_network()
 
     def player_name_changed(self, text):        
         self.player_light.name = text
         if self.client_conn.match:
             self.client_conn.match.broadcast_command("player_name", {"player": self.guid, "name": text})
 
-    def listen_for_messages(self, connection):
-        while connection.is_connected:
-            command_type, data = connection.receive_command()
-            self.incoming_messages.put((command_type, data))
+    # def listen_for_messages(self, connection):
+    #     while connection.is_connected:
+    #         command_type, data = connection.receive_command()
+    #         self.incoming_messages.put((command_type, data))
 
-    def init_network(self):
-        self.client_conn = Connection(use_singleton=True)._instance
-        self.player_dict[self.client_conn] = PlayerLight()
-        self.player_light = self.player_dict[self.client_conn]
-        self.incoming_messages = Queue()
-        # Create a new thread for listening to messages
-        listener_thread = threading.Thread(target=self.listen_for_messages, args=(self.client_conn,))
-        listener_thread.daemon = True
-        listener_thread.start()        
+    # def init_network(self):
+    #     self.client_conn = Connection(use_singleton=True)._instance
+    #     self.player_dict[self.client_conn] = PlayerLight()
+    #     self.player_light = self.player_dict[self.client_conn]
+    #     self.incoming_messages = Queue()
+    #     # Create a new thread for listening to messages
+    #     listener_thread = threading.Thread(target=self.listen_for_messages, args=(self.client_conn,))
+    #     listener_thread.daemon = True
+    #     listener_thread.start()        
 
     def update_network_status(self):
         connection = Connection(use_singleton=True)._instance
@@ -254,12 +255,12 @@ class TeamBuilder:
             self.screen_width = screen.get_width()
             self.screen_height = screen.get_height()  
 
-    def add_text(self, panel, text, pos, font_size=20):
+    def add_text(self, container, text, pos, font_size=20):
         font = pygame.font.Font(None, font_size)        
         text_surface = font.render(f"{text}", True, (255, 255, 255))
         self.info_text_image = UIImage(pos[0],pos[1], None)
         self.info_text_image.image = text_surface
-        panel.add_element(self.info_text_image)
+        container.add_element(self.info_text_image)
         return self.info_text_image
 
     def generate_id(self):
@@ -293,13 +294,13 @@ class TeamBuilder:
 
             current_x += img.image.get_width() + self.offsets[setting_name][0] + padding_x
 
-            self.units_panel.add_element(img)
-            self.units_panel.add_element(text_image)
+            self.units_container.add_element(img)
+            self.units_container.add_element(text_image)
         
 
     def get_selected_team(self):
         selected_team = []
-        for element in self.team_panel.elements:
+        for element in self.team_container.elements:
             if isinstance(element, UIImage):
                 if not element.id:
                     continue
@@ -318,50 +319,56 @@ class TeamBuilder:
             self.player_dict[data["player"]] = data["name"]
 
 
+    def run_frame(self, events_list):
+        # if self.client_conn.is_connected:
+        #     while not self.incoming_messages.empty():
+        #         command_type, data = self.incoming_messages.get()   
+        #         self.process_command(command_type, data)     
+        # Background
+        self.vertical_gradient(self.screen, (100, 100, 100), (50, 50, 50))  
+        self.main_container.draw(self.screen)
+
+        events_list = pygame.event.get() if events_list is None else events_list
+        for event in events_list:
+            self.main_container.handle_event(event)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.on_mouse_down(event)
+            if event.type == pygame.MOUSEMOTION:
+                self.on_mouse_move(event)
+            if event.type == pygame.MOUSEBUTTONUP:
+                self.on_mouse_up(event)
+            if event.type == pygame.QUIT:
+                self.running = False
+            
+        selected_team_outline = None
+        if self.selected_team_unit:
+            selected_team_outline = self.get_outline(self.selected_team_unit.image, (0, 255, 0), 1)
+
+        if selected_team_outline:
+            self.screen.blit(selected_team_outline, self.selected_team_unit.rect)
+
+        if self.team_outline and self.team_unit_over != self.selected_team_unit:
+            self.screen.blit(self.team_outline, self.team_unit_over.rect)
+        if self.outline:
+            self.screen.blit(self.outline, self.unit_over.rect)
+        if self.dragged_unit:
+            self.dragged_unit.draw(self.screen)
+
+        self.cash_manager.update()
+        self.main_container.draw(self.screen)
+        self.update_network_status()
+        # Update cash
+        current_cash = self.cash_manager.get_cash()
+        self.draw_text(self.screen, f"Cash: {int(current_cash)}", (self.team_container.rect.right + 20, self.team_container.rect.y + 20), 60)
+        return self.get_selected_team()
+
+
     def run(self):
         
         self.running = True
         
         while self.running:
-            if self.client_conn.is_connected:
-                while not self.incoming_messages.empty():
-                    command_type, data = self.incoming_messages.get()   
-                    self.process_command(command_type, data)     
-            # Background
-            self.vertical_gradient(self.screen, (100, 100, 100), (50, 50, 50))  
-            self.main_panel.draw(self.screen)
-
-            for event in pygame.event.get():
-                self.main_panel.handle_event(event)
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    self.on_mouse_down(event)
-                if event.type == pygame.MOUSEMOTION:
-                    self.on_mouse_move(event)
-                if event.type == pygame.MOUSEBUTTONUP:
-                    self.on_mouse_up(event)
-                if event.type == pygame.QUIT:
-                    self.running = False
-
-            selected_team_outline = None
-            if self.selected_team_unit:
-                selected_team_outline = self.get_outline(self.selected_team_unit.image, (0, 255, 0), 1)
-
-            if selected_team_outline:
-                self.screen.blit(selected_team_outline, self.selected_team_unit.rect)
-
-            if self.team_outline and self.team_unit_over != self.selected_team_unit:
-                self.screen.blit(self.team_outline, self.team_unit_over.rect)
-            if self.outline:
-                self.screen.blit(self.outline, self.unit_over.rect)
-            if self.dragged_unit:
-                self.dragged_unit.draw(self.screen)
-            
-            self.update_network_status()
-            # Update cash
-            self.cash_manager.update()
-            current_cash = self.cash_manager.get_cash()
-            self.draw_text(self.screen, f"Cash: {int(current_cash)}", (self.team_panel.rect.right + 20, self.team_panel.rect.y + 20), 60)
-            
+            self.run_frame(None)
             pygame.display.flip()
             self.clock.tick(60)
         
@@ -370,7 +377,7 @@ class TeamBuilder:
         return self.get_selected_team()
 
     def on_mouse_down(self, event):
-        unit = self.mouse_is_over(self.units_panel, event.pos)
+        unit = self.mouse_is_over(self.units_container, event.pos)
         if unit:
             self.dragging = True
             setting = unitSettings[unit.id]
@@ -405,7 +412,7 @@ class TeamBuilder:
                 self.team_dragged_unit.rect.x = event.pos[0] - self.drag_offset_x
                 self.team_dragged_unit.rect.y = event.pos[1] - self.drag_offset_y
         else:
-            unit = self.mouse_is_over(self.units_panel, event.pos)
+            unit = self.mouse_is_over(self.units_container, event.pos)
             self.team_unit = self.mouse_is_over_team(event.pos)
 
         if self.team_unit:
@@ -418,15 +425,15 @@ class TeamBuilder:
 
         if unit:
             if self.unit_over != unit:
-                if self.info_text_image in self.info_panel.elements:
-                    self.info_panel.elements.clear()
+                if self.info_text_image in self.info_container.elements:
+                    self.info_container.elements.clear()
                 self.unit_over = unit
-                self.write_infos(self.info_panel.rect, self.unit_over)
+                self.write_infos(self.info_container.rect, self.unit_over)
             self.outline = self.get_outline(self.unit_over.image, (255, 255, 255), 1)
         else: 
-            if self.info_text_image in self.info_panel.elements:
+            if self.info_text_image in self.info_container.elements:
                 self.unit_over = None
-                self.info_panel.elements.clear()            
+                self.info_container.elements.clear()            
 
 
 
@@ -434,18 +441,18 @@ class TeamBuilder:
         pass
 
     def clear_team_unit_properties(self):
-        self.unit_properties_panel.elements.clear()
+        self.unit_properties_container.elements.clear()
 
     def on_mouse_up(self, event):
-        if self.dragged_unit and self.team_panel.rect.collidepoint(event.pos):
+        if self.dragged_unit and self.team_container.rect.collidepoint(event.pos):
             self.buy_unit(self.dragged_unit)
             self.dragged_unit = None
             self.dragging = False
         elif self.team_dragged_unit:
-            if self.units_panel.rect.collidepoint(event.pos):
-                self.team_panel.remove_element(self.team_dragged_unit)
+            if self.units_container.rect.collidepoint(event.pos):
+                self.team_container.remove_element(self.team_dragged_unit)
                 self.remove_from_packer(self.team_dragged_unit)
-                self.update_team_panel()
+                self.update_team_container()
                 unit_type = self.get_unit_type(self.team_dragged_unit.id)
                 setting = unitSettings[unit_type]
                 cost = setting["Purchase Cost"]
@@ -549,14 +556,14 @@ class TeamBuilder:
         text_surface = font.render(f"{wrapped_text}", True, (255, 255, 255))
         self.info_text_image = UIImage(20,60, None)
         self.info_text_image.image = text_surface
-        self.info_panel.add_element(self.info_text_image)
-        self.info_panel.add_element(text_unit_type_image)
+        self.info_container.add_element(self.info_text_image)
+        self.info_container.add_element(text_unit_type_image)
         
 
-    def mouse_is_over(self, panel, mouse_pos):
+    def mouse_is_over(self, container, mouse_pos):
         pos = mouse_pos[0], mouse_pos[1]
-        for i in range(len(panel.elements)-1, -1, -1):
-            element = panel.elements[i]
+        for i in range(len(container.elements)-1, -1, -1):
+            element = container.elements[i]
             if isinstance(element, UIImage):
                 collide = element.rect.collidepoint(pos)
                 if collide:
@@ -569,13 +576,13 @@ class TeamBuilder:
             return None
         # Check rects in packed order
         for b, rx, ry, rw, rh, rid in self.all_rects:
-            unit = self.find_item_by_id(self.team_panel, rid)
+            unit = self.find_item_by_id(self.team_container, rid)
             if unit:
                 rect = unit.bounding_rect.copy()                
                 rect.x += 20 + rx
                 rect.y += 20 + ry
-                rect.x += self.team_panel.rect.x
-                rect.y += self.team_panel.rect.y
+                rect.x += self.team_container.rect.x
+                rect.y += self.team_container.rect.y
                 rect.x += unit.parent.border_size
                 rect.y += unit.parent.border_size        
                 rect.x -= unit.bounding_rect.x
@@ -586,22 +593,22 @@ class TeamBuilder:
 
         return None    
     
-    def find_item_by_id(self, panel, id):
-        for i in range(len(panel.elements)-1, -1, -1):
-            element = panel.elements[i]
+    def find_item_by_id(self, container, id):
+        for i in range(len(container.elements)-1, -1, -1):
+            element = container.elements[i]
             if element.id == id:
                 return element
         return None
         
-    def update_team_panel(self):
+    def update_team_container(self):
         self.packer.pack()
         self.all_rects = self.packer.rect_list()
         for (b, x, y, w, h, rid) in self.all_rects:
-            unit = self.find_item_by_id(self.team_panel, rid)
+            unit = self.find_item_by_id(self.team_container, rid)
             if unit:
                 unit.rect.x = x + 20
                 unit.rect.y = y + 20
-                unit.set_parent(self.team_panel)
+                unit.set_parent(self.team_container)
                 
     def buy_unit(self, unit):
         unit_type = self.get_unit_type(unit.id)
@@ -620,10 +627,10 @@ class TeamBuilder:
             unit.rect.y = 40 + self.offsets[unit_type][1]
 
 
-        self.team_panel.add_element(unit)
+        self.team_container.add_element(unit)
 
         self.packer.add_rect(max(unit.bounding_rect.width, 50) + 10, unit.bounding_rect.height, rid=unit.id)
-        self.update_team_panel()
+        self.update_team_container()
 
         return True
         

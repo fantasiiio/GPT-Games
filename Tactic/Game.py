@@ -5,13 +5,13 @@ from Tank import Tank
 from Boat import Boat
 import random
 import pygame
-from GraphicUI import UIPanel, UIButton,UIImage, UILabel,UIList
+from GraphicUI import UIContainer, UIButton,UIImage, UILabel,UIList
 #import pygame_gui
 import sys
 from grid import Grid
 from Player import Player
 import pygame.mixer
-from config import GameStateString, screen, GRAY, GameState
+from config import *
 from Inputs import Inputs
 from MusicPlayer import MusicPlayer
 from Item import Item
@@ -34,22 +34,22 @@ class StrategyGame:
         self.selected_team[2] = selected_team2
         pygame.display.set_caption('Strategy Game')
         #self.manager = pygame_gui.UIManager((self.grid.grid_width, self.grid.grid_height))
-        self.grid = Grid(pygame, self.screen, "assets\\maps\\terrain2.tmx")
+        self.grid = Grid(pygame, self.screen, f"{base_path}\\assets\\maps\\terrain2.tmx")
         self.item_list = []
-        self.coin_animation = Animation(self.screen, "assets\\images","", "Coin", -1, (32,32), 0, frame_duration=100) 
+        self.coin_animation = Animation(self.screen, f"{base_path}\\assets\\images","", "Coin", -1, (32,32), 0, frame_duration=100) 
 
         self.item_list.append(Item(self.screen, self.grid, "coin", self.grid.tiles[4][4], self.coin_animation))
         self.players = {1: Player(1, True), 2: PlayerAI(2, self.grid, self.end_turn_button_clicked, self.selected_team, self.screen)}
         self.players[1].enemy = self.players[2]
         self.players[2].enemy = self.players[1]
-        self.music_folder = 'assets\\music'
+        self.music_folder = f"{base_path}\\assets\\music"
         self.music_player = MusicPlayer(self.music_folder)
-        self.whoosh_sound = pygame.mixer.Sound("assets\\sounds\\silence.wav")
-        #self.whoosh_sound = pygame.mixer.Sound("assets\\sounds\\start.wav")
-        self.event_good_sound = pygame.mixer.Sound("assets\\sounds\\event_good.wav")
-        self.event_bad_sound = pygame.mixer.Sound("assets\\sounds\\event_bad.wav")
-        self.stump_sound = pygame.mixer.Sound("assets\\sounds\\stomp.wav")
-        self.green_check_image = pygame.image.load("assets\\UI\\green_check.png")
+        self.whoosh_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\silence.wav")
+        #self.whoosh_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\start.wav")
+        self.event_good_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\event_good.wav")
+        self.event_bad_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\event_bad.wav")
+        self.stump_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\stomp.wav")
+        self.green_check_image = pygame.image.load(f"{base_path}\\assets\\UI\\green_check.png")
         self.inputs = Inputs()
         self.inputs.update()
         if self.inputs.mouse.clicked[0]: 
@@ -70,9 +70,9 @@ class StrategyGame:
         self.game_state = None
         self.change_state()
         self.random_event = None
-        # Create a new panel for queue list
+        # Create a new container for queue list
         self.unit_queue = []
-        self.queue_panel = None
+        self.queue_container = None
         self.queue_label = None
         self.can_do_action_units = []
         # if not init_pygame:
@@ -164,16 +164,16 @@ class StrategyGame:
     def update_state_label(self):
         if self.game_state:
             self.state_label.set_text(f"{GameStateString[self.game_state.name]}")
-            self.state_label.rect.x = self.ui_panel.rect.width / 2 - self.state_label.rect.width / 2
+            self.state_label.rect.x = self.ui_container.rect.width / 2 - self.state_label.rect.width / 2
             if self.game_state == GameState.RANDOM_EVENT and self.random_event:
                 self.state_label2.set_text(f"{self.random_event['name']}: {self.random_event['description']}")
-                self.state_label2.rect.x = self.ui_panel.rect.width / 2 - self.state_label2.rect.width / 2
+                self.state_label2.rect.x = self.ui_container.rect.width / 2 - self.state_label2.rect.width / 2
             
             else:
                 self.state_label2.set_text(f"Player {self.current_player}")
-                self.state_label2.rect.x = self.ui_panel.rect.width / 2 - self.state_label2.rect.width / 2
+                self.state_label2.rect.x = self.ui_container.rect.width / 2 - self.state_label2.rect.width / 2
 
-    def update_stats_panel(self):
+    def update_stats_container(self):
 
         if self.grid.selected_tile and self.grid.selected_tile.unit:
             unit = self.grid.selected_tile.unit
@@ -183,43 +183,43 @@ class StrategyGame:
             self.unit_info_label.set_text("")
 
     def init_ui(self):
-        # Create UI panel
-        self.ui_panel = UIPanel(0, 0, self.screen.get_width(), 100, color=(0,0,0))
+        # Create UI container
+        self.ui_container = UIContainer(0, 0, self.screen.get_width(), 100, color=(0,0,0))
         
         # Create labels
-        self.state_label = UILabel(10, 10, "", self.ui_panel, font_size=60)
-        self.state_label2 = UILabel(10, 60, "", self.ui_panel, font_size=40)
+        self.state_label = UILabel(10, 10, "", self.ui_container, font_size=60)
+        self.state_label2 = UILabel(10, 60, "", self.ui_container, font_size=40)
         self.update_state_label()
 
         # Create button  
         self.end_turn_button = UIButton(0, 10, 200, 60, 
-            "End Turn", parent=self.ui_panel,image="assets\\UI\\Box03.png", font_size=40, callback=self.end_turn_button_clicked)
+            "End Turn", parent=self.ui_container,image=f"{base_path}\\assets\\UI\\Box03.png", font_size=40, callback=self.end_turn_button_clicked)
         
         self.end_turn_button.rect.right = self.screen.get_width() - 10
         self.end_turn_button.rect.bottom = self.screen.get_height() - 10
         self.end_turn_button.enabled = True
 
-        self.ui_panel.add_element(self.state_label)
-        self.ui_panel.add_element(self.state_label2)
-        self.ui_panel.add_element(self.end_turn_button)
+        self.ui_container.add_element(self.state_label)
+        self.ui_container.add_element(self.state_label2)
+        self.ui_container.add_element(self.end_turn_button)
 
-        panel_width = 240
-        self.stats_panel = UIPanel(self.screen_width-250, self.ui_panel.rect.bottom + 10, panel_width, 200, color=(0,0,0))
+        container_width = 240
+        self.stats_container = UIContainer(self.screen_width-250, self.ui_container.rect.bottom + 10, container_width, 200, color=(0,0,0))
         self.unit_info_label = UILabel(10, 10, "", font_size=30)
-        self.stats_panel.add_element(self.unit_info_label)
+        self.stats_container.add_element(self.unit_info_label)
 
-        rect = self.stats_panel.rect
-        self.queue_panel = UIPanel(rect.left, rect.bottom + 20, panel_width, 300, color=(0,0,0))
+        rect = self.stats_container.rect
+        self.queue_container = UIContainer(rect.left, rect.bottom + 20, container_width, 300, color=(0,0,0))
         # self.queue_label = UILabel(10, 10, "", font_size=30)
-        # self.queue_panel.add_element(self.queue_label)
+        # self.queue_container.add_element(self.queue_label)
 
-        self.queue_list = UIList(rect.left, rect.bottom + 20, panel_width, 200, item_selected_callback = self.item_selected_callback)
+        self.queue_list = UIList(rect.left, rect.bottom + 20, container_width, 200, item_selected_callback = self.item_selected_callback)
         index = 1
         for unit in self.selected_team[1]:
             self.queue_list.add_item(f"{index}-{unit}", self.green_check_image, id = index)
             index+= 1
 
-        self.queue_panel.add_element(self.queue_list)
+        self.queue_container.add_element(self.queue_list)
 
     def item_selected_callback(self, item):
         print(item)
@@ -441,11 +441,11 @@ class StrategyGame:
                 if event.type == pygame.QUIT:
                     running = False
 
-                self.ui_panel.handle_event(event)
-                self.queue_panel.handle_event(event)
+                self.ui_container.handle_event(event)
+                self.queue_container.handle_event(event)
                 mini_game_events.append(event)
 
-            self.grid.mouse_over_UI = self.queue_panel.rect.collidepoint(self.inputs.mouse.pos) or self.end_turn_button.rect.collidepoint(self.inputs.mouse.pos)
+            self.grid.mouse_over_UI = self.queue_container.rect.collidepoint(self.inputs.mouse.pos) or self.end_turn_button.rect.collidepoint(self.inputs.mouse.pos)
 
             self.grid.update_camera()
             self.grid.update(self.inputs)
@@ -467,12 +467,12 @@ class StrategyGame:
                     unit.update(self.inputs)
                     unit.draw()
 
-            self.ui_panel.draw(self.screen)
-            self.update_stats_panel()
-            #self.update_queue_panel()
-            self.queue_panel.draw(self.screen)
+            self.ui_container.draw(self.screen)
+            self.update_stats_container()
+            #self.update_queue_container()
+            self.queue_container.draw(self.screen)
             if self.grid.selected_tile and self.grid.selected_tile.unit:            
-                self.stats_panel.draw(self.screen)
+                self.stats_container.draw(self.screen)
 
             if self.playing_mini_game:
                 mini_game_running, self.mini_game_score[self.current_player] = self.mini_game.draw_game()

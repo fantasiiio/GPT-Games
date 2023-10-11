@@ -3,7 +3,7 @@ from Helicopter import Helicopter
 from Soldier import Soldier
 from Tank import Tank
 from Boat import Boat
-from config import GameState
+from config import *
 import random
 
 class PlayerAI(Player):
@@ -65,6 +65,69 @@ class PlayerAI(Player):
         elif self.game_state == GameState.EXECUTION:
             self.ready = True
             self.end_turn_clicked(None)
+
+    def build_team_with_support(budget=2000, buy_unit_func=None):
+        team = []
+        remaining_budget = budget
+        
+        # List of unit types for easier random selection
+        unit_types = list(unitSettings.keys())
+        id = 0
+        # Initially add a couple of medics and mechanics if possible
+        for support_type in ["Soldier-Medic", "Soldier-Mecano"]:
+            unit_id = f"{support_type}-{id}"
+            new_unit = {unit_id: unit_id}
+            setting = unitSettings[support_type]
+            cost = setting["Purchase Cost"]            
+            if cost * 2 <= remaining_budget:  # Checking if we can add two of them
+                support_unit = buy_unit_func(new_unit)
+                team.add_unit(support_unit)
+                team.add_unit(support_unit)
+                remaining_budget -= 2 * cost
+            id += 1
+        
+        while remaining_budget > 0:
+            affordable_units = [ut for ut in unit_types if unitSettings[ut]['Purchase Cost'] <= remaining_budget]
+            
+            # Exit loop if no more affordable units
+            if not affordable_units:
+                break
+            
+            # Randomly select an affordable unit type
+            selected_unit_type = choice(affordable_units)
+            
+            # Create the unit
+            new_unit = create_unit(selected_unit_type, unit_data_json)
+            
+            # Add the unit to the team
+            team.add_unit(new_unit)
+            
+            # Update the remaining budget
+            remaining_budget -= new_unit.purchase_cost
+            
+            # If the new unit is a vehicle, make sure there are at least 2 soldiers in the team for it to operate
+            if isinstance(new_unit, Vehicle) and not any(isinstance(unit, Soldier) for unit in team.units):
+                # Add two random soldier types to the team to accompany the vehicle
+                for _ in range(2):
+                    soldier_type = choice([u for u in unit_types if u.startswith("Soldier")])
+                    soldier_unit = create_unit(soldier_type, unit_data_json)
+                    
+                    # Make sure adding the soldier doesn't exceed the budget
+                    if soldier_unit.purchase_cost <= remaining_budget:
+                        team.add_unit(soldier_unit)
+                        remaining_budget -= soldier_unit.purchase_cost
+                    else:
+                        print(f"Could not add {soldier_type} due to budget constraints.")
+                            
+        return team
+
+    def play_AI_TeamBuilder(self, game_state):
+        self.game_state = game_state
+        if not self.ready:
+            self.ready = True
+            self.place_units(self.selected_team, 6, self.screen)            
+            self.end_turn_clicked(None)
+
 
     def place_units(self, team, max_distance=3, screen=None, end_turn_clicked=None):
         first_unit_placed = False

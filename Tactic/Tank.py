@@ -3,7 +3,7 @@ from Bullet import Bullet
 from Animation import Animation
 from Unit import Unit
 import math
-from config import GameState, get_unit_settings, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY, MAX_SQUARES_PER_ROW, SQUARE_SPACING, SQUARE_SIZE, BACKGROUND_COLOR, POINTS_COLOR, HEALTH_COLOR, STATUS_BAR_HEIGHT, STATUS_BAR_WIDTH
+from config import *
 import pygame
 import random
 
@@ -87,11 +87,11 @@ class TankTower:
 
 
 class Tank(Unit):
-    def __init__(self, target_tile, player, grid,  base_folder='assets\\images\\Tank', screen=None, gun_sound_file="assets\\sounds\\tank shots.wav", action_finished=None, id=None):
+    def __init__(self, target_tile, player, grid,  base_folder=f"{base_path}\\assets\\images\\Tank", screen=None, gun_sound_file=f"{base_path}\\assets\\sounds\\tank shots.wav", action_finished=None, id=None):
         super().__init__(target_tile, player, grid, base_folder, screen,"Tank", action_finished, id = id)
-        self.engine_sound = pygame.mixer.Sound("assets\\sounds\\tankEngine.wav")
-        self.bullet_explosion_sound = pygame.mixer.Sound("assets\\sounds\\explosion 1.wav")
-        self.explosion_sound = pygame.mixer.Sound("assets\\sounds\\explosion 2.wav")
+        self.engine_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\tankEngine.wav")
+        self.bullet_explosion_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\explosion 1.wav")
+        self.explosion_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\explosion 2.wav")
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)
 
         self.actions = {"Move To", "Fire", "Get Out"}
@@ -124,8 +124,8 @@ class Tank(Unit):
     def load_animations(self, base_folder):
         self.animations["Idle"] = Animation(self.screen,base_folder,"Tank_base_", "Idle", -1, self.offset, 90)
         self.bullet_image = Animation(self.screen,base_folder,"", "Bullet", -1, self.offset, 90) 
-        self.bullet_explosion_animation = Animation(self.screen, "assets\\images\\Effects","", "Explosion", 0, self.offset, 0, frame_duration=25) 
-        self.explosion_animation = Animation(self.screen, "assets\\images\\Effects","Explosion_", "1", 0, self.offset, 0, frame_duration=25) 
+        self.bullet_explosion_animation = Animation(self.screen, f"{base_path}\\assets\\images\\Effects","", "Explosion", 0, self.offset, 0, frame_duration=25) 
+        self.explosion_animation = Animation(self.screen, f"{base_path}\\assets\\images\\Effects","Explosion_", "1", 0, self.offset, 0, frame_duration=25) 
         #SpriteLayers.add_animation("top", self.explosion_animation) 
         #self.animations["Move"] = Animation(self.screen,base_folder,"Tank_base_", "Move", -1, self.offset, 90)
         self.animations["Broken"] = Animation(self.screen,base_folder,"Tank_base_", "Broken", 0, self.offset, 90)

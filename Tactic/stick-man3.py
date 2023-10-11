@@ -18,7 +18,7 @@ import pygame
 import socket
 import struct
 from Connection import Connection
-
+from config import *
 
 class HealthBar:
     def __init__(self, max_health, position, color=(0, 255, 0)):
@@ -983,7 +983,7 @@ class StickManGame:
         self.mouse_last_pos = Vector2D(0, 0)
         self.controling_stickman = self.stickman1
         self.time_punch_started = 0
-        self.punch_sound = pygame.mixer.Sound("assets\\\sounds\\sfx-punch2.mp3")
+        self.punch_sound = pygame.mixer.Sound(f"{base_path}\\assets\\\sounds\\sfx-punch2.mp3")
 
         # Create a queue to hold received data
         self.data_queue = queue.Queue()
@@ -1125,7 +1125,7 @@ class StickManGame:
             self.mouse_last_pos = mouse_position
             pygame.display.update()
             if self.client_conn is not None:
-                self.client_conn.send_data(
+                self.client_conn.send_command("client_data", "system", 
                     self.controling_stickman.serialize_positions_and_angles_with_timestamp(
                         handshake_time
                     )

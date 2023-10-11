@@ -35,6 +35,6 @@ def resize_to_nearest_64(folder_path, tile_path):
             blank_img.save(file_path)
 
 # Specify your directory path here
-directory_path = "assets\\maps\\Riverwood Assets"
+directory_path = f"{base_path}\\assets\\maps\\Riverwood Assets"
 tile_path = "C:\\dev-fg\\GPT-Games\\Tactic\\assets\\maps\\water (13).png"
 resize_to_nearest_64(directory_path, tile_path)

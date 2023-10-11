@@ -1,4 +1,4 @@
-from GraphicUI import UIPanel, UILabel
+from GraphicUI import UIContainer, UILabel
 import pygame
 
 
@@ -8,7 +8,7 @@ class Instructions:
         self.init_graphics(init_pygame, full_screen, screen, 1000, 1000)
 
         self.file_path = file_path
-        self.panel = UIPanel(0, 0, self.screen_width, self.screen_height, color=(50, 50, 50))
+        self.container = UIContainer(0, 0, self.screen_width, self.screen_height, color=(50, 50, 50))
         self.init_instructions()
 
     def read_md_file(self):
@@ -16,7 +16,7 @@ class Instructions:
             lines = f.readlines()
         return lines
 
-    def parse_md_to_panel(self):
+    def parse_md_to_container(self):
         lines = self.read_md_file()
         y_offset = 10  # Starting y-position for the first label
         for line in lines:
@@ -36,14 +36,14 @@ class Instructions:
 
             line = self.wrap_text_to_pixel_width(line, pygame.font.SysFont(None, font_size), self.screen_width - 60)            
                 
-            # Create a UILabel and add it to the panel
-            label = UILabel(10, y_offset, line, self.panel, font_size=font_size, text_color=text_color)
-            self.panel.add_element(label)
+            # Create a UILabel and add it to the container
+            label = UILabel(10, y_offset, line, self.container, font_size=font_size, text_color=text_color)
+            self.container.add_element(label)
             
             y_offset += label.rect.height + 10
 
     def init_instructions(self):
-        self.parse_md_to_panel()
+        self.parse_md_to_container()
 
     def init_graphics(self, init_pygame, full_screen, screen, width, height):
         self.init_pygame = init_pygame
@@ -100,17 +100,22 @@ class Instructions:
     def simulate_tab(self, text, tab_size=4):
         return text.replace("\t", " " * tab_size)            
 
+    def run_frame(self, events_list):
+        events_list = pygame.event.get() if events_list is None else events_list        
+        for event in events_list:
+            if event.type == pygame.QUIT:
+                running = False
+            self.container.handle_event(event)
+        
+        self.container.draw(self.screen)
+        pygame.display.flip()
+
+
     def run(self):
-        # Main game loop
-        running = True
-        while running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    running = False
-                self.panel.handle_event(event)
-            
-            self.panel.draw(self.screen)
-            pygame.display.flip()
+        self.running = True
+        while self.running:
+            self.run_frame()
+
 
 # Run the game
 if __name__ == "__main__":

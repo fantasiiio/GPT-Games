@@ -1,6 +1,11 @@
+import pygame
+import requests
+from io import BytesIO
 import json
 import random
 from enum import Enum
+
+base_path = "C:\\dev-fg\\GPT-Games\\Tactic"
 
 WHITE = (255, 255, 255)
 GRAY = (200, 200, 200)
@@ -22,9 +27,11 @@ BACKGROUND_COLOR = (200, 200, 200)  # Light gray for depleted sections
 SQUARE_SIZE = 5  # adjust based on preference
 SQUARE_SPACING = 1  # spacing between squares
 MAX_SQUARES_PER_ROW = 10 
-
+    
+redis_host = "redis-15293.c228.us-central1-1.gce.cloud.redislabs.com"
+redis_port = 15293
 unitSettings = None
-with open('unitSettings.json', 'r') as file:
+with open('C:\\dev-fg\\GPT-Games\\Tactic\\data\\unitSettings.json', 'r') as file:
     unitSettings = json.load(file)
 
 def speed_to_number(speed_str):
@@ -50,7 +57,7 @@ def get_unit_settings(unit_type):
     return unitSettings[unit_type]
 
 maleNames = None
-with open('names-male.json', 'r') as file:
+with open(f"{base_path}\\data\\names-male.json", 'r') as file:
     maleNames = json.load(file)
     if maleNames:
         maleNames = maleNames["data"]
@@ -66,9 +73,67 @@ GameStateString = {
     "OUTCOME": "Outcome"
 }
 
+def find_object_by_property(array, property_name, value):
+    for obj in array:
+        if getattr(obj, property_name, None) == value:
+            return obj
+    return None
+
+country_names = None
+with open(f"{base_path}\\data\\country-names.json", 'r') as file:
+    country_names = json.load(file)
+
+countries = None
+with open(f"{base_path}\\data\\countries.json", 'r') as file:
+    countries = json.load(file)
+    if countries and country_names:
+        for country in countries:
+            country_name = find_object_by_property(country_names, "let3",  country["alpha3"])
+            if country_name:
+                country["alpha2"] = country_name["let2"]
+
+def load_image_from_url(url):
+    response = requests.get(url)
+    if response.status_code == 200:  # Check if request was successful
+        image_data = BytesIO(response.content)
+        return pygame.image.load(image_data)
+    else:
+        print(f"Failed to load image from {url}. Status code: {response.status_code}")
+        return None
+image_cache = {}
+
+def get_country_image(alpha2, countries):
+    # Check if the image is already in the cache
+    if alpha2 in image_cache:
+        return image_cache[alpha2]
+
+    # Otherwise, load the image from the URL and store it in the cache
+    for country in countries:
+        if country["alpha2"] == alpha2:
+            image = load_image_from_url(country["image"])
+            if image:  # Store only if the image was successfully loaded
+                image_cache[alpha2] = image
+            return image
+        
+
 class GameState(Enum):
     UNIT_PLACEMENT = 1
     RANDOM_EVENT = 2
     PLANNING = 3
     EXECUTION = 4
     OUTCOME = 5
+
+# class GameStateTeamBuilder(Enum):
+#     UNIT_PLACEMENT = 1
+#     RANDOM_EVENT = 2
+#     PLANNING = 3
+#     EXECUTION = 4
+#     OUTCOME = 5    
+
+user_settings = None
+with open(f"{base_path}\\data\\player.json", 'r') as file:
+    user_settings = json.load(file)
+
+def save_user_settings():
+    with open(f"{base_path}\\data\\player.json", 'w') as file:
+        json.dump(user_settings, file, indent=4)

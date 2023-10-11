@@ -1,5 +1,6 @@
 import os
 from PIL import Image
+from config import *
 
 def read_grid_from_file(filename):
     grid = []
@@ -37,7 +38,7 @@ def save_merged_image(image, output_filename):
 def main():
     print(os.getcwd() )
     # Step 1: Read the grid from a file
-    grid_filename = "assets\\maps\\tilesNumbers.txt"
+    grid_filename = f"{base_path}\\assets\\maps\\tilesNumbers.txt"
     grid = read_grid_from_file(grid_filename)
 
     # Step 2: Stitch the images based on the grid
@@ -46,7 +47,7 @@ def main():
     merged_img = stitch_images(tiles_folder, base_filename, grid)
 
     # Step 3: Save the merged image
-    output_filename = "assets\\maps\\water.png"
+    output_filename = f"{base_path}\\assets\\maps\\water.png"
     save_merged_image(merged_img, output_filename)
     print(f"Merged image saved as {output_filename}!")
 

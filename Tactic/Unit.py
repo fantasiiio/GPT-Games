@@ -6,13 +6,13 @@ import math
 import pygame
 from Bullet import Bullet
 import pygame.mixer
-from config import GameState, get_unit_settings, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY, MAX_SQUARES_PER_ROW, SQUARE_SPACING, SQUARE_SIZE, BACKGROUND_COLOR, POINTS_COLOR, HEALTH_COLOR, STATUS_BAR_HEIGHT, STATUS_BAR_WIDTH
+from config import *
 
 class Unit:
 
     
-    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Gunner', screen=None, type=None, action_finished=None, id=None):
-        gun_sound_file="assets\\sounds\\machinegun.wav"
+    def __init__(self, target_tile, player, grid, base_folder=f"{base_path}\\assets\\images\\Gunner", screen=None, type=None, action_finished=None, id=None):
+        gun_sound_file=f"{base_path}\\assets\\sounds\\machinegun.wav"
         self.id = id
         self.action_finished = action_finished
         self.gun_sound = pygame.mixer.Sound(gun_sound_file)

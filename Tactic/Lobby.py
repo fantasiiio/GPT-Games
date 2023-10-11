@@ -1,6 +1,7 @@
 import pygame
 from Connection import Connection
-from GraphicUI import UIList, UIPanel, UIGridList, UILabel, UIProgressBar
+from GraphicUI import UIList, UIContainer, UILabel, UIProgressBar, UIButton, UICheckBox
+from config import *
 
 class Lobby():
     def __init__(self, init_pygame=True, full_screen=False, screen=None):
@@ -31,16 +32,20 @@ class Lobby():
 
     def init_UI(self):
         list_width = 400
-        #self.panel = UIPanel(600, 0, 400, 1000, "assets\\UI\\Box03.png", border_size=23)
-        self.list2 = UIGridList(500, 30, list_width, 200, 4, [20, 100, 50, 30], "assets\\UI\\Box03.png", border_size=23)
+        #self.container = UIContainer(600, 0, 400, 1000, f"{base_path}\\assets\\UI\\Box03.png", border_size=23)
+        self.list2 = UIList(10, 100, list_width, 200, image=f"{base_path}\\assets\\UI\\Box03.png", border_size=23, padding=7, num_columns=4, column_widths=[100, 150, 50, 50], headers=["Win/Loose', 'Name', 'Ping', 'Country'], header_height=40)
+        row_height = 30
         for i in range(20):
-            self.list2.add_grid_row([UILabel(0,0, "1", font_size=30),UILabel(0,0, f"Player {i}", font_size=30),UIProgressBar(0,0, 50, 15, 5),UILabel(0,0, "Canada", font_size=30)])
+            button1 = UIButton(20,0, 50, row_height, text="Invite")
+            checkbox = UICheckBox(0,0, 40, 40, image=f"{base_path}\\assets\\UI\\checkbox.png", icon=f"{base_path}\\assets\\UI\\green_check.png")
+            checkbox.checked = True
+            progress = UIProgressBar(0,0, 50, 15, 5, max_value=5)
+            progress.current_value = 3
+            name_label = UILabel(0,0, f"Player {i}", font_size=30)
+            self.list2.add_row([checkbox,name_label,progress, button1])
 
-        self.list = UIList(10, 30, list_width, 200, image="assets\\UI\\Box03.png", border_size=23, padding=7)
-        for i in range(10):
-            self.list.add_item(f"Player {i}")
 
-        #self.panel.add_element(list)
+        #self.container.add_element(list)
 
     def item_selected_callback(self, item):
         pass
@@ -60,14 +65,14 @@ class Lobby():
         
             self.list.handle_event(event)
             self.list2.handle_event(event)
-            #self.panel.handle_event(event)
+            #self.container.handle_event(event)
 
 
     def update(self):
         pass
         
     def render(self):
-        #self.panel.draw(self.screen)
+        #self.container.draw(self.screen)
         self.list.draw(self.screen)
         self.list2.draw(self.screen)
         pygame.display.flip()

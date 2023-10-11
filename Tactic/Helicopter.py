@@ -3,7 +3,7 @@ from Bullet import Bullet
 from Animation import Animation
 from Unit import Unit
 import math
-from config import GameState, get_unit_settings, TILE_SIZE, GRID_WIDTH, GRID_HEIGHT, TILES_X, TILES_Y, GRAY, MAX_SQUARES_PER_ROW, SQUARE_SPACING, SQUARE_SIZE, BACKGROUND_COLOR, POINTS_COLOR, HEALTH_COLOR, STATUS_BAR_HEIGHT, STATUS_BAR_WIDTH
+from config import *
 import pygame
 import random
 import time
@@ -85,11 +85,11 @@ class HelicopterBlades():
 
 
 class Helicopter(Unit):
-    def __init__(self, target_tile, player, grid, base_folder='assets\\images\\Helicopter', screen=None, gun_sound_file="assets\\sounds\\helicoptergun.wav", action_finished=None, id=None):
+    def __init__(self, target_tile, player, grid, base_folder=f"{base_path}\\assets\\images\\Helicopter", screen=None, gun_sound_file=f"{base_path}\\assets\\sounds\\helicoptergun.wav", action_finished=None, id=None):
         super().__init__(target_tile, player, grid, base_folder, screen, "Helicopter", action_finished, id = id)
-        self.engine_sound = pygame.mixer.Sound("assets\\sounds\\helicopterEngine.wav")
-        self.take_off_sound = pygame.mixer.Sound("assets\\sounds\\helicopterTakeOff.wav")
-        self.landing_sound = pygame.mixer.Sound("assets\\sounds\\helicopterLanding.wav")
+        self.engine_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\helicopterEngine.wav")
+        self.take_off_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\helicopterTakeOff.wav")
+        self.landing_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\helicopterLanding.wav")
 
         self.actions_ground = {"Get Out", "Take Off"}
         self.actions_altitude = {"Move To", "Fire", "Landing"}
@@ -140,8 +140,8 @@ class Helicopter(Unit):
     def load_animations(self, base_folder):
         self.animations["Idle"] = Animation(self.screen,base_folder,"Helicopter_base_", "Idle", 0, self.offset, 90)
         self.bullet_image = Animation(self.screen,base_folder,"", "Bullet", -1, self.offset, 90) 
-        self.bullet_explosion_animation = Animation(self.screen, "assets\\images\\Effects","", "Explosion", 0, self.offset, 0, frame_duration=25) 
-        self.explosion_animation = Animation(self.screen, "assets\\images\\Effects","Explosion_", "1", 0, self.offset, 0, frame_duration=25) 
+        self.bullet_explosion_animation = Animation(self.screen, f"{base_path}\\assets\\images\\Effects","", "Explosion", 0, self.offset, 0, frame_duration=25) 
+        self.explosion_animation = Animation(self.screen, f"{base_path}\\assets\\images\\Effects","Explosion_", "1", 0, self.offset, 0, frame_duration=25) 
         #self.animations["Broken"] = Animation(self.screen,base_folder,"Helicopter_base_", "Broken", 0, self.offset, 90)
 
     def take_off(self):

@@ -1,9 +1,9 @@
 import pygame
 from grid import Grid 
 from Inputs import Inputs
-from GraphicUI import UIPanel, UIButton,UIImage, UILabel
+from GraphicUI import UIContainer, UIButton,UIImage, UILabel
 from Tank import Tank
-
+from config import *
 
 class MainMenu:
     def __init__(self, init_pygame=True, full_screen=False, screen=None):
@@ -18,23 +18,24 @@ class MainMenu:
         pygame.display.set_caption('Strategy Game')
         
         self.inputs = Inputs()
-        self.panel_width = 240
-        self.panel_height = 350
-        self.grid = Grid(pygame, self.screen, "assets/maps/menu.tmx")
+        self.container_width = 240
+        self.container_height = 350
+        self.grid = Grid(pygame, self.screen, f"{base_path}\\assets\\maps\\menu.tmx")
         self.grid_offset = (-(self.grid.tiles_x*64)/2 + self.screen_width/2, 
                             -(self.grid.tiles_y*64)/2 + self.screen_height/2 + 64*2)
         
         self.grid.move(self.grid_offset[0], self.grid_offset[1])
         
-        self.menu_panel = UIPanel(self.screen_width/2 - self.panel_width/2, 120, 
-                             self.panel_width, self.panel_height, image="assets/UI/panel.png")
+        self.menu_container = UIContainer(self.screen_width/2 - self.container_width/2, 120, 
+                             self.container_width, self.container_height, image=f"{base_path}\\assets\\UI\\panel.png", padding = 20)
                              
 
-        self.top_panel = UIPanel(0, 0, 0, 0, color=(0,0,0))
-        font = pygame.font.Font('assets\\UI\\Army.ttf', 72)
+
+        self.top_container = UIContainer(0, 0, 0, 0, color=(0,0,0))
+        font = pygame.font.Font(f"{base_path}\\assets\\UI\\Army.ttf", 72)
         self.player_label = UILabel(10, 20, f"Battle Grid", font=font, text_color=(232,217,194), outline_width=1)
         self.player_label.rect.x = self.screen_width / 2 - self.player_label.rect.width / 2
-        self.top_panel.add_element(self.player_label)
+        self.top_container.add_element(self.player_label)
 
         self.create_buttons()
 
@@ -42,7 +43,7 @@ class MainMenu:
         self.tank.angle = 180
         self.tank.child.angle = 180
         
-        silence_sound = pygame.mixer.Sound("assets\\sounds\\silence.wav")
+        silence_sound = pygame.mixer.Sound(f"{base_path}\\assets\\sounds\\silence.wav")
         self.tank.max_action_points = 50
         self.tank.action_points = 50
         self.tank.action_points = 50
@@ -78,28 +79,31 @@ class MainMenu:
             self.screen_height = screen.get_height()   
 
     def create_buttons(self):
-            button_map = {
-                "Single Player": self.menu_clicked,
-                "Multi-Player": self.menu_clicked,
-                "Instructions": self.menu_clicked,
-                "Mini Game": self.menu_clicked,
-                "Quit": self.menu_clicked
-            }
+        button_map = {
+            "Single Player": self.menu_clicked,
+            "Multi-Player": self.menu_clicked,
+            "Instructions": self.menu_clicked,
+            "Mini Game": self.menu_clicked,
+            "Quit": self.menu_clicked
+        }
 
-            y_offset = 20  # Initial vertical offset
-            for label, callback in button_map.items():
-                button = UIButton(20, y_offset, 200, 50, label, 40, "assets\\UI\\Box03.png", border_size=23, callback=callback)
-                y_offset += 60  # Increment vertical offset for the next button
-                self.menu_panel.add_element(button)
+        y_offset = 20  # Initial vertical offset
+        for label, callback in button_map.items():
+            button = UIButton(20, y_offset, 200, 50, label, 40, f"{base_path}\\assets\\UI\\Box03.png", border_size=23, callback=callback)
+            y_offset += 60  # Increment vertical offset for the next button
+            self.menu_container.add_element(button)
+
+        self.menu_container.adjust_to_content()                
 
 
     def menu_clicked(self, button):
         self.running = False
         self.selected_menu_item = button.text
 
-    def handle_input(self):
-        for event in pygame.event.get():
-            self.menu_panel.handle_event(event)
+    def handle_input(self, events_list):
+        events_list = pygame.event.get() if events_list is None else events_list
+        for event in events_list:
+            self.menu_container.handle_event(event)
             if event.type == pygame.QUIT:
                 self.running = False
                 
@@ -118,19 +122,24 @@ class MainMenu:
         self.grid.update(self.inputs)
         self.tank.update(self.inputs)
         
-    def render(self):
+    def render(self, no_flip=False):
         self.screen.fill((60, 60, 60))  
         self.grid.draw_grid(self.inputs, False)
         self.tank.draw()
-        self.menu_panel.draw(self.screen)
-        self.top_panel.draw(self.screen)
-        pygame.display.flip()
+        self.menu_container.draw(self.screen)
+        self.top_container.draw(self.screen)
+        if not no_flip:
+            pygame.display.flip()
         
+    def run_frame(self, events_list=None):
+        self.handle_input(events_list)
+        self.update()
+        self.render(True)
+        return self.selected_menu_item
+    
     def run(self):
         while self.running:
-            self.handle_input()
-            self.update()
-            self.render()
+            self.run_frame()
         if self.init_pygame:
             pygame.quit()            
         return self.selected_menu_item
