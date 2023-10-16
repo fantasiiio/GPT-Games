@@ -1,3 +1,5 @@
+import uuid
+from EmailSender import EmailSender
 import bcrypt
 import jwt
 import datetime
@@ -8,19 +10,26 @@ import threading
 from Connection import Connection, Match, Result
 from Database import Database
 from config import *
-
+from WebService import WebService
+from TokenManager import TokenManager
 class Server:
     def __init__(self, host, port):
         self.database = Database()
         self.database.connect_mongo('BattleGrid')
         self.active_matches = []  # List of active matches
         self.waiting_list = []  # List of clients waiting for a match
-        self.server_conn = Connection(use_singleton=True, host=host, port=port, is_server=True)
+        self.server_conn = Connection(host=host, port=port, is_server=True)
         self.port = port
         self.host = host
         self.connected_players = [] 
         self.users = self.database.connect_mongo('users')
-        self.SECRET_KEY = 'supersecretkey'
+        self.run_web_service()
+        self.email_sender = EmailSender(gmail_user=email_sender, gmail_app_password=email_sender_password)
+
+
+    def run_web_service(self):
+        web_service = WebService(self.database, self.users)
+        web_service.run()        
 
 
 
@@ -32,16 +41,6 @@ class Server:
     def check_password(self,plain_password, hashed_password):
         return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
 
-    def generate_token(self,username):
-        return jwt.encode({'user': username, 'exp': datetime.datetime.utcnow() + datetime.timedelta(days=365)}, self.SECRET_KEY)
-
-    def decode_token(self,token):
-        try:
-            return jwt.decode(token, self.SECRET_KEY)
-        except jwt.ExpiredSignatureError:
-            return "Token expired"
-        except jwt.InvalidTokenError:
-            return "Invalid token"
 
     def add_to_waiting_list(self, connection):
         self.waiting_list.append(connection)
@@ -53,7 +52,7 @@ class Server:
         new_match.add_connection(connection1)
         new_match.add_connection(connection2)
         self.active_matches.append(new_match)
-        new_match.broadcast("new_match_created")
+        #new_match.broadcast("new_match_created")
 
     def check_for_possible_matches(self):
         while len(self.waiting_list) >= 2:
@@ -94,55 +93,60 @@ class Server:
                 match = client_conn.match
                 command_type, receiver, data = client_conn.receive_command()  # Unpack the receiver as well
                 if receiver == 'system':
-                    if command_type == "register":
+                    if command_type == "login":
                         message = data
-                        username = message['username']
-                        plain_assword = message['password']
                         email = message['email']
+                        plain_assword = message['password']
                         hashed_password = self.hash_password(plain_assword)
-                        user = self.database.get_user(self.users, username)
-                        if user:
-                            result = Result('User already exists', "negative")
-                            client_conn.send_command('register', data=result.serialize())
-                            #client_conn.close()
-                            continue
-                        else:
-                            new_user = {"username": username, "password": hashed_password, "email": email} 
-                            self.database.create_user(self.users, new_user)
+                        user = self.database.get_user_by_email(self.users, email)
+                        if not user:
+                            guid = uuid.uuid1()
+                            new_user = {"email": email, "password": hashed_password, "guid": guid}
                             result = Result('User created', "positive")
                             client_conn.send_command('register', data=result.serialize())
+                            token = TokenManager.generate_token(guid, datetime.timedelta(days=1))
+                            new_user["validate_token"] = token
+                            self.database.create_user(self.users, new_user)
+                            email_sender.send_verification_email(email, f"https://http://127.0.0.1:5000/verify?token={token}")
+                            
                             #client_conn.close()
-                            continue
-                    elif command_type == "login":
-                        message = data
-                        username = message['username']
-                        plain_assword = message['password']
-                        hashed_password = self.hash_password(plain_assword)
-                        user = self.database.get_user(self.users, username)
+                            continue                            
                     elif command_type == "token":    
-                        message = data
-                        token = message['token']
-                        decoded_token = self.decode_token(token)
+                        token = data
+                        decoded_token = TokenManager.decode_token(token)
                         if decoded_token == "Token expired" or decoded_token == "Invalid token":
                             result = Result(decoded_token, "negative")
                             client_conn.send_command('token', data=result.serialize())
-                            client_conn.close()
                             continue
                         else:
+                            guid = decoded_token
+                            user = self.database.get_user_by_guid(self.users, guid)
+                            data = {"token": token, "user": user}
                             result = Result(decoded_token, "positive")
                             client_conn.send_command('token', data=result.serialize())
+                            continue
+                    elif command_type == "display_name":
+                        message = data
+                        email = message['email']
+                        display_name = message['display_name']
+                        user = self.database.get_user_by_email(self.users, email)
+                        if user:
+                            user["display_name"] = display_name
+                            self.database.update_user(self.users, user)
+                            result = Result('Display name updated', "positive")
+                            client_conn.send_command('display_name', data=result.serialize())
                             continue
                         
                     if user :
                         is_valid = self.check_password(plain_assword, user["password"])
                         if is_valid:
-                            token = self.generate_token(username)
-                            result = Result(token, "positive")
+                            token = TokenManager.generate_token(user["guid"], datetime.timedelta(days=365))
+                            data = {"token": token, "user": user}
+                            result = Result(data, "positive")
                             client_conn.send_command('login', data=result.serialize())  
                         else:
                             result = Result('Invalid password', "negative")
                             client_conn.send_command('login', data=result.serialize())
-                            client_conn.close()
                             continue
                     else:
                         result = Result('Invalid User', "negative")
@@ -173,9 +177,13 @@ class Server:
                 self.check_for_possible_matches()
 
         finally:
-            match = client_conn._instance.match
-            if match:
-                match.broadcast("end")
+            if hasattr(client_conn, 'match') and client_conn.match:
+                match = client_conn.match            
+                if match:
+                    match.broadcast("end")
+
+            if client_conn in self.waiting_list:
+                self.waiting_list.remove(client_conn)                
 
 
 

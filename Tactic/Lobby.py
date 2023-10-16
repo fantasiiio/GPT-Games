@@ -51,8 +51,8 @@ class Lobby():
         pass
 
     def connect(self, host, port):
-        self.connection = Connection(host=host, port=port, use_singleton=True)
-        self.connection.connect()
+        pass
+
 
 
     def update_player_list(self):

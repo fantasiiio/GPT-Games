@@ -5,6 +5,9 @@ import json
 import random
 from enum import Enum
 
+email_sender = "fredericgiroux666@gmail.com"
+email_sender_password = "ughi hfbp pzdk bfzp"
+
 base_path = "C:\\dev-fg\\GPT-Games\\Tactic"
 
 WHITE = (255, 255, 255)

@@ -44,28 +44,16 @@ class Match:
         return others
 
 class Connection:
-    _instance = None
+    _last_instance = None
 
-    def __init__(self, sock=None, host=None, port=None, is_server=False, use_singleton=True):
-        if use_singleton:
-            if Connection._instance is None:
-                # If this is the first instance, initialize it
-                self.initialize_connection(sock, host, port, is_server)
-                Connection._instance = self
-            else:
-                self.encryption = None
-                pass
-                # If an instance already exists, update it
-                #Connection._instance.initialize_connection(sock, host, port, is_server)
-        else:
-            # If singleton is not used, just initialize as normal
-            self.initialize_connection(sock, host, port, is_server)
+    def __init__(self, sock=None, host=None, port=None, is_server=False):
+        self.initialize_connection(sock, host, port, is_server)
+        Connection._last_instance = self
 
     def connect_to_server(self):
         self.sock.connect((self.host, self.port))
         self.perform_handshake(is_server=False)
         self.is_connected = True
-        connection_test = self.connection_test()
 
     def initialize_connection(self, sock, host, port, is_server):
         self.host = host

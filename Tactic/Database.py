@@ -13,15 +13,23 @@ class Database:
         return collection
 
 
-    def get_user(self, collection, username):
-        user = collection.find_one({"username": username})
+    def get_user_by_email(self, collection, email):
+        user = collection.find_one({"email": email})
         return user
 
     def create_user(self, collection, user):
         collection.insert_one(user)
 
     def update_user(self, collection, user):
-        collection.find_one_and_update({"username": user.username}, {"$set": user})
+        collection.find_one_and_update({"email": user.email}, {"$set": user})
 
     def delete_user(self, collection, user):
-        collection.delete_one({"username": user.username})
+        collection.delete_one({"email": user.email})
+
+    def get_user_by_valide_token(self, collection, token):
+        user = collection.find_one({"validate_token": token})
+        return user
+
+    def get_user_by_guid(self, collection, guid):
+        user = collection.find_one({"guid": guid})
+        return user

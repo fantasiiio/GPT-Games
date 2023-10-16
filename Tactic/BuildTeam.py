@@ -72,7 +72,6 @@ class TeamBuilder:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 20)
         self.all_rects = None
-        self.client_conn = Connection(use_singleton=True)._instance
 
         self.offsets = {
             'Tank': (0, 64),
@@ -185,23 +184,8 @@ class TeamBuilder:
         if self.client_conn.match:
             self.client_conn.match.broadcast_command("player_name", {"player": self.guid, "name": text})
 
-    # def listen_for_messages(self, connection):
-    #     while connection.is_connected:
-    #         command_type, data = connection.receive_command()
-    #         self.incoming_messages.put((command_type, data))
-
-    # def init_network(self):
-    #     self.client_conn = Connection(use_singleton=True)._instance
-    #     self.player_dict[self.client_conn] = PlayerLight()
-    #     self.player_light = self.player_dict[self.client_conn]
-    #     self.incoming_messages = Queue()
-    #     # Create a new thread for listening to messages
-    #     listener_thread = threading.Thread(target=self.listen_for_messages, args=(self.client_conn,))
-    #     listener_thread.daemon = True
-    #     listener_thread.start()        
-
     def update_network_status(self):
-        connection = Connection(use_singleton=True)._instance
+        connection = None
         if not connection.is_connected:
             self.network_status_label.set_text("Not connected")
         else:
@@ -259,7 +243,7 @@ class TeamBuilder:
         font = pygame.font.Font(None, font_size)        
         text_surface = font.render(f"{text}", True, (255, 255, 255))
         self.info_text_image = UIImage(pos[0],pos[1], None)
-        self.info_text_image.image = text_surface
+        self.info_text_image.diplay_image = text_surface
         container.add_element(self.info_text_image)
         return self.info_text_image
 
@@ -289,10 +273,10 @@ class TeamBuilder:
             text_surface = self.font.render(f"{name}\n{cost}", True, (255, 255, 255))
             pos_x = img.rect.width / 2 - text_surface.get_width() / 2
             text_image = UIImage(action_pos[0] + pos_x, action_pos[1], None)
-            text_image.image = text_surface
+            text_image.diplay_image = text_surface
             text_image.id = f"txt_{setting_name}"
 
-            current_x += img.image.get_width() + self.offsets[setting_name][0] + padding_x
+            current_x += img.diplay_image.get_width() + self.offsets[setting_name][0] + padding_x
 
             self.units_container.add_element(img)
             self.units_container.add_element(text_image)
@@ -429,7 +413,7 @@ class TeamBuilder:
                     self.info_container.elements.clear()
                 self.unit_over = unit
                 self.write_infos(self.info_container.rect, self.unit_over)
-            self.outline = self.get_outline(self.unit_over.image, (255, 255, 255), 1)
+            self.outline = self.get_outline(self.unit_over.diplay_image, (255, 255, 255), 1)
         else: 
             if self.info_text_image in self.info_container.elements:
                 self.unit_over = None
@@ -551,11 +535,11 @@ class TeamBuilder:
         cost = setting["Purchase Cost"]
         text_unit_type = font_big.render(f"{self.get_unit_type(unit.id)} ({cost})", True, (255, 255, 255))
         text_unit_type_image = UIImage(20,20, None)
-        text_unit_type_image.image = text_unit_type
+        text_unit_type_image.diplay_image = text_unit_type
 
         text_surface = font.render(f"{wrapped_text}", True, (255, 255, 255))
         self.info_text_image = UIImage(20,60, None)
-        self.info_text_image.image = text_surface
+        self.info_text_image.diplay_image = text_surface
         self.info_container.add_element(self.info_text_image)
         self.info_container.add_element(text_unit_type_image)
         

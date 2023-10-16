@@ -1,10 +1,11 @@
 from GraphicUI import UIContainer, UILabel
 import pygame
+from config import base_path
 
 
 
 class Instructions:
-    def __init__(self, file_path = "instructions.md", init_pygame=True, full_screen=False, screen=None):
+    def __init__(self, file_path =  f"{base_path}\\data\\instructions.md", init_pygame=True, full_screen=False, screen=None):
         self.init_graphics(init_pygame, full_screen, screen, 1000, 1000)
 
         self.file_path = file_path

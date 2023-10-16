@@ -21,23 +21,28 @@ class MainMenu:
         self.container_width = 240
         self.container_height = 350
         self.grid = Grid(pygame, self.screen, f"{base_path}\\assets\\maps\\menu.tmx")
-        self.grid_offset = (-(self.grid.tiles_x*64)/2 + self.screen_width/2, 
-                            -(self.grid.tiles_y*64)/2 + self.screen_height/2 + 64*2)
+        tile = self.grid.tiles[26][26]
+        tile_pos = tile.x * self.TILE_SIZE, tile.y * self.TILE_SIZE
+        # self.grid_offset = (-(self.grid.tiles_x*64)/2 + self.screen_width/2, 
+        #                     -(self.grid.tiles_y*64)/2 + self.screen_height/2 + 64*2)
         
-        self.grid.move(self.grid_offset[0], self.grid_offset[1])
-        
-        self.menu_container = UIContainer(self.screen_width/2 - self.container_width/2, 120, 
-                             self.container_width, self.container_height, image=f"{base_path}\\assets\\UI\\panel.png", padding = 20)
+        self.grid.move(-tile_pos[0], -tile_pos[1])
+
+
+        self.menu_container = UIContainer(100,0, 
+                             self.container_width, self.container_height, image=f"{base_path}\\assets\\UI-v2\\Window\\Window_Background.png", padding = 20)
                              
+        self.menu_container.adjust_to_content()
 
-
-        self.top_container = UIContainer(0, 0, 0, 0, color=(0,0,0))
-        font = pygame.font.Font(f"{base_path}\\assets\\UI\\Army.ttf", 72)
-        self.player_label = UILabel(10, 20, f"Battle Grid", font=font, text_color=(232,217,194), outline_width=1)
+        self.top_container = UIContainer(0, 0)
+        self.player_label = UILabel(10, 20, f"Battle Grid", text_color=(232,217,194), outline_width=1, font_size=100, font_path=f"{base_path}\\assets\\UI\\Army.ttf")
         self.player_label.rect.x = self.screen_width / 2 - self.player_label.rect.width / 2
         self.top_container.add_element(self.player_label)
-
+        self.top_container.adjust_to_content()
+        self.top_container.center_on_screen(self.screen_width, self.screen_height, 20)
         self.create_buttons()
+        self.menu_container.center_on_screen(screen.get_width(), screen.get_height(), 200)
+#        self.menu_container.set_position(self.menu_container.rect.x, self.menu_container.rect.y - 200)
 
         self.tank = Tank(self.grid.tiles[35][26], 2, self.grid, screen=self.screen)
         self.tank.angle = 180
@@ -88,9 +93,11 @@ class MainMenu:
         }
 
         y_offset = 20  # Initial vertical offset
+        spacing = 20  # Vertical spacing between buttons
         for label, callback in button_map.items():
-            button = UIButton(20, y_offset, 200, 50, label, 40, f"{base_path}\\assets\\UI\\Box03.png", border_size=23, callback=callback)
-            y_offset += 60  # Increment vertical offset for the next button
+            button_height = 64
+            button = UIButton(20, y_offset, 200, button_height, label, 40, callback=callback)
+            y_offset += button_height + spacing
             self.menu_container.add_element(button)
 
         self.menu_container.adjust_to_content()                
