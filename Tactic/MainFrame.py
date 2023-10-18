@@ -1,3 +1,4 @@
+from Lobby import Lobby
 import re
 import threading
 from queue import Queue
@@ -15,22 +16,30 @@ import sys
 class MainFrame():
     def __init__(self):
         self.init_graphics(True, False, None, 1500, 1280)
-        self.msg_box = UIMessageBox(" ", 0, 0, screen=self.screen)
         self.connection = None
         self.waiting_for_match = False
         self.is_ai = False
         self.login_result = None
         self.current_screen = "Main Menu"
+        self.lobby = Lobby(init_pygame=False, full_screen=False, screen=self.screen)
         self.main_menu = MainMenu(False, False, self.screen)
         self.instructions = Instructions(init_pygame=False, full_screen=False, screen=self.screen)
-        self.display_Name_popup = DisplayNamePopup(0,0, screen=self.screen)
-        popup_width = 200
-        popup_height = 300
-        self.login_popup = UILoginPopup(0,0, popup_width, popup_height, screen=self.screen)
-
+        self.init_UI()
         for i, arg in enumerate(sys.argv[1:]):
             if arg=="-ai":
                 self.is_ai = True
+
+    def init_UI(self):
+        self.ui_manager = UIManager()
+        UIManager.screen = self.screen
+        self.ui_manager.add_child_manager(self.main_menu.ui_manager)
+        self.login_popup = UILoginPopup(0,0,0,0, screen=self.screen)
+        self.msg_box = UIMessageBox(" ", 0, 0, screen=self.screen)
+        self.display_Name_popup = DisplayNamePopup(0,0, screen=self.screen)
+        self.ui_manager.add_container(self.display_Name_popup)
+        self.ui_manager.add_container(self.login_popup)
+        self.ui_manager.add_container(self.msg_box)
+
 
     def init_graphics(self, init_pygame, full_screen, screen, width, height):
         self.init_pygame = init_pygame
@@ -61,25 +70,36 @@ class MainFrame():
 
                 if command_type == "login":
                     result = json.loads(data)
+                    message = result["message"]
                     if result["success"] == "positive":
                         self.login_result = True
                         #self.waiting_for_match = False
-                        message = result["message"]
-                        user_settings["token"] = message
+                        
+                        user_settings["token"] = message["token"]
                         save_user_settings()
                         self.on_login_success()
                     else:
-                        self.msg_box.show("Login failed")
+                        self.msg_box.show(f"Login failed:\n{message}")
                         self.login_result = False
                 elif command_type == "new_match_created":
                     self.waiting_for_match = False
                 elif command_type == "token":
                     result = json.loads(data)
+                    message = result["message"]
+                    user = message["user"]
                     if result["success"] == "positive":
+                        self.display_Name_popup.name_field.deserialize(user["display_name"])
                         self.on_login_success()
                     else:
                         self.msg_box.show(result["message"], self.token_failed_message_ok)
-                        
+                elif command_type =="display_name":
+                    result = json.loads(data)
+                    if result["success"] == "positive":
+                        # save display_name in player.json                        
+                        save_user_settings()                                    
+                        self.current_screen = "Lobby"
+                    else:
+                        self.msg_box.show(message)    
             except Exception as e:
                 print(f"Error receiving command: {e}")
                 self.msg_box.show("Login failed")
@@ -162,7 +182,7 @@ class MainFrame():
         events_list = []
         while self.running:
             self.screen.fill((0,0,0))
-            UIColoredTextBox.mouse_over_textbox = False
+            UITextBox.mouse_over_textbox = False
             UIButton.mouse_over_button = False
             if self.is_ai:
                 self.multiplayer()
@@ -173,6 +193,7 @@ class MainFrame():
                         pygame.quit()
                         self.running =  False
                         return
+                    self.ui_manager.handle_event(event)
                     events_list.append(event)
 
 
@@ -201,23 +222,17 @@ class MainFrame():
                         self.current_screen = "Game"
                         #self.game = StrategyGame(selected_team1, selected_team2, False, False, self.screen)
                         #self.game.game_loop()
-
+                elif(self.current_screen == "Lobby"):
+                    self.lobby.run_frame(events_list)
 
                 if self.waiting_for_match:
                     pass
-                if self.login_popup and self.login_popup.running:                    
-                    result = self.login_popup.run_frame(events_list)
-                    self.display_Name_popup
-
-                if self.display_Name_popup and self.display_Name_popup.running:
-                    result = self.display_Name_popup.run_frame(events_list)
 
 
-            if(self.msg_box.is_visible):
-                self.msg_box.handle_event(event)   
-                self.msg_box.draw(self.screen)
+            self.ui_manager.draw(self.screen)
+
             
-            if UIColoredTextBox.mouse_over_textbox:
+            if UITextBox.mouse_over_textbox:
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_IBEAM)
             elif UIButton.mouse_over_button:
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
@@ -241,8 +256,8 @@ class UILoginPopup(UIPopupBase):
         self.password_label = UILabel(10, 110, "Password:", font_size=30, text_color=(255,255,255))
         input_width = 300
         # Shift text fields down to make more room for labels
-        self.email_field = UIColoredTextBox(10, 50, input_width, 40, font_size=30)
-        self.password_field = UIColoredTextBox(10, 140, input_width, 40, font_size=30, is_password_field=True)
+        self.email_field = UITextBox(10, 50, input_width, 40, font_size=30)
+        self.password_field = UITextBox(10, 140, input_width, 40, font_size=30, is_password_field=True)
         
         self.email_error_label = UILabel(10, self.email_field.rect.bottom, "", font_size=20, text_color=(255, 0, 0))
         #self.password_strength_label = UILabel(10, self.password_field.rect.bottom, "", font_size=20, text_color=(255, 0, 0))
@@ -322,7 +337,11 @@ class UILoginPopup(UIPopupBase):
         else:
             self.password_strength_bar.color1 = (0, 255, 0)
         self.password_strength_bar.current_value = strength["score"]
+    
 
+    def draw(self, screen):
+        self.draw_password_strength_bar()
+        super().draw(screen)
 
     def perform_login(self):
         self.connection = Connection._last_instance        
@@ -351,22 +370,26 @@ class UILoginPopup(UIPopupBase):
 
 class DisplayNamePopup(UIPopupBase):
     def __init__(self, x, y, screen=None):
-        super().__init__(x, y, screen=screen)
+        super().__init__(x, y, screen=screen, padding_header = 0)
         self.connection = Connection._last_instance
-        self.name_label = UILabel(0,0, "Display Name:", font_size=30)
+        self.name_label = UILabel(0,0, "Display Name:", font_size=25)
         self.name_label.original_y = 100
-        self.name_field = UIColoredTextBox(0, 30, 280, 40, font_size=30, enable_color_picker=True)
+        self.name_field = UITextBox(0, 30, 350, 40, font_size=30, enable_color_picker=True)
         
         self.inner_container.add_element(self.name_label)
         self.inner_container.add_element(self.name_field)
         self.inner_container.id = "InnerContainer"
         self.adjust_to_content()
         self.id = "DisplayNamePopup"
-
+        
 
     def ok_button_clicked(self, button):
-        self.display_name = self.name_field.serialize()
-        self.connection.send_command(command_type="display_name", receiver="system", data=self.display_name)
+        self.connection = Connection._last_instance
+        display_name = self.name_field.serialize()
+        data = {"display_name": display_name,
+                "email": user_settings["email"]
+                }
+        self.connection.send_command(command_type="display_name", receiver="system", data=data)
         self.hide()            
 
 main = MainFrame()

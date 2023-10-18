@@ -7,6 +7,68 @@ class Sentinel:
     def __bool__(self):
         return False
 UNSET = Sentinel()  # Sentinel object to signify unset attributes
+AUTO = Sentinel()  # Sentinel object to signify automatic attribute value
+
+class UIManager:
+    screen = None
+    def __init__(self):
+        self.containers = []  # List of containers, in order of Z-position (back to front)
+        self.child_managers = []  # List of child managers, in order of Z-position (back to front)
+
+    def add_container(self, container):
+        self.containers.append(container)
+
+    def remove_container(self, container):
+        if container in self.containers:
+            self.containers.remove(container)
+
+    def add_child_manager(self, manager):
+        self.child_managers.append(manager)
+
+    def remove_child_manager(self, manager):
+        if manager in self.child_managers:
+            self.child_managers.remove(manager)
+
+    def bring_to_front(self, container):
+        if container in self.containers:
+            self.containers.remove(container)
+            self.containers.append(container)
+
+    def send_to_back(self, container):
+        if container in self.containers:
+            self.containers.remove(container)
+            self.containers.insert(0, container)
+
+    def bring_manager_to_front(self, manager):
+        if manager in self.managers:
+            self.managers.remove(manager)
+            self.managers.append(manager)
+
+    def send_manager_to_back(self, manager):
+        if manager in self.managers:
+            self.managers.remove(manager)
+            self.managers.insert(0, manager)
+
+    def handle_event(self, event):
+        # First, give the event to the child managers
+        for manager in reversed(self.child_managers):
+            if manager.handle_event(event):
+                return True
+
+        # If no child manager handled the event, give it to the containers
+        for container in reversed(self.containers):
+            if container.is_visible and container.handle_event(event):
+                    return True
+
+        return False  # If no child manager or container handled the event, return False
+
+    def draw(self, screen):
+        for manager in self.child_managers:
+            manager.draw(screen)
+        # Draw the containers first, then the child managers
+        for container in self.containers:
+            if container.is_visible:
+                container.draw(screen)
 
 class FocusManager:
     def __init__(self):
@@ -28,14 +90,7 @@ class FocusManager:
         for elem in self.focus_group:
             elem.is_focused = False
         element.is_focused = True
-
-
-    def handle_cursor(self, event, textboxes):
-        for textbox in textboxes:
-            if textbox.rect.collidepoint(event.pos):
-                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_IBEAM)
-                return
-        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)        
+    
 
 
 class UIElement:
@@ -59,11 +114,14 @@ class UIElement:
         height = height if height is not UNSET else 0
         x = x if x is not UNSET else 0
         y = y if y is not UNSET else 0
-
+        self.focus_manager = None
         if parent:
             self.rect = pygame.Rect(x + parent.rect.x, y + parent.rect.y, width, height)
         else:
             self.rect = pygame.Rect(x, y, width, height)
+
+    def set_focus_manager(self, focus_manager):
+        self.focus_manager = focus_manager
 
     def get_unique_ordered_classes(self, classes):
         return list(OrderedDict.fromkeys(classes).keys())
@@ -91,7 +149,7 @@ class UIElement:
                         setattr(self, property_name, default_value)
 
     def handle_event(self, event):
-        pass
+        return False  # Base class does not handle any events
 
     def set_parent(self, parent):
         self.parent = parent
@@ -148,92 +206,6 @@ class UIElement:
         # Center
         screen.blit(pygame.transform.scale(self.image.subsurface((border, border, source_inner_width, source_inner_height)), (dest_inner_width, dest_inner_height)), (self.rect.x + border, self.rect.y + border))
 
-
-
-
-class UITextBox(UIElement):
-    mouse_over_textbox = False
-    def __init__(self, x, y, width, height, text='', font_size=20, text_color=(255, 255, 255), cursor_color=(255, 255, 255), parent=None, image=None, border_size=10, end_edit_callback=None, is_password_field=False):
-        super().__init__(x, y, width, height, parent, image=image, border_size=border_size)
-        self.is_password_field = is_password_field 
-        self.text = text
-        self.font = pygame.font.Font(None, font_size)
-        self.text_color = text_color
-        self.cursor_color = cursor_color
-        self.cursor_pos = len(text)
-        self.cursor_visible = True
-        self.last_cursor_toggle_time = 0
-        self.cursor_toggle_interval = 500
-        self.is_focused = False
-        self.end_edit_callback = end_edit_callback
-
-    def draw(self, screen, show_cursor=True):
-        super().draw(screen)
-        display_text = self.text if not self.is_password_field else '*' * len(self.text)  # Display '*' if it's a password field
-        text_surface = self.font.render(display_text, True, self.text_color)
-        text_rect = text_surface.get_rect(topleft=(self.rect.x + 10, self.rect.y + 10))
-        screen.blit(text_surface, text_rect)
-        if self.rect.collidepoint(pygame.mouse.get_pos()):
-            UITextBox.mouse_over_textbox = True
-        if show_cursor:
-            current_time = pygame.time.get_ticks()
-            if current_time - self.last_cursor_toggle_time > self.cursor_toggle_interval:
-                self.cursor_visible = not self.cursor_visible
-                self.last_cursor_toggle_time = current_time
-
-            if self.cursor_visible and self.is_focused:
-                cursor_x_pos = text_rect.x + text_rect.width
-                pygame.draw.line(screen, self.cursor_color, (cursor_x_pos, text_rect.y), (cursor_x_pos, text_rect.y + text_rect.height), 2)
-        
-
-    def set_focus(self, focus_manager):
-        try:
-            index = focus_manager.focus_group.index(self)
-            focus_manager.current_focus_index = index
-        except ValueError:
-            # This textbox is not in the list of focusable elements
-            pass
-
-    def set_text(self, text):
-        self.text = text
-        self.cursor_pos = len(text)
-
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                if self.rect.collidepoint(event.pos):
-                    self.is_focused = True
-                    self.set_focus(self.focus_manager)
-                else:
-                    self.is_focused = False
-                    if self.end_edit_callback:
-                        self.end_edit_callback(self.text)
-    
-
-        if not self.is_focused:
-            return
-
-        if self.is_focused:
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:  # Enter key
-                    self.is_focused = False
-                    if self.end_edit_callback:
-                        self.end_edit_callback(self.text)
-                elif event.key == pygame.K_BACKSPACE:
-                    if self.cursor_pos > 0:
-                        self.text = self.text[:self.cursor_pos - 1] + self.text[self.cursor_pos:]
-                        self.cursor_pos -= 1                        
-                elif event.key == pygame.K_LEFT:
-                    self.cursor_pos = max(0, self.cursor_pos - 1)
-                elif event.key == pygame.K_RIGHT:
-                    self.cursor_pos = min(len(self.text), self.cursor_pos + 1)
-                elif event.key == pygame.K_TAB:
-                    pass  
-                else:
-                    self.text = self.text[:self.cursor_pos] + event.unicode + self.text[self.cursor_pos:]
-                    self.cursor_pos += len(event.unicode)                    
-        
-
 class UIColorPicker(UIElement):
     def __init__(self, x, y, width, height, color_clicked_callback=UNSET, parent=UNSET, image=UNSET, border_size=10, padding=0):
         super().__init__(x, y, width, height, parent=parent, image=image, border_size=border_size, padding=padding)
@@ -241,6 +213,9 @@ class UIColorPicker(UIElement):
         self.surface = pygame.Surface((width, height))
         self.is_visible = False
         self.ignore_next_click = False
+        # Create the color value textbox
+        self.color_value_textbox = UITextBox(self.rect.x, self.rect.y + self.rect.height, self.rect.width, 30, font_size=20, enable_color_picker=False)
+        self.color_value_textbox.set_text("#000000")        
 
         # Fill color picker with blended colors
         for x in range(width):
@@ -262,7 +237,14 @@ class UIColorPicker(UIElement):
             (192, 192, 192), (255, 255, 255)
         ]
 
+    def set_focus_manager(self, focus_manager):
+        self.color_value_textbox.set_focus_manager(focus_manager)
+        super().set_focus_manager(focus_manager)
+    
 
+    def set_parent(self, parent):
+        super().set_parent(parent)
+        self.color_value_textbox.set_parent(parent)       
 
     def draw(self, screen):
         if self.is_visible:
@@ -274,12 +256,15 @@ class UIColorPicker(UIElement):
            # Additional code for grayscale and common colors
             column_width = 20  # Width of each column
             y_start = self.rect.y  # Y-coordinate where the columns start
-            
+            self.color_value_textbox.rect.x = self.rect.x
+            self.color_value_textbox.rect.y = self.rect.y + self.rect.height
             for i, color in enumerate(self.grayscale_colors):
                 pygame.draw.rect(screen, color, (self.rect.x + self.rect.width, y_start + i * column_width, column_width, column_width))
             
             for i, color in enumerate(self.common_colors):
                 pygame.draw.rect(screen, color, (self.rect.x + self.rect.width + column_width, y_start + i * column_width, column_width, column_width))
+            
+            self.color_value_textbox.draw(screen)
 
             screen.set_clip(rect)
 
@@ -293,8 +278,17 @@ class UIColorPicker(UIElement):
             if event.buttons[0]:
                 self.handle_mouse_click(event)
 
+        self.color_value_textbox.handle_event(event)
+
         return None
 
+    def update_hex_color(self):
+        r, g, b = self.currentColor[:3]
+        self.color_value_textbox.set_text('#%02x%02x%02x' % (r, g, b))       
+
+    def set_color(self, color):
+        self.currentColor = color
+        self.update_hex_color()
 
     def handle_mouse_click(self, event):
         if self.ignore_next_click:
@@ -303,12 +297,18 @@ class UIColorPicker(UIElement):
 
         x, y = event.pos
 
+        # Check if the click is within the color_value_textbox
+        if self.color_value_textbox.rect.collidepoint(x, y):
+            return
+
         # Check if the click is within the color picker area
         surface_width, surface_height = self.surface.get_size()
+        
         if 0 <= x - self.rect.x < surface_width and 0 <= y - self.rect.y < surface_height:
             self.currentColor = self.surface.get_at((x - self.rect.x, y - self.rect.y))
             if self.color_clicked_callback:
                 self.color_clicked_callback(self.currentColor)
+            self.update_hex_color()
         else:
             self.handle_click_in_additional_columns(x, y)
 
@@ -333,10 +333,10 @@ class UIColorPicker(UIElement):
         else:
             self.is_visible = False
 
-class UIColoredTextBox(UIElement):
+class UITextBox(UIElement):
     mouse_over_textbox = False    
     def __init__(self, x=UNSET, y=UNSET, width=UNSET, height=UNSET, text=UNSET, font_size=UNSET, text_color=UNSET,
-                 cursor_color=UNSET, parent=UNSET, image=UNSET, border_size=UNSET, end_edit_callback=UNSET, is_password_field=UNSET, color=UNSET, enable_color_picker=UNSET):
+                 cursor_color=UNSET, parent=UNSET, image=UNSET, border_size=UNSET, end_edit_callback=UNSET, is_password_field=UNSET, color=UNSET, enable_color_picker=UNSET, selection_color=UNSET, padding=UNSET):
         self.enable_color_picker = enable_color_picker
         self.text = text if text else ''
         self.font_size = font_size
@@ -351,34 +351,52 @@ class UIColoredTextBox(UIElement):
         self.width = width
         self.height = height
         self.cursor_color = cursor_color
-
+        self.enable_color_picker = enable_color_picker
+        self.selection_color = selection_color
+        self.padding = padding
         self.apply_ui_settings()
 
-        super().__init__(x, y, self.width, self.height, self.parent, self.image, self.no_image_color, self.border_size)     
+        super().__init__(x, y, self.width, self.height, self.parent, self.image, self.no_image_color, self.border_size, padding=self.padding)     
         
         self.last_cursor_toggle_time = 0
         self.cursor_toggle_interval = 500
         self.cursor_visible = True
         self.end_edit_callback = end_edit_callback
-
+        self.selection_start = None
+        self.selection_end = None
         self.current_color = self.text_color
-        self.font = pygame.font.Font(None, font_size)
+        self.font = pygame.font.Font(None, self.font_size)
         self.is_focused = False
 
         button_height = 30  # Or any other size you'd like
         button_width = 50
-        self.color_picker_button = UIButton(width - button_width, 0, button_width, button_height, None, callback=self.pick_color, image=None, border_size=border_size, color=text_color)
+        self.color_picker_button = UIButton(width - button_width, 0, button_width, button_height, None, callback=self.pick_color, image=None, border_size=border_size, color=self.text_color)
         button_height = self.color_picker_button.rect.height
         self.color_picker_button.rect.y = (self.rect.height /2  - button_height/ 2)
 
         color_picker_x = x + width - button_width + button_width + 5  # 5 pixels to the right of the button
         color_picker_y = 0  # same vertical level as the button
-        self.color_picker = UIColorPicker(color_picker_x, color_picker_y, 256, 256, color_clicked_callback=self.update_color, image=image, border_size=border_size, padding=10)
-        self.color_picker.is_visible = False  # Initially set to invisible
+        if self.enable_color_picker:
+            self.color_picker = UIColorPicker(color_picker_x, color_picker_y, 256, 256, color_clicked_callback=self.set_selection_color, image=image, border_size=border_size, padding=10)
+            self.color_picker.set_parent(self)
+            self.color_picker.is_visible = False  # Initially set to invisible
         self.elements.append(self.color_picker_button)
         self.color_list = [{'index': 0, 'color': self.current_color}]
         self.is_password_field = is_password_field
+        self.cursor_pos = 0
         # self.set_position(x, y)
+
+
+    def set_selection_color(self, color):
+        if self.selection_start is not None and self.selection_end is not None:
+            start = min(self.selection_start, self.selection_end)
+            end = max(self.selection_start, self.selection_end)
+
+            for i in range(start, end):
+                # Remove any existing color change at this index
+                self.color_list = [color_change for color_change in self.color_list if color_change['index'] != i]
+                # Add the new color
+                self.color_list.append({'index': i, 'color': color})
 
     def set_focus(self, focus_manager):
         try:
@@ -388,22 +406,28 @@ class UIColoredTextBox(UIElement):
             # This textbox is not in the list of focusable elements
             pass
         
+    def set_focus_manager(self, focus_manager):
+        self.focus_manager = focus_manager
+        if self.enable_color_picker:
+            self.color_picker.set_focus_manager(focus_manager)
+
     def set_text(self, text):
         self.text = text
         self.cursor_pos = len(text)
 
     def serialize(self):
+        # Convert each color in the color_list to a list of RGBA values
+        color_list_serializable = [{'index': color_change['index'], 'color': list(color_change['color'])} for color_change in self.color_list]
         state = {
             'text': self.text,
-            'colors': self.color_list
+            'colors': color_list_serializable
         }
         return json.dumps(state)
-
+    
     def deserialize(self, state_string):
         state = json.loads(state_string)
         self.text = state['text']
-        self.color_list = state['color_list']
-
+        self.color_list = [{'index': change['index'], 'color': pygame.Color(*change['color'])} for change in state['colors']]
 
     def set_parent(self, parent):
         super().set_parent(parent)
@@ -415,7 +439,7 @@ class UIColoredTextBox(UIElement):
             # Update the position of color_picker to be beside the button
             self.color_picker.rect.x = self.color_picker_button.rect.x + self.color_picker_button.rect.width + 5
             self.color_picker.rect.y = self.color_picker_button.rect.y + self.color_picker.rect.height / 2 + self.color_picker_button.rect.height / 2
-            self.color_picker.ignore_next_click = True
+            #self.color_picker.ignore_next_click = True
 
     def insert_char(self, char):
         self.text = self.text[:self.cursor_pos] + char + self.text[self.cursor_pos:]
@@ -427,48 +451,71 @@ class UIColoredTextBox(UIElement):
                 if color_change['index'] >= self.cursor_pos:
                     color_change['index'] += 1
 
-    def remove_char(self):
-        if self.cursor_pos > 0:
-            self.text = self.text[:self.cursor_pos - 1] + self.text[self.cursor_pos:]
-            self.cursor_pos -= 1
-            for color_change in self.color_list:
+    def remove_char(self, mode='backspace'):
+        if mode == 'backspace':
+            if self.cursor_pos > 0:
+                self.text = self.text[:self.cursor_pos - 1] + self.text[self.cursor_pos:]
+                self.cursor_pos -= 1
+        elif mode == 'delete':
+            if self.cursor_pos < len(self.text):
+                self.text = self.text[:self.cursor_pos] + self.text[self.cursor_pos + 1:]
+
+        for color_change in self.color_list:
+            if mode == 'backspace':
                 if color_change['index'] >= self.cursor_pos:
                     color_change['index'] -= 1
+            elif mode == 'delete':
+                if color_change['index'] > self.cursor_pos:
+                    color_change['index'] -= 1
+
 
     def update_color(self, color):
         for color_change in self.color_list:
             if color_change['index'] == self.cursor_pos:
-                color_change['color'] = color
+                color_change['color'] = list(color)  # convert to list
                 self.update_button_color()
                 return
-        self.color_list.append({'index': self.cursor_pos, 'color': color})
+        self.color_list.append({'index': self.cursor_pos, 'color': list(color)})  # convert to list
         self.color_list = sorted(self.color_list, key=lambda x: x['index'])
         self.update_button_color()
 
-
     def draw(self, screen):
         super().draw(screen)
-        display_text = self.text if not self.is_password_field else '*' * len(self.text)  # Display '*' if it's a password field
-        # Handling mouse-over state from UITextBox
+        display_text = self.text if not self.is_password_field else '*' * len(self.text)
         if self.rect.collidepoint(pygame.mouse.get_pos()):
-            UIColoredTextBox.mouse_over_textbox = True
+            UITextBox.mouse_over_textbox = True
 
         current_color = self.current_color
         x_offset = 0
-        cursor_x_offset = 0  # Initialize x offset for the cursor
+        cursor_x_offset = 0
+
+        if self.selection_start is not None and self.selection_end is not None and self.selection_start != self.selection_end:
+            start = min(self.selection_start, self.selection_end)
+            end = max(self.selection_start, self.selection_end)
+            selected_text = self.text[start:end]
+            selected_text_width = self.font.size(selected_text)[0]
+            selection_x = self.rect.x + 10 + self.font.size(self.text[:start])[0]
+            pygame.draw.rect(screen, self.selection_color, pygame.Rect(selection_x, self.rect.y + 10, selected_text_width, self.font.size("A")[1]))
+
+        # Keep track of the last index in color_list
+        last_color_index = -1
 
         for i, char in enumerate(display_text):
-            # Update color if the index matches a color change point
+            # Update color if index matches a color change point
             for color_change in self.color_list:
                 if color_change['index'] == i:
                     current_color = color_change['color']
+                    last_color_index = i
+
+            # Reset color back to the original text_color after the color segment
+            if i > last_color_index:
+                current_color = self.text_color
 
             char_surface = self.font.render(char, True, current_color)
-            char_rect = char_surface.get_rect(topleft=(self.rect.x + 10 + x_offset, self.rect.y + 10))
+            char_rect = char_surface.get_rect(topleft=(self.rect.x + self.padding + x_offset, self.rect.y + self.padding))
             screen.blit(char_surface, char_rect)
             x_offset += char_surface.get_width()
 
-            # Update the cursor_x_offset if we're at the cursor's position
             if i == self.cursor_pos - 1:
                 cursor_x_offset = x_offset
 
@@ -478,9 +525,8 @@ class UIColoredTextBox(UIElement):
             self.last_cursor_toggle_time = current_time
 
         if self.cursor_visible and self.is_focused:
-            # Draw the cursor
             cursor_color = self.cursor_color
-            cursor_rect = pygame.Rect(self.rect.x + 10 + cursor_x_offset, self.rect.y + 10, 2, self.font.size("A")[1])
+            cursor_rect = pygame.Rect(self.rect.x + self.padding + cursor_x_offset, self.rect.y + self.padding, 2, self.font.size("A")[1])
             pygame.draw.rect(screen, cursor_color, cursor_rect)
 
         if self.enable_color_picker:
@@ -490,10 +536,42 @@ class UIColoredTextBox(UIElement):
             if self.color_picker.is_visible:
                 self.color_picker.draw(screen)
 
+        pygame.draw.rect(UIManager.screen, (0,0,0), self.rect ,1)
 
+
+
+    def get_mouse_position(self, mouse_pos):
+        x, _ = mouse_pos
+        x -= (self.rect.x + self.padding)  # Adjust for the textbox's position and padding
+        x_offset = 0  # Initialize x_offset
+
+        # Iterate over each character in the text
+        for i, char in enumerate(self.text):
+            char_surface = self.font.render(char, True, self.current_color)
+            char_width = char_surface.get_width()
+
+            # If we've passed the click position, return the current index
+            if x_offset + char_width > x:
+                return i
+
+            x_offset += char_width
+
+        return len(self.text)
+
+
+    def replace_selection(self, text):
+        if self.selection_start is not None and self.selection_end is not None:
+            start = min(self.selection_start, self.selection_end)
+            end = max(self.selection_start, self.selection_end)
+            self.text = self.text[:start] + text + self.text[end:]
+            self.cursor_pos = start + len(text)
+            self.selection_start = None
+            self.selection_end = None
+
+   
     def handle_event(self, event):
         self.color_picker_button.handle_event(event)
-        
+
         if event.type == pygame.MOUSEBUTTONDOWN:
             x, y = event.pos
             if event.button == 1:                
@@ -501,54 +579,92 @@ class UIColoredTextBox(UIElement):
                 if self.color_picker_button.rect.collidepoint(x, y):
                     return
                 if self.rect.collidepoint(x, y):
-                    # Mouse clicked inside the text box, now find the closest character
-                    x_offset = 0  # Initialize x_offset
-                    closest_char_index = 0  # Initialize closest character index
-                    for i, char in enumerate(self.text):
-                        char_surface = self.font.render(char, True, (0, 0, 0))  # Dummy color, we just need the dimensions
-                        char_width = char_surface.get_width()
-                        
-                        if x_offset + char_width > x - self.rect.x - 10:  # 10 is the x-padding you set when drawing text
-                            break
-                        
-                        x_offset += char_width
-                        closest_char_index = i + 1  # 1-indexed
-                        
+                    closest_char_index = self.get_mouse_position(event.pos)
                     self.cursor_pos = closest_char_index
                     self.update_button_color()
+                    self.selection_start = None
+                    self.selection_end = None
+
+                    # Start the selection
+                    self.selection_start = closest_char_index
+                    self.selection_end = closest_char_index  # Do not add one here
 
                     self.is_focused = True
                     self.set_focus(self.focus_manager)
                 else:
                     self.is_focused = False
                     if self.end_edit_callback:
-                        self.end_edit_callback(self.text)                    
-                
-        if event.type == pygame.KEYDOWN and self.is_focused:
-            if event.key == pygame.K_BACKSPACE:
-                self.remove_char()
-            elif event.key == pygame.K_LEFT:
-                self.cursor_pos = max(0, self.cursor_pos - 1)
-                self.update_button_color()
-            elif event.key == pygame.K_RIGHT:
-                self.cursor_pos = min(len(self.text), self.cursor_pos + 1)
-                self.update_button_color()
-            elif event.unicode:  # Check if the event produces a unicode character
-                self.add_char(event.unicode)  # Add the character
+                        self.end_edit_callback(self.text)
+
+        elif event.type == pygame.MOUSEMOTION:
+            if event.buttons[0] and self.rect.collidepoint(event.pos):
+                closest_char_index = self.get_mouse_position(event.pos)
+                self.selection_end = closest_char_index  # Do not add one here
+
+        elif event.type == pygame.KEYDOWN:
+            if event.key in [pygame.K_LEFT, pygame.K_RIGHT] and pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                if self.selection_start is None:
+                    self.selection_start = self.cursor_pos
+                self.cursor_pos = max(0, min(len(self.text), self.cursor_pos + (1 if event.key == pygame.K_RIGHT else -1)))
+                self.selection_end = self.cursor_pos
+
             else:
-                super().handle_event(event)
+                if event.key == pygame.K_BACKSPACE:
+                    if self.selection_start is not None and self.selection_end is not None:
+                        self.replace_selection('')
+                    else:
+                        self.remove_char('backspace')
+
+                elif event.key == pygame.K_DELETE:
+                    if self.selection_start is not None and self.selection_end is not None:
+                        self.replace_selection('')
+                    else:
+                        self.remove_char('delete')
+
+                elif event.key == pygame.K_LEFT:
+                    self.cursor_pos = max(0, self.cursor_pos - 1)
+                    self.update_button_color()
+                elif event.key == pygame.K_RIGHT:
+                    self.cursor_pos = min(len(self.text), self.cursor_pos + 1)
+                    self.update_button_color()
+                elif event.unicode:
+                    if self.selection_start is not None and self.selection_end is not None:
+                        start = min(self.selection_start, self.selection_end)
+                        end = max(self.selection_start, self.selection_end)
+                        self.text = self.text[:start] + event.unicode + self.text[end:]
+                        self.cursor_pos = start + 1
+                        self.selection_start = None
+                        self.selection_end = None
+
+                    else:
+                        self.add_char(event.unicode)
+
         else:
             super().handle_event(event)
 
-        picked_color = self.color_picker.handle_event(event)
-        if picked_color:
-            self.current_color = picked_color
+        if self.enable_color_picker:
+            picked_color = self.color_picker.handle_event(event)
+            if picked_color:
+                self.set_selection_color(picked_color)
+      
+
 
     def update_button_color(self):
-        for color_change in self.color_list:
-            if color_change['index'] == self.cursor_pos:
-                self.color_picker_button.no_image_color = color_change['color']
-                break
+        current_color = self.text_color  # Assuming text_color holds the default color
+        
+        # Sort the color list based on the index
+        sorted_color_list = sorted(self.color_list, key=lambda x: x['index'])
+        
+        for color_change in sorted_color_list:
+            if color_change['index'] <= self.cursor_pos:
+                current_color = color_change['color']
+            elif color_change['index'] >= self.cursor_pos:
+                break  # Exit if we crossed the cursor position
+
+        if self.enable_color_picker:
+            self.color_picker_button.no_image_color = current_color
+            self.color_picker.set_color(current_color)
+
 
     def add_element(self, element):
         element.set_parent(self)
@@ -761,6 +877,9 @@ class UIButton(UIElement):
         self.normal_text_color = self.text_color
         self.normal_hover_image = self.image
 
+    def reset_hover(self):
+        self.on_unhover()
+
     def set_image(self, image_path):
         self.button_image = pygame.image.load(image_path)
         self.adjust()
@@ -789,6 +908,8 @@ class UIButton(UIElement):
 
 
     def adjust(self):
+        if self.hovered:
+            return
         self.content_offset_x = 0  # Initialize content offset for X
         self.content_offset_y = 0  # Initialize content offset for Y
         rect = None
@@ -824,11 +945,9 @@ class UIButton(UIElement):
         if event.type == pygame.MOUSEMOTION:
             if self.is_mouse_is_over(event.pos):
                 if not self.is_hovered:  # If the button was not already hovered
-                    self.is_hovered = True
                     self.on_hover()
             else:
                 if self.is_hovered:  # If the button was hovered previously
-                    self.is_hovered = False
                     self.on_unhover()
 
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -844,7 +963,8 @@ class UIButton(UIElement):
         return collide
 
     def on_hover(self):        
-        if self.hover_image and self.image:
+        if self.hover_image and self.image and not self.is_hovered:
+            self.is_hovered = True
             self.image = self.hover_image
             self.rect.x -= self.hover_image_offset_x
             self.rect.y -= self.hover_image_offset_y
@@ -857,7 +977,8 @@ class UIButton(UIElement):
             self.text_surface = self.font.render(self.text, True, self.text_color)
 
     def on_unhover(self):
-        if self.hover_image and self.image:
+        if self.hover_image and self.image and self.is_hovered:
+            self.is_hovered = False
             self.image = self.normal_hover_image
             self.rect.x += self.hover_image_offset_x
             self.rect.y += self.hover_image_offset_y
@@ -884,7 +1005,8 @@ class UIContainer(UIElement):
         self.min_width = width
         self.min_height = height
         self.apply_ui_settings()
-        self.can_handle_events = True 
+        self.can_handle_events = True
+        self.is_visible = True
 
         super().__init__(x, y, self.width, self.height, None, self.image, self.no_image_color, self.border_size, padding=self.padding)
         self.focus_manager = FocusManager()
@@ -895,6 +1017,12 @@ class UIContainer(UIElement):
         self.caret_height = 50  # Initial height of scrollbar
         self.dragging_caret = False  # True if the caret is being dragged
         self.mouse_offset = 0  # Offset from top of caret to mouse        
+
+    def set_focus_manager(self, focus_manager):
+        self.focus_manager = focus_manager
+        for element in self.elements:
+            element.set_focus_manager(focus_manager)
+        
 
     def get_max_height(self):
         for element in self.elements:
@@ -942,7 +1070,7 @@ class UIContainer(UIElement):
         element.set_parent(self)
         self.elements.append(element)
         element.original_y = element.rect.y  # Store the original y-position
-        element.focus_manager = self.focus_manager
+        element.set_focus_manager(self.focus_manager)
         if isinstance(element, UITextBox):  # Add only UITextBox elements to the focus manager
             self.focus_manager.add(element)
 
@@ -1034,7 +1162,7 @@ class UIContainer(UIElement):
         #                         self.rect.y + self.padding, 
         #                         self.rect.width - 2 * self.padding, 
         #                         self.rect.height - 2 * self.padding)
-        #pygame.draw.rect(screen, (0, 0, 0), clip_rect, 2)
+        #pygame.draw.rect(screen, (0, 0, 0), self.rect, 2)
         #screen.set_clip(clip_rect)
         
         for element in self.elements:
@@ -1196,9 +1324,9 @@ class UICheckBox(UIElement):
             surface.blit(self.icon, icon_rect)
 
 class UIHeader(UIElement):
-    def __init__(self, x, y, width=UNSET, height=UNSET, column_names=UNSET, column_widths=UNSET, font_size=UNSET, image=UNSET, border_size=UNSET, color=UNSET, padding=UNSET, horizontal_align=UNSET, num_columns=UNSET):
+    def __init__(self, x, y, width=UNSET, height=UNSET, column_names=UNSET, column_widths=UNSET, font_size=UNSET, image=UNSET, border_size=UNSET, text_color=UNSET, padding=UNSET, horizontal_align=UNSET, num_columns=UNSET):
         self.font_size = font_size
-        self.text_color = color
+        self.text_color = text_color
         self.is_hovered = False
         self.enabled = True
         self.image = image
@@ -1253,23 +1381,28 @@ class UIHeader(UIElement):
 
 class UIList(UIElement):
     def __init__(self, x=UNSET, y=UNSET, width=UNSET, height=UNSET, rows = UNSET, text_color=UNSET,item_height = UNSET, item_selected_callback=UNSET, image=UNSET, border_size=UNSET, padding=UNSET,  num_columns=UNSET, column_widths=UNSET, headers=UNSET, header_font_size=UNSET, header_image=UNSET, header_height=UNSET):
-        super().__init__(x, y, width, height - header_height, None, image, (0, 0, 0), border_size, padding=padding)
         self.headers = headers if headers else []
 
         self.num_columns = num_columns
-        self.column_widths = column_widths if column_widths else [width // num_columns] * num_columns         
-        self.item_selected_callback = item_selected_callback
-        self.rect = pygame.Rect(x, y, width, height)
-        self.selected_item = None
+
         self.rows = [] if not rows else rows
-        self.text_color = text_color
         self.item_height = item_height  # Height of each item
-        self.font = pygame.font.Font(None, header_font_size)
-        if self.headers:
-            self.header = UIHeader(x, y- header_height, width, header_height, self.headers, self.column_widths, self.font, color = text_color, image=header_image if header_image else image)
-        else:
-            self.header = None
+        self.text_color = text_color    
+        self.header_image = header_image
+        self.header_font_size = header_font_size
+        self.image = image
+        self.padding = padding
+        self.border_size = border_size
+        self.header_height = header_height
+        self.width = width
+        self.height = height
         #self._rebuild_ui()
+
+
+        self.apply_ui_settings()
+        super().__init__(x, y, self.width, self.height - self.header_height, None, self.image, (0, 0, 0), self.border_size, padding=self.padding)
+        self.column_widths = column_widths if column_widths else [width // num_columns] * self.num_columns         
+        self.total_width = sum(self.column_widths)
         self.hovered_item = None
         self.read_only = False
         self.scroll_position = 0  # The scroll position, starting at 0
@@ -1279,8 +1412,14 @@ class UIList(UIElement):
         self.item_offset_y = 0
         self.mouse_offset = 0
         self.mouse_button_down = False
-        self.total_width = sum(self.column_widths)
         self.screen = None
+        self.item_selected_callback = item_selected_callback
+        self.rect = pygame.Rect(x, y, width, height)
+        self.selected_item = None
+        if self.headers:
+            self.header = UIHeader(x, y- header_height, width, header_height, self.headers, self.column_widths,font_size=self.header_font_size, text_color = self.text_color, image=self.header_image)
+        else:
+            self.header = None
 
     def set_read_only(self, read_only):
         self.read_only = read_only
@@ -1579,7 +1718,6 @@ class UIPopupBase(UIContainer):
         self.is_visible = False
         self.screen = screen
 
-        self.running = False
         # Inner Container to hold custom UI elements
         #inner_container_height = 300
         self.inner_container = UIContainer(0,0, self.width, UNSET,padding=0, image=None, border_size=0)
@@ -1655,165 +1793,18 @@ class UIPopupBase(UIContainer):
                 self.hide()   
 
             super().handle_event(event)
-            # self.inner_container.handle_event(event)
-            # self.ok_button.handle_event(event)
-            # self.cancel_button.handle_event(event)
 
     def show(self, position_y=UNSET):
+        self.ok_button.reset_hover()
+        self.cancel_button.reset_hover()
         self.is_visible = True
-        self.running = True
         self.center_on_screen(self.screen.get_width(), self.screen.get_height(), position_y)
         self.adjust_to_content()
 
     def hide(self):
         self.is_visible = False
-        self.running = False
 
     def draw(self, screen):
         if self.is_visible:
-            super().draw(screen)
+            super().draw(screen)          
 
-    def run_frame(self, events_list=UNSET):
-        self.handle_events(events_list)
-        self.draw(self.screen)
-        if not self.running:
-            return self.return_result            
-
-
-"""
-PyGame UI Framework
-
-Provides reusable UI elements and containers for building interfaces with PyGame.
-
-Components:
-
-- FocusManager: Handles focus between UIElements like text fields. 
-              Tracks current focused element.
-
-- UIElement: Base class for interactive UI elements.
-             Has event handling, drawing, positioning code.
-             
-- UITextBox: Text input box that supports cursor, text insertion/deletion, 
-             keyboard focus. Blinks cursor when focused.
-             
-- ColorPicker: Widget to select a color. Renders gradient and returns 
-               clicked color.
-               
-- UIColoredTextBox: Extends UITextBox with support for colored text.
-                    Allows coloring ranges of text.
-                    
-- UIButton: Clickable button with hover state handling. Calls a
-            callback function when clicked.
-            
-- UIContainer: Groups UIElements together. Useful for windows, panels etc.
-               Draws children and passes events to them.
-               
-- UIMessageBox: Popup dialog with a message and OK button.
-
-- UIProgressBar: Renders a progress bar out of colored squares.
-
-- ListItem: Displays a selectable row item with icon, text, states.
-
-- UICheckBox: Clickable box with a checkmark icon when enabled.
-
-- UIHeader: Renders column headings for lists.
-
-- UIList: Vertical list of selectable rows. Handles scrolling, selection,
-           keyboard focus between items.
-           
-Usage:
-
-1. Create UIElement instances and add to a UIContainer.
-
-2. Draw the UIContainer on the screen. 
-
-3. Pass PyGame events from main loop to container to propagate to children.
-
-4. Call individual element event handlers for additional behavior.
-
-Provides building blocks for complex interfaces without repeating boilerplate 
-event handling, drawing, focus logic etc.
-"""
-
-
-import pygame
-
-
-# # Screen constants
-# SCREEN_WIDTH = 800
-# SCREEN_HEIGHT = 600
-
-# # Helper function to create some buttons
-# def create_buttons(container):
-#   btn_names = ["Btn 1", "Btn 2", "Btn 3"]
-  
-#   for name in btn_names:
-#     btn = UIButton(20, 20, 120, 40, name, callback=button_clicked)
-#     container.add_element(btn)
-
-# # Callback when a button is clicked  
-# def button_clicked(button):
-#   print(f"{button.text} clicked!")
-
-# # Callback when an item is selected  
-# def item_selected(item):
-#   print(f"{item.text} selected!")
-  
-# # Main program  
-
-# pygame.init()
-# screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-
-# # Root container
-# container = UIContainer(20, 20, SCREEN_WIDTH-40, SCREEN_HEIGHT-40)
-
-# # Buttons
-# create_buttons(container)
-
-# # Text box
-# textbox = UITextBox(20, 80, 300, 40) 
-# container.add_element(textbox)
-
-# # Colored text box  
-# color_textbox = UITextBox(20, 140, 300, 40)
-# container.add_element(color_textbox)
-
-# # Progress bar
-# progress = UIProgressBar(20, 200, 300, 40, 10)
-# container.add_element(progress)
-
-# # Image
-# image = UIImage(350, 20, "assets\\UI\\Button01.png")
-# container.add_element(image) 
-
-# # List
-# mylist = UIList(350, 80, 300, 220, item_selected_callback=item_selected)
-# mylist.add_item("Item 1")
-# mylist.add_item("Item 2")
-# container.add_element(mylist)
-
-# # Checkbox
-# checkbox = UICheckBox(350, 320, 30, 30, icon="assets\\UI\\checkbox.png")
-# container.add_element(checkbox)
-
-# # Message box
-# msgbox = UIMessageBox("Hello World!", 300, 300, ok_callback=print)
-
-# running = True
-# while running:
-
-#   # Draw and handle events
-#   container.draw(screen)
-  
-#   for event in pygame.event.get():
-#     if event.type == pygame.QUIT:
-#       running = False
-      
-#     container.handle_event(event)
-    
-#     if event.type == pygame.MOUSEBUTTONDOWN:
-#       msgbox.center_on_screen(SCREEN_WIDTH, SCREEN_HEIGHT)
-      
-#   pygame.display.update()
-  
-# pygame.quit()

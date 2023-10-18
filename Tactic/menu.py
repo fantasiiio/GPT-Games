@@ -1,7 +1,7 @@
 import pygame
 from grid import Grid 
 from Inputs import Inputs
-from GraphicUI import UIContainer, UIButton,UIImage, UILabel
+from GraphicUI import *
 from Tank import Tank
 from config import *
 
@@ -9,39 +9,7 @@ class MainMenu:
     def __init__(self, init_pygame=True, full_screen=False, screen=None):
         self.init_graphics(init_pygame, full_screen, screen, 1500,1200)
         
-        self.TILE_SIZE = 64
-        self.MENU_TILES_X = 20
-        self.MENU_TILES_Y = 20
-        self.GRID_WIDTH = self.TILE_SIZE * self.MENU_TILES_X
-        self.GRID_HEIGHT = self.TILE_SIZE * self.MENU_TILES_Y
-        
-        pygame.display.set_caption('Strategy Game')
-        
-        self.inputs = Inputs()
-        self.container_width = 240
-        self.container_height = 350
-        self.grid = Grid(pygame, self.screen, f"{base_path}\\assets\\maps\\menu.tmx")
-        tile = self.grid.tiles[26][26]
-        tile_pos = tile.x * self.TILE_SIZE, tile.y * self.TILE_SIZE
-        # self.grid_offset = (-(self.grid.tiles_x*64)/2 + self.screen_width/2, 
-        #                     -(self.grid.tiles_y*64)/2 + self.screen_height/2 + 64*2)
-        
-        self.grid.move(-tile_pos[0], -tile_pos[1])
-
-
-        self.menu_container = UIContainer(100,0, 
-                             self.container_width, self.container_height, image=f"{base_path}\\assets\\UI-v2\\Window\\Window_Background.png", padding = 20)
-                             
-        self.menu_container.adjust_to_content()
-
-        self.top_container = UIContainer(0, 0)
-        self.player_label = UILabel(10, 20, f"Battle Grid", text_color=(232,217,194), outline_width=1, font_size=100, font_path=f"{base_path}\\assets\\UI\\Army.ttf")
-        self.player_label.rect.x = self.screen_width / 2 - self.player_label.rect.width / 2
-        self.top_container.add_element(self.player_label)
-        self.top_container.adjust_to_content()
-        self.top_container.center_on_screen(self.screen_width, self.screen_height, 20)
-        self.create_buttons()
-        self.menu_container.center_on_screen(screen.get_width(), screen.get_height(), 200)
+        self.init_ui()
 #        self.menu_container.set_position(self.menu_container.rect.x, self.menu_container.rect.y - 200)
 
         self.tank = Tank(self.grid.tiles[35][26], 2, self.grid, screen=self.screen)
@@ -61,6 +29,44 @@ class MainMenu:
         self.selected_menu_item = None
         self.running = True
         
+    def init_ui(self):
+        self.TILE_SIZE = 64
+        self.MENU_TILES_X = 20
+        self.MENU_TILES_Y = 20
+        self.GRID_WIDTH = self.TILE_SIZE * self.MENU_TILES_X
+        self.GRID_HEIGHT = self.TILE_SIZE * self.MENU_TILES_Y
+        
+        pygame.display.set_caption('Strategy Game')
+        
+        self.inputs = Inputs()
+        self.container_width = 240
+        self.container_height = 350
+        self.grid = Grid(pygame, self.screen, f"{base_path}\\assets\\maps\\menu.tmx")
+        tile = self.grid.tiles[26][26]
+        tile_pos = tile.x * self.TILE_SIZE, tile.y * self.TILE_SIZE
+        
+        self.grid.move(-tile_pos[0], -tile_pos[1])
+
+
+        self.menu_container = UIContainer(100,0, 
+                             self.container_width, self.container_height, image=f"{base_path}\\assets\\UI-v2\\Window\\Window_Background.png", padding = 20)
+                             
+        self.menu_container.adjust_to_content()
+
+        self.top_container = UIContainer(0, 0)
+        self.player_label = UILabel(10, 20, f"Battle Grid", text_color=(232,217,194), outline_width=1, font_size=100, font_path=f"{base_path}\\assets\\UI\\Army.ttf")
+        self.player_label.rect.x = self.screen_width / 2 - self.player_label.rect.width / 2
+        self.top_container.add_element(self.player_label)
+        self.top_container.adjust_to_content()
+        self.top_container.center_on_screen(self.screen_width, self.screen_height, 20)
+        self.create_buttons()
+        self.menu_container.center_on_screen(self.screen.get_width(), self.screen.get_height(), 200)
+
+        self.ui_manager = UIManager()        
+        self.ui_manager.add_container(self.menu_container)
+        self.ui_manager.add_container(self.top_container)
+
+
 
     def init_graphics(self, init_pygame, full_screen, screen, width, height):
         self.init_pygame = init_pygame

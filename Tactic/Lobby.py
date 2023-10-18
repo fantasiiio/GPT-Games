@@ -33,7 +33,7 @@ class Lobby():
     def init_UI(self):
         list_width = 400
         #self.container = UIContainer(600, 0, 400, 1000, f"{base_path}\\assets\\UI\\Box03.png", border_size=23)
-        self.list2 = UIList(10, 100, list_width, 200, image=f"{base_path}\\assets\\UI\\Box03.png", border_size=23, padding=7, num_columns=4, column_widths=[100, 150, 50, 50], headers=["Win/Loose', 'Name', 'Ping', 'Country'], header_height=40)
+        self.list2 = UIList(10, 100, list_width, 200, image=f"{base_path}\\assets\\UI\\Box03.png", border_size=23, padding=7, num_columns=4, column_widths=[100, 150, 50, 50], headers=['Win/Loose', 'Name', 'Ping', 'Country'], header_height=40)
         row_height = 30
         for i in range(20):
             button1 = UIButton(20,0, 50, row_height, text="Invite")
@@ -58,32 +58,29 @@ class Lobby():
     def update_player_list(self):
         pass
 
-    def handle_input(self):
-        for event in pygame.event.get():
+    def handle_input(self, events_list=None):
+        events_list = pygame.event.get() if events_list is None else events_list
+        for event in events_list:
             if event.type == pygame.QUIT:
                 self.running = False     
         
-            self.list.handle_event(event)
+            #self.list.handle_event(event)
             self.list2.handle_event(event)
-            #self.container.handle_event(event)
-
 
     def update(self):
         pass
         
     def render(self):
         #self.container.draw(self.screen)
-        self.list.draw(self.screen)
+        #self.list.draw(self.screen)
         self.list2.draw(self.screen)
         pygame.display.flip()
 
-    def run(self):
-        self.running = True
-        while self.running:
-            self.screen.fill((0,0,0))
-            self.handle_input()
-            self.update()
-            self.render()
+    def run_frame(self, events_list=None):
+        self.handle_input(events_list)
+        self.update()
+        self.render()
 
-connect = Lobby()
-connect.run()
+
+# connect = Lobby()
+# connect.run()

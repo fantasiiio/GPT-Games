@@ -1,4 +1,6 @@
 {
     "email": "fantasiiio@hotmail.com",
-    "password": "tdk2hdD!"
+    "password": "tdk2hdD!",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiZWQ2YjE5NjctNmM3MS0xMWVlLWJiZTctMDAxNTVkNGY4ZGJjIiwiZXhwIjoxNzI5MDQ4NTI5fQ.whPu6E406blRqTqyPQh0P8UwG1wcNYKstXTw3pfntds",
+    "display_name": "Display name updated"
 }

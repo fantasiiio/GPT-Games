@@ -1,4 +1,5 @@
 from config import base_path
+# from GraphicUI import AUTO
 
 ui_settings ={
     "UIButton":{
@@ -33,17 +34,18 @@ ui_settings ={
         "text_color": (200, 200, 200),
         "font_size": 40
     },
-    "UIColoredTextBox":{
+    "UITextBox":{
         "image":f"{base_path}\\assets\\UI-v2\\Input\\Input_Background.png",
         "image_focus":f"{base_path}\\assets\\UI-v2\\Input\\Input_Focus.png",
         "border_size":12,
-        "padding": 7,
+        "padding": 10,
         "text_color": (166,199,80),
         "font_size": 30,
         "width": 100,
         "height": 40,
         "cursor_color": (255,255,255),
-        "enable_color_picker": False
+        "enable_color_picker": False,
+        "selection_color":  (200, 233, 114),
     },
     "UIPopupBase":{
         "header_height": 94,
@@ -73,5 +75,13 @@ ui_settings ={
         "max_squares_per_row": 5,
         "max_value": 5,
         "square_height": 10,
-    }  
+    },
+    "UIList":{
+        "num_columns": 1,
+        "item_height": 40,
+        "width": 0,
+        "height": 0,
+        "padding": 20,
+
+    }
 }

@@ -10,7 +10,7 @@ import threading
 from Connection import Connection, Match, Result
 from Database import Database
 from config import *
-from WebService import WebService
+from WebAPI import WebApi
 from TokenManager import TokenManager
 class Server:
     def __init__(self, host, port):
@@ -28,7 +28,7 @@ class Server:
 
 
     def run_web_service(self):
-        web_service = WebService(self.database, self.users)
+        web_service = WebApi(self.database, self.users)
         web_service.run()        
 
 
@@ -101,6 +101,7 @@ class Server:
                         user = self.database.get_user_by_email(self.users, email)
                         if not user:
                             guid = uuid.uuid1()
+                            guid = str(guid)
                             new_user = {"email": email, "password": hashed_password, "guid": guid}
                             result = Result('User created', "positive")
                             client_conn.send_command('register', data=result.serialize())
@@ -110,7 +111,18 @@ class Server:
                             email_sender.send_verification_email(email, f"https://http://127.0.0.1:5000/verify?token={token}")
                             
                             #client_conn.close()
-                            continue                            
+                            continue
+                        else:
+                            if not user["is_verified"]:
+                                result = Result('User not verified', "negative")
+                                client_conn.send_command('login', data=result.serialize())
+                                continue
+                            else:
+                                token = TokenManager.generate_token(user["guid"], datetime.timedelta(days=365))
+                                data = {"token": token, "user": self.database.get_serializable_user(user)}
+                                result = Result(data, "positive")
+                                client_conn.send_command('login', data=result.serialize())  
+                                continue
                     elif command_type == "token":    
                         token = data
                         decoded_token = TokenManager.decode_token(token)
@@ -119,11 +131,16 @@ class Server:
                             client_conn.send_command('token', data=result.serialize())
                             continue
                         else:
-                            guid = decoded_token
+                            guid = decoded_token["user"]
                             user = self.database.get_user_by_guid(self.users, guid)
-                            data = {"token": token, "user": user}
-                            result = Result(decoded_token, "positive")
-                            client_conn.send_command('token', data=result.serialize())
+                            if guid == user["guid"]:
+                                data = {"token": token, "user": self.database.get_serializable_user(user)}
+                                result = Result(data, "positive")
+                                client_conn.send_command('token', data=result.serialize())
+                            else:
+                                result = Result('Invalid token', "negative")
+                                client_conn.send_command('token', data=result.serialize())
+                                continue
                             continue
                     elif command_type == "display_name":
                         message = data
@@ -177,10 +194,10 @@ class Server:
                 self.check_for_possible_matches()
 
         finally:
-            if hasattr(client_conn, 'match') and client_conn.match:
-                match = client_conn.match            
-                if match:
-                    match.broadcast("end")
+            # if hasattr(client_conn, 'match') and client_conn.match:
+            #     match = client_conn.match            
+            #     if match:
+            #         match.broadcast("end")
 
             if client_conn in self.waiting_list:
                 self.waiting_list.remove(client_conn)                
