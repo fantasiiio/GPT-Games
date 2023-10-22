@@ -1,0 +1,17 @@
+Box2D
+cryptography==41.0.4
+Faker==19.11.0
+Flask==3.0.0
+Pillow==10.1.0
+ping3==4.0.4
+PyJWT==2.8.0
+pymongo==4.5.0
+python_bcrypt==0.3.2
+pytmx==3.32
+rectpack==0.2.2
+redis==5.0.1
+Requests==2.31.0
+#servicemanager
+tqdm==4.66.1
+wand==0.6.11
+Werkzeug==3.0.0

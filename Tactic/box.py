@@ -67,7 +67,7 @@ def inverse_kinematics(base, target, l1, l2):
 
 
 def draw_boxer(pos, color, target):
-
+    pass
     # Left Feet
 
 

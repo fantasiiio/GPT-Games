@@ -47,6 +47,8 @@ class Connection:
     _last_instance = None
 
     def __init__(self, sock=None, host=None, port=None, is_server=False):
+        self.player = None
+        self.is_logged_in = False 
         self.initialize_connection(sock, host, port, is_server)
         Connection._last_instance = self
 
@@ -142,7 +144,7 @@ class Connection:
             data = message.get('data')
             return command_type, receiver, data
         except Exception as e:
-            print(f"Failed to receive command")
+            print(f"Failed to receive command:{e}")
             raise e
 
     def send_data(self, data):
@@ -166,11 +168,9 @@ class Connection:
         # Prepare the complete message to send
         # Send the length of the ciphertext, the IV, and then the ciphertext
         complete_message = struct.pack('!I', len(ciphertext)) + iv + ciphertext
-        bytes_sent = self.sock.sendall(complete_message)
+        self.sock.sendall(complete_message)
         
-        if bytes_sent is not None and bytes_sent < len(complete_message):
-            print(f"Warning: Only {bytes_sent} out of {len(complete_message)} bytes were sent.")
-        print(f"Sent {bytes_sent} bytes")
+        print(f"Message Sent")
 
     def connection_test(self):
         try:
@@ -187,14 +187,14 @@ class Connection:
             data_len_bytes = self.sock.recv(4)
             if len(data_len_bytes) != 4:
                 raise Exception("Failed to receive data length")
-            print(f"Data Length Bytes: {data_len_bytes}")
+            #print(f"Data Length Bytes: {data_len_bytes}")
             data_len = struct.unpack('!I', data_len_bytes)[0]
 
             # Receive the IV
             iv = self.sock.recv(16)
             if len(iv) != 16:
                 raise Exception("Failed to receive IV")
-            print(f"IV: {iv}")
+            #print(f"IV: {iv}")
             # Receive the actual data
             chunks = []
             bytes_received = 0
@@ -220,10 +220,10 @@ class Connection:
             plaintext = decryptor.update(ciphertext) + decryptor.finalize()
 
             # Before trying to decode, log the essential components
-            print(f"Data Length: {data_len}")
-            print(f"IV: {iv}")
-            print(f"Received Ciphertext: {ciphertext}")
-            print(f"Decrypted Plaintext: {plaintext}")
+            #print(f"Data Length: {data_len}")
+            #print(f"IV: {iv}")
+            #print(f"Received Ciphertext: {ciphertext}")
+            #print(f"Decrypted Text: {plaintext}")
 
             try:
                 received_data = plaintext.decode('utf-8')

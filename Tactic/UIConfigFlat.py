@@ -1,7 +1,7 @@
 from config import base_path
 # from GraphicUI import AUTO
 
-ui_settings ={
+ui_settings_flat ={
     "UIButton":{
         "image":f"{base_path}\\assets\\UI-v2\\Buttons\\Framed\\Square\\Green\\Button_FSG_Background.png",
         "border_size":12,
@@ -16,23 +16,25 @@ ui_settings ={
         "hover_image":f"{base_path}\\assets\\UI-v2\\Buttons\\Framed\\Square\\Green\\Outline.png",
     },
     "UIContainer":{
-        "image":f"{base_path}\\assets\\UI-v2\\Window\\Window.png",
-        "border_size":80,
+        "image":None,
+        "border_size":0,
         "padding": 20,
         "height": 100,
         "width": 100,
-        "min_width": 200,
-        "min_height": 50,
+        "min_width": 0,
+        "min_height": 0,
         "horizontal_align":'center',
-        "no_image_color": (0,0,0,0)
+        "no_image_color": (44, 65, 81, 255)
     },
     "UIHeader":{
         "image":f"{base_path}\\assets\\UI-v2\\Window\\Window_Header.png",
+        "border_size":24,
         "horizontal_align":'left',
         "num_columns": 1,
         "padding": 20,
         "text_color": (200, 200, 200),
-        "font_size": 40
+        "font_size": 40,
+        "height": 50
     },
     "UITextBox":{
         "image":f"{base_path}\\assets\\UI-v2\\Input\\Input_Background.png",
@@ -78,10 +80,24 @@ ui_settings ={
     },
     "UIList":{
         "num_columns": 1,
-        "item_height": 40,
+        "item_height": None,
         "width": 0,
         "height": 0,
         "padding": 20,
+        "image":f"{base_path}\\assets\\UI-v2\\Window\\Window.png",
+        "header_border_size": 24,
+        "border_size": 80,
+        "header_height": None,
+        "enable_scrollbar": True,
+        "item_height": 50,
+        "header_image":f"{base_path}\\assets\\UI-v2\\Window\\Window_small.png",
+    },
+    "UIScrollBar":{
+        "image":f"{base_path}\\assets\\UI-v2\\Sliders & Scrollbars\\Scrollbar_Vertical_Background.png",
+        "caret_image":f"{base_path}\\assets\\UI-v2\\Sliders & Scrollbars\\Scrollbar_Vertical_Thumb.png",
+        "border_size": 6,
+        "padding": 0,
+        "color": (0,0,0)
+    },
 
-    }
 }

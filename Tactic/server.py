@@ -1,10 +1,7 @@
 import uuid
 from EmailSender import EmailSender
 import bcrypt
-import jwt
 import datetime
-import redis
-import json
 import socket
 import threading
 from Connection import Connection, Match, Result
@@ -12,6 +9,11 @@ from Database import Database
 from config import *
 from WebAPI import WebApi
 from TokenManager import TokenManager
+import win32serviceutil
+import win32service
+import win32event
+import sys
+
 class Server:
     def __init__(self, host, port):
         self.database = Database()
@@ -119,9 +121,13 @@ class Server:
                                 continue
                             else:
                                 token = TokenManager.generate_token(user["guid"], datetime.timedelta(days=365))
-                                data = {"token": token, "user": self.database.get_serializable_user(user)}
+                                connected_user = self.database.get_serializable_user(user)
+                                data = {"token": token, "user": connected_user}
                                 result = Result(data, "positive")
-                                client_conn.send_command('login', data=result.serialize())  
+                                client_conn.send_command('login', data=result.serialize())
+                                client_conn.player = connected_user
+                                client_conn.is_logged_in = True
+                                self.broadcast("user_connected", receiver="others", data=connected_user)  
                                 continue
                     elif command_type == "token":    
                         token = data
@@ -134,9 +140,13 @@ class Server:
                             guid = decoded_token["user"]
                             user = self.database.get_user_by_guid(self.users, guid)
                             if guid == user["guid"]:
-                                data = {"token": token, "user": self.database.get_serializable_user(user)}
+                                connected_user = self.database.get_serializable_user(user)
+                                data = {"token": token, "user": self.database.get_serializable_user(connected_user)}
                                 result = Result(data, "positive")
                                 client_conn.send_command('token', data=result.serialize())
+                                client_conn.is_logged_in = True
+                                client_conn.player = connected_user
+                                self.broadcast("user_connected", receiver="others", data=connected_user)                                 
                             else:
                                 result = Result('Invalid token', "negative")
                                 client_conn.send_command('token', data=result.serialize())
@@ -153,7 +163,13 @@ class Server:
                             result = Result('Display name updated', "positive")
                             client_conn.send_command('display_name', data=result.serialize())
                             continue
-                        
+                    elif command_type == "get_user_list":
+                        for player in self.connected_players:
+                            if player.player:
+                                player.player["is_connected"] = True
+                        users = self.get_user_list()  # You need to implement this method.
+                        client_conn.send_command("user_list", data=users)    
+
                     if user :
                         is_valid = self.check_password(plain_assword, user["password"])
                         if is_valid:
@@ -177,21 +193,21 @@ class Server:
         except (ConnectionResetError, BrokenPipeError, Exception) as e:
             print(f"An error occurred or client disconnected: {e}")
 
-            if hasattr(client_conn, 'match') and client_conn.match:
-                match = client_conn.match
+            # if hasattr(client_conn, 'match') and client_conn.match:
+            #     match = client_conn.match
 
-                # Remove the disconnected client from the match
-                match.connections.remove(client_conn)
-                self.connected_players.remove(client_conn)
-                # Put the remaining player back into the waiting list
-                for remaining_conn in match.connections:
-                    self.add_to_waiting_list(remaining_conn)
-                    remaining_conn.match = None  # Reset match for remaining player
+            #     # Remove the disconnected client from the match
+            #     match.connections.remove(client_conn)
+            #     self.connected_players.remove(client_conn)
+            #     # Put the remaining player back into the waiting list
+            #     for remaining_conn in match.connections:
+            #         self.add_to_waiting_list(remaining_conn)
+            #         remaining_conn.match = None  # Reset match for remaining player
 
-                # Remove the now-empty match from active matches
-                self.active_matches.remove(match)
+            #     # Remove the now-empty match from active matches
+            #     self.active_matches.remove(match)
 
-                self.check_for_possible_matches()
+            #     self.check_for_possible_matches()
 
         finally:
             # if hasattr(client_conn, 'match') and client_conn.match:
@@ -224,6 +240,67 @@ class Server:
             self.close_all_connections()
             print("Server socket closed.")
 
+
+
+class BattleGridService(win32serviceutil.ServiceFramework):
+    _svc_name_ = 'BattleGridService'
+    _svc_display_name_ = 'BattleGrid Server'
+
+    def __init__(self, args):
+        win32serviceutil.ServiceFramework.__init__(self, args)
+        self.hWaitStop = win32event.CreateEvent(None, 0, 0, None)
+        self.ip = None
+        self.port = None
+
+        # Extract IP and port from args
+        if '--ip' in args:
+            self.ip = args[args.index('--ip')+1]
+        if '--port' in args:
+            self.port = int(args[args.index('--port')+1])
+
+    def SvcStop(self):
+        self.ReportServiceStatus(win32service.SERVICE_STOP_PENDING)
+        self.web_api.stop()  # Stop the Flask server
+        win32event.SetEvent(self.hWaitStop)
+
+    def SvcDoRun(self):
+        self.main()
+
+    def main(self):
+        print(f"Starting on {self.ip}:{self.port}")
+        server_instance = Server(host=self.ip, port=self.port)
+        server_instance.middleman_server()
+
+
 if __name__ == "__main__":
-    server_instance = Server(host='127.0.0.1', port=65432)
-    server_instance.middleman_server()
+    if '-runservice' in sys.argv:
+        # Stash custom arguments for later
+        stashed_args = []
+        for arg in ['--ip', '--port']:
+            if arg in sys.argv:
+                index = sys.argv.index(arg)
+                stashed_args.extend([sys.argv[index], sys.argv[index+1]])
+                del sys.argv[index+1]
+                sys.argv.remove(arg)
+
+        sys.argv.remove('-runservice')
+        sys.argv.extend(stashed_args)  # Add back stashed arguments for service initialization
+        win32serviceutil.HandleCommandLine(BattleGridService)
+    else:
+            # Normal script behavior here
+        print("Running as a normal script or .exe")
+
+        # Extract IP and Port for normal script execution
+        ip = '127.0.0.1'
+        port = 65432
+        for arg in ['--ip', '--port']:
+            if arg in sys.argv:
+                if arg == '--ip':
+                    ip = sys.argv[sys.argv.index(arg)+1]
+                elif arg == '--port':
+                    port = int(sys.argv[sys.argv.index(arg)+1])
+                del sys.argv[sys.argv.index(arg)+1]
+                sys.argv.remove(arg)
+
+        server_instance = Server(host=ip, port=port)
+        server_instance.middleman_server()

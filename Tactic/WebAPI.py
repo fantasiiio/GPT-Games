@@ -1,4 +1,6 @@
-
+from flask import Flask
+from werkzeug.serving import make_server
+import threading
 from TokenManager import TokenManager
 from flask import Flask, request, render_template
 from Database import Database
@@ -13,6 +15,7 @@ class WebApi:
         self.app = Flask(__name__)
         self.database = user_db  # Simulated database
         self.user_collection = user_collection
+        self.stop_event = threading.Event()  # Add this line
 
     def verify_email(self):
         try:
@@ -26,20 +29,32 @@ class WebApi:
                 return render_template("verification_fail.html")
         except Exception as e:
             return render_template("verification_fail.html")
+        
+    def hello(self):
+        return "Hello, World!"
 
     def run(self):
-        self.app.add_url_rule('/verify', 'verify_email', self.verify_email)
+        self.app.add_url_rule('/hello', 'hello', self.hello)
         t = threading.Thread(target=self._run_flask)
+        t.daemon = True  # Makes thread exit when main program exits
         t.start()
 
     def _run_flask(self):
-        self.app.run(debug=False)    
+        self.server = make_server('127.0.0.1', 5000, self.app)
+        self.ctx = self.app.app_context()
+        self.ctx.push()
+        self.server.serve_forever()
 
-# Usage
+    def stop(self):
+        self.server.shutdown_signal = True
+
 # if __name__ == '__main__':
 #     web_service = WebApi()
-
-#     # Simulate adding a verification entry
-#     web_service.add_verification_entry('xyz123', 'example@example.com')
-
 #     web_service.run()
+
+#     try:
+#         while True:
+#             pass  # Simulating main loop, replace with actual server logic
+#     except KeyboardInterrupt:
+#         print("Ctrl+C detected. Shutting down Flask server.")
+#         web_service.stop()

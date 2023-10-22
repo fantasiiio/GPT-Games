@@ -49,6 +49,7 @@ class Database:
             "guid": self.get_dict_property(user,"guid", ""),
             "is_verified": self.get_dict_property(user,"is_verified", False),
             "display_name": self.get_dict_property(user,"display_name", ""),
+            "country": self.get_dict_property(user,"country", "CA")
         }
     
     

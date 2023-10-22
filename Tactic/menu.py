@@ -5,10 +5,11 @@ from GraphicUI import *
 from Tank import Tank
 from config import *
 
-class MainMenu:
+class MainMenu(UIManager):
     def __init__(self, init_pygame=True, full_screen=False, screen=None):
+        super().__init__()
         self.init_graphics(init_pygame, full_screen, screen, 1500,1200)
-        
+        self.containers = []
         self.init_ui()
 #        self.menu_container.set_position(self.menu_container.rect.x, self.menu_container.rect.y - 200)
 
@@ -41,7 +42,7 @@ class MainMenu:
         self.inputs = Inputs()
         self.container_width = 240
         self.container_height = 350
-        self.grid = Grid(pygame, self.screen, f"{base_path}\\assets\\maps\\menu.tmx")
+        self.grid = Grid(self.screen, f"{base_path}\\assets\\maps\\menu.tmx")
         tile = self.grid.tiles[26][26]
         tile_pos = tile.x * self.TILE_SIZE, tile.y * self.TILE_SIZE
         
@@ -62,9 +63,8 @@ class MainMenu:
         self.create_buttons()
         self.menu_container.center_on_screen(self.screen.get_width(), self.screen.get_height(), 200)
 
-        self.ui_manager = UIManager()        
-        self.ui_manager.add_container(self.menu_container)
-        self.ui_manager.add_container(self.top_container)
+        self.add_container(self.menu_container)
+        self.add_container(self.top_container)
 
 
 

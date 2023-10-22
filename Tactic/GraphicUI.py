@@ -1,7 +1,75 @@
+'''
+
+- **UIElement**: 
+    - Base class for all user interface (UI) elements in the framework. 
+    - Provides fundamental attributes and methods that all UI elements leverage.
+    - Includes positioning elements on the screen, drawing the elements onto the Pygame window, and handling user interactions with these elements.
+    - Supports 9-slice scaling for images, allowing the UI element to maintain the aspect ratio of the image's corners when scaling.
+    - Can be configured with a dictionary object, which maps class names to property names for flexible UI design.
+
+- **FocusManager**:
+    - Manages keyboard focus among multiple `UITextBox` elements.
+    - Ensures that at any given time, keyboard interactions are only processed by one `UITextBox`.
+    - Particularly useful for forms and other UI structures where multiple text input fields are present.
+
+- **UIButton**:
+    - Represents a clickable button in the UI.
+    - Supports displaying either a text label or an image.
+    - Executes a callback function when clicked, providing hover state handling to change its appearance when the mouse cursor is over it.
+    - Can be disabled, preventing it from responding to clicks.
+    - Allows for a wide range of visual button styles, from text labels to intricate graphics.
+
+- **UITextBox**:
+    - Represents a text field that users can type into.
+    - Displays the user's input and has the ability to call a callback function when the text content changes.
+    - Useful for interactive forms and other user input scenarios.
+
+- **UIContainer**:
+    - A container class capable of holding multiple `UIElement` instances.
+    - Responsible for relaying events (like mouse clicks or keyboard inputs) to its child elements and orchestrating the drawing of these elements on the screen.
+
+- **UIColorPicker**:
+    - A specialized UI element that allows users to select a color from a gradient of options.
+    - Useful for customization interfaces where users can choose colors.
+
+- **UIList**:
+    - Represents a list of selectable rows.
+    - Each row can consist of multiple columns, and each cell in the list can contain different types of controls.
+    - Manages keyboard focus between items, handles scrolling if the number of items exceeds the visible space, and displays a scrollbar for easier navigation when the list is scrollable.
+    - Supports hover states to highlight the item currently under the cursor.
+
+- **UIHeader**:
+    - Typically used to display a title or section heading in the UI.
+    - Aids in structuring and organizing the UI.
+
+- **UIManager**:
+    - Manages multiple `UIContainer` instances.
+    - Provides the ability to create and manage separate screens or views in a game.
+    - Essential for games with multiple screens or states.
+
+- **UIPopupBase**:
+    - A base class for popup windows in the UI.
+    - Provides fundamental functionality such as showing and hiding the popup.
+    - Includes a header for displaying a title or message.
+    - Contains a dedicated `UIContainer` that can host a variety of UI elements.
+    - Includes 'OK' and 'Cancel' buttons, which can be linked with specific callback functions to perform actions when clicked.
+
+- **UILabel**:
+    - Represents a static text label in the UI.
+    - Capable of displaying a static text string.
+    - Typically used for non-interactive text display in the UI.
+
+- **UIProgressBar**:
+    - Represents a progress bar.
+    - Can visually display a progress value, which can be updated dynamically.
+    - Useful in scenarios where you need to show progress or loading status to the user.
+
+Each of these classes can be configured with the `ui_settings` dictionary, which maps class names to dictionaries of property names and values, allowing for flexible configuration of UI elements.
+ '''
+
 from collections import OrderedDict
 import pygame
 from config import *
-from UIConfig import *
 
 class Sentinel:
     def __bool__(self):
@@ -9,11 +77,49 @@ class Sentinel:
 UNSET = Sentinel()  # Sentinel object to signify unset attributes
 AUTO = Sentinel()  # Sentinel object to signify automatic attribute value
 
+class Anchor:
+    LEFT = 1
+    RIGHT = 2
+    TOP = 4
+    BOTTOM = 8
+
+    def __init__(self, control, target=None, flags=0):
+        self.control = control
+        self.target = target
+        self.flags = flags
+
+    def apply(self):
+        target_rect = self.target.rect if self.target else self.control.parent.rect
+
+        if self.flags & self.LEFT:
+            dx = target_rect.x - self.control.rect.x
+            self.control.move_by_offset(dx, 0)
+        if self.flags & self.RIGHT:
+            dx = target_rect.right - self.control.rect.right
+            self.control.move_by_offset(dx, 0)
+        if self.flags & self.TOP:
+            dy = target_rect.y - self.control.rect.y
+            self.control.move_by_offset(0, dy)
+        if self.flags & self.BOTTOM:
+            dy = target_rect.bottom - self.control.rect.bottom
+            self.control.move_by_offset(0, dy)
+
+
 class UIManager:
     screen = None
+    is_active = True
+    ui_settings = None
     def __init__(self):
         self.containers = []  # List of containers, in order of Z-position (back to front)
         self.child_managers = []  # List of child managers, in order of Z-position (back to front)
+
+
+
+    def show(self):
+        self.is_active = True
+    
+    def hide(self):
+        self.is_active = False
 
     def add_container(self, container):
         self.containers.append(container)
@@ -50,6 +156,9 @@ class UIManager:
             self.managers.insert(0, manager)
 
     def handle_event(self, event):
+        if not self.is_active:
+            return
+
         # First, give the event to the child managers
         for manager in reversed(self.child_managers):
             if manager.handle_event(event):
@@ -63,6 +172,8 @@ class UIManager:
         return False  # If no child manager or container handled the event, return False
 
     def draw(self, screen):
+        if not self.is_active:
+            return
         for manager in self.child_managers:
             manager.draw(screen)
         # Draw the containers first, then the child managers
@@ -95,7 +206,7 @@ class FocusManager:
 
 class UIElement:
     global_id = 1
-    def __init__(self, x=UNSET, y=UNSET, width=UNSET, height=UNSET, parent=UNSET,image=UNSET, color=UNSET, border_size=UNSET, id=UNSET, padding=UNSET):
+    def __init__(self, x=UNSET, y=UNSET, width=UNSET, height=UNSET, parent=UNSET,image=UNSET, color=UNSET, border_size=UNSET, id=UNSET, padding=UNSET, border_width=UNSET, border_color=UNSET):
         self.padding = padding if padding is not UNSET else 0
         self.elements = []      
         self.id = self.generate_id() if id is not UNSET else id
@@ -110,15 +221,36 @@ class UIElement:
         self.disabled = False
         self.hovered = False
         self.selected = False
-        width = width if width is not UNSET else 0
-        height = height if height is not UNSET else 0
-        x = x if x is not UNSET else 0
-        y = y if y is not UNSET else 0
+        self.border_width = border_width
+        self.border_color = border_color
+        width = width if width is not UNSET and width is not AUTO else 0
+        height = height if height is not UNSET and height is not AUTO else 0
+        x = x if x is not UNSET and x is not AUTO else 0
+        y = y if y is not UNSET and y is not AUTO else 0
         self.focus_manager = None
         if parent:
             self.rect = pygame.Rect(x + parent.rect.x, y + parent.rect.y, width, height)
         else:
             self.rect = pygame.Rect(x, y, width, height)
+        self.anchors = []
+        self.tooltip = None
+
+    def create_tooltip(self, text):
+        self.tooltip = UITooltip(attach_control=self, text=text)
+
+        pass
+
+    def add_anchor(self, target=None, flags=0):
+        anchor = Anchor(self, target, flags)
+        self.anchors.append(anchor)
+
+    def update_anchor(self):
+        for anchor in self.anchors:
+            anchor.apply()
+
+    def move_by_offset(self, x_offset, y_offset):
+        self.rect.x += x_offset
+        self.rect.y += y_offset
 
     def set_focus_manager(self, focus_manager):
         self.focus_manager = focus_manager
@@ -142,14 +274,23 @@ class UIElement:
         # Loop over all classes and apply settings
         for base_class in all_classes:
             class_name = base_class.__name__
-            if class_name in ui_settings:
-                for property_name, default_value in ui_settings[class_name].items():
+            if class_name in UIManager.ui_settings:
+                for property_name, default_value in UIManager.ui_settings[class_name].items():
                     current_value = getattr(self, property_name, UNSET)
                     if current_value is UNSET:
                         setattr(self, property_name, default_value)
 
     def handle_event(self, event):
-        return False  # Base class does not handle any events
+        if not self.tooltip:
+            return False
+        if event.type == pygame.MOUSEMOTION:
+            if self.rect.collidepoint(event.pos):
+                self.tooltip.visible = True
+                return True
+            else:
+                self.tooltip.visible = False
+                return False
+
 
     def set_parent(self, parent):
         self.parent = parent
@@ -177,7 +318,12 @@ class UIElement:
         else:
             transparent_surface = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
             transparent_surface.fill(self.get_rgba(self.no_image_color))
-            screen.blit(transparent_surface, self.rect.topleft)            
+            if self.border_width:
+                pygame.draw.rect(transparent_surface, self.get_rgba(self.no_image_color), self.rect, self.border_width)
+                screen.blit(transparent_surface, self.rect.topleft)
+
+        if self.tooltip:
+            self.tooltip.draw(screen)
 
     def draw_9_slice(self, screen):
         border = self.border_size
@@ -269,6 +415,7 @@ class UIColorPicker(UIElement):
             screen.set_clip(rect)
 
     def handle_event(self, event):
+        super().handle_event(event)
         if not self.is_visible:
             return None
 
@@ -425,9 +572,12 @@ class UITextBox(UIElement):
         return json.dumps(state)
     
     def deserialize(self, state_string):
-        state = json.loads(state_string)
-        self.text = state['text']
-        self.color_list = [{'index': change['index'], 'color': pygame.Color(*change['color'])} for change in state['colors']]
+        if state_string and not state_string.startswith('{'):
+            self.text = state_string
+        else:
+            state = json.loads(state_string)
+            self.text = state['text']
+            self.color_list = [{'index': change['index'], 'color': pygame.Color(*change['color'])} for change in state['colors']]
 
     def set_parent(self, parent):
         super().set_parent(parent)
@@ -536,7 +686,7 @@ class UITextBox(UIElement):
             if self.color_picker.is_visible:
                 self.color_picker.draw(screen)
 
-        pygame.draw.rect(UIManager.screen, (0,0,0), self.rect ,1)
+        #pygame.draw.rect(UIManager.screen, (0,0,0), self.rect ,1)
 
 
 
@@ -677,7 +827,7 @@ class UITextBox(UIElement):
 
 
 class UIImage(UIElement):
-    def __init__(self, x=UNSET, y=UNSET, image=UNSET, parent=UNSET, border_size=UNSET, move_to_bounding_pos=UNSET, callback=UNSET, padding=UNSET, backgroung_image=UNSET):
+    def __init__(self, x=UNSET, y=UNSET, image_file=UNSET, parent=UNSET, border_size=UNSET, move_to_bounding_pos=UNSET, callback=UNSET, padding=UNSET, backgroung_image=UNSET, image=UNSET):
         self.padding = padding
         self.border_size = border_size
         self.color = (0,0,0,0)
@@ -689,9 +839,16 @@ class UIImage(UIElement):
 
         self.move_to_bounding_pos = move_to_bounding_pos
         self.callback = callback
-        if image:
-            self.diplay_image = pygame.image.load(image)
-            self.bounding_rect = self.get_bounding_rectangle()
+        self.diplay_image = None
+        if image_file or image:
+            if image_file:
+                self.diplay_image = pygame.image.load(image_file)
+            elif image:
+                self.diplay_image = image
+            if move_to_bounding_pos:
+                self.bounding_rect = self.get_bounding_rectangle()
+            else:
+                self.bounding_rect = self.rect
             rect = self.diplay_image.get_rect()
             self.rect.width = rect.width
             self.rect.height = rect.height
@@ -702,6 +859,34 @@ class UIImage(UIElement):
             if move_to_bounding_pos:
                 self.rect.x -= self.bounding_rect.x
                 self.rect.y -= self.bounding_rect.y
+
+    def scale_image_to_width(self, width):
+        # Get the aspect ratio of the original image
+        original_width, original_height = self.diplay_image.get_size()
+        aspect_ratio = original_height / original_width
+
+        # Calculate the new height based on the aspect ratio and desired width
+        new_height = int(width * aspect_ratio)
+
+        # Scale the image
+        scaled_image = pygame.transform.scale(self.diplay_image, (width, new_height))
+        self.rect.width = width
+        self.rect.height = new_height
+        self.diplay_image = scaled_image
+
+    def scale_image_to_height(self, height):
+        # Get the aspect ratio of the original image
+        original_width, original_height = self.diplay_image.get_size()
+        aspect_ratio = original_height / original_width
+
+        # Calculate the new height based on the aspect ratio and desired width
+        new_width = int(height / aspect_ratio)
+
+        # Scale the image
+        scaled_image = pygame.transform.scale(self.diplay_image, (new_width, height))
+        self.rect.width = new_width
+        self.rect.height = height
+        self.diplay_image = scaled_image        
 
 
     def world_to_local(self, pos):
@@ -736,9 +921,13 @@ class UIImage(UIElement):
             self.rect.y -= self.bounding_rect.y      
 
     def draw(self, screen):
-        screen.blit(self.diplay_image, (self.rect.x, self.rect.y))
+        super().draw(screen)
+        if self.diplay_image:
+            screen.blit(self.diplay_image, (self.rect.x, self.rect.y))
 
     def handle_event(self, event):
+        super().handle_event(event)
+
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1 and self.is_mouse_is_over(event.pos):
                 if self.callback:
@@ -790,43 +979,83 @@ class UILabel(UIImage):
         self.padding = padding
         self.font_path = font_path
 
-        super().__init__(x, y, None, parent, self.text_color, padding=self.padding) 
-
+        super().__init__(x, y, None, parent, None, padding=self.padding) 
+        
+        self.color_list = [{'index': 0, 'color': self.text_color}]
         self.font = pygame.font.Font(self.font_path, self.font_size)
         self.text_surface = self.font.render(self.text, True, self.text_color)
         self.rect = self.text_surface.get_rect(top=self.rect.top, left=self.rect.left)
 
+    def deserialize(self, state_string):
+        if state_string and not state_string.startswith('{'):
+            self.text = state_string
+        else:
+            state = json.loads(state_string)
+            self.text = state['text']
+            self.color_list = [{'index': change['index'], 'color': pygame.Color(*change['color'])} for change in state['colors']]
+
     def set_text(self, text):
         self.text = text
-        self.text_surface = self.font.render(self.text, True, self.text_color)
-        self.rect = self.text_surface.get_rect(top=self.rect.top, left=self.rect.left)
+        self.color_list = [{'index': 0, 'color': self.text_color}]  # Initialize with default text color
+
 
     def draw(self, screen):
         if not self.font:
             return
-        #self.set_parent(self.parent)
+
         if self.outline_width > 0:
-            self.draw_text_with_outline(self.text, screen, self.text_color, self.outline_color, self.outline_width)
+            self.draw_text_with_outline(screen)
         else:
-            screen.blit(self.text_surface, (self.rect.topleft[0], self.rect.topleft[1]))
+            self.draw_text(screen)
 
-    def draw_text_with_outline(self, text, screen, text_color=(255,255,255), outline_color=(0,0,0), outline_thickness=2, alpha_value=255):
-        # Create text surface
-        text_surface = self.font.render(text, True, text_color)
-        text_rect = text_surface.get_rect(top=self.rect.top, left=self.rect.left)
+    def draw_text(self, screen):
+        x_offset = 0
+        current_color = self.text_color  # Initialize with default text color 
+        last_color_index = -1  
         
-        # Create outline by drawing text multiple times around the original text
-        outline_alpha_color = (*outline_color[:3], alpha_value)
-        for i in range(-outline_thickness, outline_thickness+1):
-            for j in range(-outline_thickness, outline_thickness+1):
-                outline_surface = self.font.render(text, True, outline_alpha_color)
-                outline_rect = outline_surface.get_rect(top=self.rect.top+j, left=self.rect.left+i)
-                screen.blit(outline_surface, outline_rect)
-        
-        # Draw the original text
-        screen.blit(text_surface, text_rect)    
+        for i, char in enumerate(self.text):
+            for color_change in self.color_list:
+                if color_change['index'] == i:
+                    current_color = color_change['color']
+                    last_color_index = i
 
+            if i > last_color_index:
+                current_color = self.text_color
 
+            char_surface = self.font.render(char, True, current_color)
+            char_rect = char_surface.get_rect(topleft=(self.rect.x + self.padding + x_offset, self.rect.y + self.padding))
+            screen.blit(char_surface, char_rect)
+            x_offset += char_surface.get_width()
+
+    def draw_text_with_outline(self, screen):
+        x_offset = 0
+        current_color = self.text_color
+        last_color_index = -1  
+
+        for i, char in enumerate(self.text):
+            for color_change in self.color_list:
+                if color_change['index'] == i:
+                    current_color = color_change['color']
+                    last_color_index = i
+
+            if i > last_color_index:
+                current_color = self.text_color
+
+            char_surface = self.font.render(char, True, current_color)
+            char_rect = char_surface.get_rect(topleft=(self.rect.x + self.padding + x_offset, self.rect.y + self.padding))
+
+            # Draw outline
+            outline_alpha_color = (*self.outline_color[:3], 255)
+            outline_surface = self.font.render(char, True, outline_alpha_color)
+
+            for dx in range(-self.outline_width, self.outline_width + 1):
+                for dy in range(-self.outline_width, self.outline_width + 1):
+                    outline_rect = char_rect.move(dx, dy)
+                    screen.blit(outline_surface, outline_rect)
+
+            # Draw the actual character
+            screen.blit(char_surface, char_rect)
+            x_offset += char_surface.get_width()
 class UIButton(UIElement):
     mouse_over_button = False
     def __init__(self, x, y, width=UNSET, height=UNSET, text=UNSET, font_size=UNSET, image=UNSET, parent=UNSET,color=UNSET, border_size=UNSET, text_color=UNSET, hover_text_color=UNSET, callback=UNSET, trigger_key=UNSET, padding = UNSET, button_image=UNSET, font_path=UNSET, hover_image=UNSET):
@@ -934,6 +1163,8 @@ class UIButton(UIElement):
         # self.rect.height = rect.height + 2 * self.padding
 
     def handle_event(self, event):
+        super().handle_event(event)
+
         if not self.enabled:
             return
         
@@ -1122,6 +1353,8 @@ class UIContainer(UIElement):
 
     def handle_event(self, event):
         if self.can_handle_events:
+            #super().handle_event(event)
+
             mouse_pos = pygame.mouse.get_pos()
             
             # Handle Scrollbar and Caret Events
@@ -1162,8 +1395,8 @@ class UIContainer(UIElement):
         #                         self.rect.y + self.padding, 
         #                         self.rect.width - 2 * self.padding, 
         #                         self.rect.height - 2 * self.padding)
-        #pygame.draw.rect(screen, (0, 0, 0), self.rect, 2)
-        #screen.set_clip(clip_rect)
+        # pygame.draw.rect(screen, (0, 0, 0), self.rect, 2)
+        # screen.set_clip(clip_rect)
         
         for element in self.elements:
             element.draw(screen)
@@ -1177,6 +1410,48 @@ class UIContainer(UIElement):
             if self.needs_scrollbar():        
                 pygame.draw.rect(screen, (0, 0, 0), (self.rect.right - 20, self.rect.y, 20, self.rect.height))
                 pygame.draw.rect(screen, (100, 100, 100), (self.rect.right - 20, self.rect.y + self.scroll_position, 20, self.caret_height))
+
+class UITooltip(UIContainer):
+    def __init__(self, attach_control=UNSET,x=UNSET, y=UNSET, width=UNSET, height=UNSET, image=UNSET, color=UNSET, border_size=UNSET, padding=UNSET, text=UNSET, font_size=UNSET, text_color=UNSET, font_path=UNSET, screen=UNSET):
+        self.attach_control = attach_control
+        self.text = text
+        self.font_size = font_size
+        self.text_color = text_color
+        self.font_path = font_path
+        self.screen = screen
+        super().__init__(attach_control.rect.x, y, width, height, image=image, color=color, border_size=border_size, padding=padding)
+
+        self.message_label = UILabel(0, 0, self.text, font_size=self.font_size, text_color=self.text_color, font_path=self.font_path)
+        self.add_element(self.message_label)
+        #self.is_visible = False
+
+    def draw(self, screen):
+        if not self.is_visible:
+            return
+        else:
+            return super().draw(screen)
+    
+    def show(self, text=UNSET):
+        if text:
+            self.message_label.set_text(text)
+        self.adjust()
+        self.is_visible = True
+
+    def hide(self):
+        self.is_visible = False
+
+    def adjust(self):
+        super().adjust_to_content()
+        self.rect.x = self.attach_control.rect.right + 20
+        self.rect.y = self.attach_control.rect.y - self.rect.height /2
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEMOTION:
+            if self.rect.collidepoint(event.pos):
+                self.visible = True
+            else:
+                self.visible = False        
+
 
 class UIMessageBox(UIContainer):
     def __init__(self, message=UNSET, x=UNSET, y=UNSET, width=UNSET, height=UNSET, ok_callback=UNSET, padding=UNSET, image=UNSET, color=UNSET, border_size=UNSET, font_size=UNSET, screen=UNSET):
@@ -1199,6 +1474,8 @@ class UIMessageBox(UIContainer):
             self.ok_callback(self)
         
     def handle_event(self, event):
+        super().handle_event(event)
+
         for element in self.elements:
             element.handle_event(event)
     
@@ -1254,7 +1531,8 @@ class UIProgressBar(UIElement):
         self.max_squares_per_row = max_squares_per_row
         self.x = x
         self.y = y
-        self.apply_ui_settings()        
+        self.apply_ui_settings()
+        self.height = height       
         super().__init__(self.x, self.y, self.width, self.height, image=self.image, border_size=self.border_size)
         self.square_width = width / max_squares_per_row -1
 
@@ -1324,7 +1602,7 @@ class UICheckBox(UIElement):
             surface.blit(self.icon, icon_rect)
 
 class UIHeader(UIElement):
-    def __init__(self, x, y, width=UNSET, height=UNSET, column_names=UNSET, column_widths=UNSET, font_size=UNSET, image=UNSET, border_size=UNSET, text_color=UNSET, padding=UNSET, horizontal_align=UNSET, num_columns=UNSET):
+    def __init__(self, x, y, width=UNSET, height=AUTO, column_names=UNSET, column_widths=UNSET, font_size=UNSET, image=UNSET, border_size=UNSET, text_color=UNSET, padding=UNSET, horizontal_align=UNSET, num_columns=UNSET):
         self.font_size = font_size
         self.text_color = text_color
         self.is_hovered = False
@@ -1343,11 +1621,22 @@ class UIHeader(UIElement):
         self.apply_ui_settings()
         self.font = pygame.font.Font(None, self.font_size)
 
-        super().__init__(x, y, self.width, self.height, image=self.image, color=self.no_image_color, padding=self.padding)
+
+        super().__init__(x, y, self.width, self.height, image=self.image, color=self.no_image_color, padding=self.padding, border_size=self.border_size)
         self.column_names = column_names
+        if height == AUTO:
+            self.adjust_height_to_content()
         self.column_widths = column_widths if column_widths else [width // self.num_columns] * self.num_columns         
         self.font = pygame.font.Font(None, self.font_size)
 
+
+    def adjust_height_to_content(self):
+        height = 0
+        for i, name in enumerate(self.column_names):
+            label_surface = self.font.render(name, True, self.text_color)
+            label_rect = (label_surface.get_rect())
+            height = max(height, label_rect.height)      
+        self.rect.height = height + 2 * self.padding
 
     def adjust_width_to_content(self):
         width = 0
@@ -1379,8 +1668,99 @@ class UIHeader(UIElement):
             x_offset += self.column_widths[i]
 
 
+class UIScrollBar(UIElement):
+    def __init__(self, x, y, width, height, image=UNSET, border_size=UNSET, padding=UNSET, caret_image=UNSET, content_height=UNSET):
+        self.scroll_position = 0
+        self.dragging_caret = False
+        self.mouse_offset = 0
+        self.caret_height = None
+        self.scrollbar_width = None
+        self.padding = padding
+        self.item_offset_y = 0
+        self.caret_image = caret_image  # Placeholder for a potential image
+        self.image = image
+        self.border_size = border_size
+        self.content_height = height if not content_height else content_height
+        self.list_observer = None
+
+        self.apply_ui_settings()
+        super().__init__(x, y, width, height, image=self.image, color=self.color, border_size=self.border_size, padding=self.padding)
+
+        if self.image:
+            self.scrollbar_width = self.image.get_width()
+            self.rect.x -= self.scrollbar_width
+            self.rect.width += self.scrollbar_width
+
+        if self.caret_image:
+            self.caret_image = pygame.image.load(self.caret_image)
+            self.caret_height = self.caret_image.get_height()
+
+
+    def get_scroll_offset(self):
+        return self.item_offset_y
+
+    def on_scroll_update(self):
+        self.height_ratio = (self.content_height-self.rect.height+100) / self.rect.height
+        self.item_offset_y = self.scroll_position * self.height_ratio - self.parent.padding
+        if self.list_observer:
+            self.list_observer.on_scroll_update()
+
+    def handle_event(self, event):
+        super().handle_event(event)
+
+        mouse_pos = pygame.mouse.get_pos()
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            self._handle_mouse_down(event, mouse_pos)
+        elif event.type == pygame.MOUSEBUTTONUP:
+            self._handle_mouse_up(event)
+        elif event.type == pygame.MOUSEMOTION:
+            self._handle_mouse_motion(event, mouse_pos)
+
+    def _handle_mouse_down(self, event, mouse_pos):
+        scroll_increment = 10
+
+        if event.button == 4:  # Scroll up
+            self.scroll_position = max(0, self.scroll_position - scroll_increment)
+            self.on_scroll_update()  # Call the update method here
+        elif event.button == 5:  # Scroll down
+            self.scroll_position = min(self.rect.height - self.caret_height, self.scroll_position + scroll_increment)
+            self.on_scroll_update()  # Call the update method here
+
+        elif event.button == 1:
+            scrollbar_rect = pygame.Rect(self.rect.right - self.scrollbar_width, self.rect.y + self.scroll_position, self.scrollbar_width, self.caret_height)
+            if scrollbar_rect.collidepoint(mouse_pos):
+                self.dragging_caret = True
+                self.mouse_offset = mouse_pos[1] - self.rect.y - self.scroll_position
+
+    def _handle_mouse_up(self, event):
+        self.dragging_caret = False
+        #self.on_scroll_update()
+
+    def _handle_mouse_motion(self, event, mouse_pos):
+        if self.dragging_caret:
+            new_scroll_position = mouse_pos[1] - self.rect.y - self.mouse_offset
+            max_scroll = self.rect.height - self.caret_height - self.padding * 2
+            self.scroll_position = min(max(-self.padding, new_scroll_position), max_scroll)
+            #self.item_offset_y = self.scroll_position * self.height_ratio + 50
+            self.on_scroll_update()
+
+    def draw(self, screen):
+        super().draw(screen)
+        # Draw caret
+        if self.caret_image:
+            caret_rect = self.caret_image.get_rect()
+            screen.blit(self.caret_image, (self.rect.x, self.rect.y + self.scroll_position))
+        else:
+            caret_rect = pygame.Rect(self.rect.right - self.scrollbar_width, self.rect.y + self.scroll_position, self.scrollbar_width, self.caret_height)
+            pygame.draw.rect(screen, (100, 100, 100), caret_rect)
+
+class UIListRow:
+    def __init__(self, items, data=None):
+        self.items = items
+        self.data = data
+
 class UIList(UIElement):
-    def __init__(self, x=UNSET, y=UNSET, width=UNSET, height=UNSET, rows = UNSET, text_color=UNSET,item_height = UNSET, item_selected_callback=UNSET, image=UNSET, border_size=UNSET, padding=UNSET,  num_columns=UNSET, column_widths=UNSET, headers=UNSET, header_font_size=UNSET, header_image=UNSET, header_height=UNSET):
+    def __init__(self, x=UNSET, y=UNSET, width=UNSET, height=UNSET, rows = UNSET, text_color=UNSET,item_height = UNSET, item_selected_callback=UNSET, image=UNSET, border_size=UNSET, padding=UNSET,  num_columns=UNSET, column_widths=UNSET, headers=UNSET, header_font_size=UNSET, header_image=UNSET, header_height=UNSET, header_border_size=UNSET, scrollbar_width=UNSET, scrollbar_bg_image=UNSET,scrollbar_bg_border=UNSET, scrollbar_cursor_image=UNSET, scrollbar_cursor_border=UNSET, enable_scrollbar=UNSET):
         self.headers = headers if headers else []
 
         self.num_columns = num_columns
@@ -1394,45 +1774,94 @@ class UIList(UIElement):
         self.padding = padding
         self.border_size = border_size
         self.header_height = header_height
+        self.header_border_size = header_border_size
         self.width = width
         self.height = height
+        self.scrollbar_width = scrollbar_width
+        self.scrollbar_bg_image = scrollbar_bg_image
+        self.scrollbar_cursor_image = scrollbar_cursor_image
+        self.scrollbar_bg_border = scrollbar_bg_border
+        self.scrollbar_cursor_border = scrollbar_cursor_border
+        self.enable_scrollbar = enable_scrollbar
         #self._rebuild_ui()
 
+        self.scrollbar_width = scrollbar_width
 
         self.apply_ui_settings()
-        super().__init__(x, y, self.width, self.height - self.header_height, None, self.image, (0, 0, 0), self.border_size, padding=self.padding)
-        self.column_widths = column_widths if column_widths else [width // num_columns] * self.num_columns         
+        super().__init__(x , y, self.width, self.height, None, self.image, (0, 0, 0), self.border_size, padding=self.padding)
+        
+
+        self.column_widths = column_widths if column_widths else [self.width // self.num_columns] * self.num_columns         
         self.total_width = sum(self.column_widths)
         self.hovered_item = None
         self.read_only = False
         self.scroll_position = 0  # The scroll position, starting at 0
-        self.scrollbar_width = 20  # Width of the scrollbar
         self.caret_height = 50  # Initial height of the scrollbar caret
+
+        if self.enable_scrollbar:
+            self.scrollbar = UIScrollBar(0, y + self.padding, 0, height - self.padding * 2, image=self.scrollbar_bg_image, border_size=self.scrollbar_bg_border, caret_image=self.scrollbar_cursor_image)        
+            self.scrollbar.parent = self
+            self.scrollbar.list_observer = self
+            self.scrollbar.on_scroll_update()             
+
+
         self.dragging_caret = False
         self.item_offset_y = 0
         self.mouse_offset = 0
         self.mouse_button_down = False
         self.screen = None
         self.item_selected_callback = item_selected_callback
-        self.rect = pygame.Rect(x, y, width, height)
         self.selected_item = None
         if self.headers:
-            self.header = UIHeader(x, y- header_height, width, header_height, self.headers, self.column_widths,font_size=self.header_font_size, text_color = self.text_color, image=self.header_image)
+            self.header = UIHeader(0,0,0,AUTO, self.headers, self.column_widths,font_size=self.header_font_size, text_color = self.text_color, image=self.header_image, border_size=self.header_border_size)
+            self.header.rect.width = self.total_width + self.padding * 2 + self.scrollbar.rect.width
+            self.header.rect.x = self.rect.x
+            self.header.rect.y = self.rect.y - self.header.rect.height + 15
+            self.header.rect = self.header.rect
+            if self.width == AUTO:
+                self.rect.width = self.header.rect.width
         else:
             self.header = None
+
+        self.scrollbar.rect.x = x + self.rect.width - self.scrollbar.rect.width - self.padding
+    
+    def find_row_index_by_data(self, property_name, property_value):
+        for index, row in enumerate(self.rows):
+            if row.data and property_name in row.data and row.data[property_name] == property_value:
+                return index
+        return None
+
+    def adjust_width_to_content(self):
+        self.rect.width = self.total_width + self.scrollbar.rect.width + self.padding * 2
+
+    def on_scroll_update(self):
+        pass
+
+    def move_by_offset(self, x_offset, y_offset):
+        super().move_by_offset(x_offset, y_offset)
+        for row in self.rows:
+            for item in row.items:
+                item.move_by_offset(x_offset, y_offset)
+
+        if self.header:
+            self.header.move_by_offset(x_offset, y_offset)
+        if self.enable_scrollbar:
+            self.scrollbar.move_by_offset(x_offset, y_offset)
 
     def set_read_only(self, read_only):
         self.read_only = read_only
 
     def reset_all(self):
         for row in self.rows:
-            for item in row:
+            for item in row.items:
                 item.checked = False
                 item.disabled = False
                 item.hovered = False
                 item.selected = False
 
-    def add_row(self, elements):
+    def add_row(self, elements, data=None):
+        row = UIListRow(elements, data)
+        self.rows.append(row)
         if len(elements) != self.num_columns:
             print("Warning: Number of elements doesn't match the number of columns.")
             return
@@ -1442,12 +1871,20 @@ class UIList(UIElement):
         y_offset = len(self.rows) * self.item_height  # Stack vertically
 
         for i, elem in enumerate(elements):
-            elem.rect.x = self.rect.x + x_offset
-            elem.rect.y = self.rect.y + y_offset  # Same y-coordinate for all elements in the row
+            elem.rect.x = x_offset
+            # Bottom align the item in the list row
+            elem.rect.y = y_offset + (self.item_height - elem.rect.height)
+            elem.original_y = elem.rect.y  # Store the original y-coordinate
             x_offset += self.column_widths[i]  # Increment x-coordinate based on column width
             elem.set_parent(self)  # Set the parent to adjust position accordingly
         
-        self.rows.append(elements)  # Add the row to the list
+        #self.rows.append(elements)  # Add the row to the list
+
+        self.scrollbar.content_height = (len(self.rows) + 2) * self.item_height
+
+    def clear_rows(self):
+        self.rows = []
+        self.scrollbar.content_height = 0
 
     def add_item(self, text, icon=None, color=(255, 255, 255), id=None):
         new_item = ListItem(0, self.num_columns * self.item_height, self.rect.width, self.item_height, text, color, self.font, icon, id=id)
@@ -1461,7 +1898,7 @@ class UIList(UIElement):
 
     def _rebuild_ui(self):
         for index, row in enumerate(self.rows):
-            for item in row:
+            for item in row.items:
                 list_item = ListItem(0, index * self.item_height, self.rect.width, self.item_height, item.text, item.color, self.font, item.icon)
                 list_item.id = item  
                 self.rows[index][0] = list_item
@@ -1469,7 +1906,7 @@ class UIList(UIElement):
     def _item_selected(self, list_item):
         self.selected_item = list_item.id
         for row in self.rows:
-            for item in row:
+            for item in row.items:
                 item.selected = item.id == self.selected_item
                 if self.item_selected_callback:
                     self.item_selected_callback(item)  
@@ -1478,6 +1915,7 @@ class UIList(UIElement):
         for index, row in enumerate(self.rows):
             if row[0].id == id:
                 del self.rows[index]
+                self.scrollbar.content_height = (len(self.rows) + 2) * self.item_height                
                 break
 
     def check_item(self, id, checked=True):
@@ -1501,186 +1939,63 @@ class UIList(UIElement):
                 return row[0]
         return None
     
-
     def handle_event(self, event):
-        if self.read_only:
-            return
+        super().handle_event(event)
 
-        mouse_pos = pygame.mouse.get_pos()
-        mouse_pos = (mouse_pos[0] + self.padding, mouse_pos[1])
-
-        if event.type == pygame.MOUSEBUTTONDOWN and self.rect.collidepoint(mouse_pos):
-            self._handle_mouse_down(event, mouse_pos)
-
-        elif event.type == pygame.MOUSEBUTTONUP:
-            self._handle_mouse_up(event)
-
-        elif event.type == pygame.MOUSEMOTION:
-            self._handle_mouse_motion(event, mouse_pos)
-
-        
-        # Update item positions based on scroll
-        height_ratio = ((len(self.rows) + 2) * self.item_height) / self.rect.height
-        self.item_offset_y = self.scroll_position * height_ratio
-
-        row_y_offset = 0  # Initialize row offset
+        if self.enable_scrollbar:        
+            self.scrollbar.handle_event(event)
+            self.item_offset_y = self.scrollbar.item_offset_y
 
         for row in self.rows:
-            x_offset = 0  # Initialize x offset for each row
-            for i, item in enumerate(row):
-                item.rect.x = self.rect.x + x_offset + self.padding  # Update x based on column position
-
-                # Calculate the bottom-aligned y-coordinate for each item
-                aligned_bottom_y = self.rect.y + row_y_offset - self.item_offset_y + self.item_height - item.rect.height  
-
-                # Update y based on row position, scroll and alignment
-                item.rect.y = aligned_bottom_y 
-
-                x_offset += self.column_widths[i]  # Increment x-coordinate based on column width
-                item.handle_event(event)  # Call handle_event for each UIElement
-
-            row_y_offset += self.item_height  # Increment row y-coordinate based on item height and padding
-
-    def _handle_mouse_down(self, event, mouse_pos):
-        # Handle mouse wheel scrolling
-        if event.button == 4:  # Scroll up 
-            self.scroll_position = max(self.scroll_position - self.item_height, 0)
-            max_scroll = self.rect.height - self.caret_height - self.padding * 2
-            height_ratio = ((len(self.rows) + 2) * self.item_height) / self.rect.height
-            self.scroll_position = min(max(0, self.scroll_position), max_scroll)
-            self.item_offset_y = self.scroll_position * height_ratio
-            # Update row items
-            for row in self.rows:
-                for item in row:
-                    item.rect.y = item.original_y - self.item_offset_y            
-        elif event.button == 5:  # Scroll down
-            max_scroll = self.rect.height - self.caret_height - self.padding * 2  
-            self.scroll_position = min(self.scroll_position + self.item_height, max_scroll)
-            max_scroll = self.rect.height - self.caret_height - self.padding * 2
-            height_ratio = ((len(self.rows) + 2) * self.item_height) / self.rect.height
-            self.scroll_position = min(max(0, self.scroll_position), max_scroll)
-            self.item_offset_y = self.scroll_position * height_ratio  
-            #item.rect.y = (item.original_y - self.item_offset_y + self.caret_height / 2)         
-            # Update row items
-            for row in self.rows:
-                for item in row:
-                    item.rect.y = item.original_y - self.item_offset_y  
-
-        for row in self.rows:
-            for item in row:
-                item.rect.y = (item.original_y - self.item_offset_y + self.caret_height / 2)                     
-
-        if event.button == 1:
-            # Update row items
-            # Handle scrollbar drag
-            scrollbar_rect = pygame.Rect(self.rect.right - self.scrollbar_width, self.rect.y + self.scroll_position, self.scrollbar_width, self.caret_height)
-            if scrollbar_rect.collidepoint(mouse_pos):
-                self.dragging_caret = True
-                self.mouse_offset = mouse_pos[1] - self.rect.y - self.scroll_position
-                return  
-            else:
-                self.dragging_caret = False
-
-            for row in self.rows:
-                for item in row:
-                    item.selected = item.id == self.selected_item
-
-                    # Check if the mouse is over an item
-                    if item.rect.collidepoint(mouse_pos) and not item.disabled:
-                        self.selected_row = row
-                        self._item_selected(item)
-                        if self.item_selected_callback:
-                            self.item_selected_callback(item)                  
-
-
-
-    def _handle_mouse_up(self, event):
-        self.dragging_caret = False
-        height_ratio = ((len(self.rows) + 2) * self.item_height) / self.rect.height
-        self.item_offset_y = self.scroll_position * height_ratio
-
-    def _handle_mouse_motion(self, event, mouse_pos):
-
-        # Existing logic for dragging caret and updating hover state
-        if self.dragging_caret:
-            new_scroll_position = mouse_pos[1] - self.rect.y - self.mouse_offset
-            max_scroll = self.rect.height - self.caret_height - self.padding * 2
-            height_ratio = ((len(self.rows) + 2) * self.item_height) / self.rect.height
-            self.scroll_position = min(max(0, new_scroll_position), max_scroll)
-            self.item_offset_y = self.scroll_position * height_ratio
-
-
-        over_scroll_bar = False
-        scrollbar_rect = pygame.Rect(self.rect.right - self.scrollbar_width, self.rect.y + self.scroll_position, self.scrollbar_width, self.caret_height)
-        if scrollbar_rect.collidepoint(mouse_pos):
-            over_scroll_bar = True  
-
-
-        self.hovered_item = None
-        #if self.rect.collidepoint(mouse_pos):  # Only update hovered_item if the mouse is over the list
-        for row in self.rows:
-            for item in row:
-                #item.rect.y = (item.original_y - self.item_offset_y + 100)
-                if not over_scroll_bar and item.rect.collidepoint(mouse_pos):
-                    self.hovered_item = item
-                    break
-
-
+            for item in row.items:
+                item.handle_event(event)
 
     def draw(self, screen):
-        # screen.fill((0, 0, 0))
-        super().draw(screen)
-
         if self.header:
-            self.header.draw(screen)      
-        self.screen = screen
-        clip_rect = pygame.Rect(self.rect.x + self.padding, 
-                                self.rect.y + self.padding, 
-                                self.rect.width - 2 * self.padding, 
-                                self.rect.height - 2 * self.padding)
+            self.header.draw(screen)
 
-        screen.set_clip(clip_rect)
-
-        first_item = None
-        row_index = 0
-        for row in self.rows:
-            for item in row:
-                if not first_item:
-                    first_item = item
-                item.draw(screen)
-                item.hovered = item == self.hovered_item
-                #pygame.draw.rect(screen, (0, 150, 0), item.rect, 2)
-
-            height_ratio = ((len(self.rows) + 2) * self.item_height) / self.rect.height
-            self.item_offset_y = self.scroll_position * height_ratio + self.rect.y
-            pygame.draw.line(screen, (150, 150, 150), (first_item.rect.x, self.rect.y -self.item_offset_y+(row_index*(self.item_height)) + self.item_height*2), 
-                            (first_item.rect.x + self.total_width, self.rect.y -self.item_offset_y+(row_index*(self.item_height)) + self.item_height*2), 2)
-            
-            row_index+=1
-
-        screen.set_clip(None)  # Remove clipping region
-
-        if len(self.rows) == 0:
-            total_height = 0
+        super().draw(screen)
+        if self.enable_scrollbar:
+            # Get the current offset from the scrollbar
+            scrollbar_offset = self.scrollbar.get_scroll_offset()
         else:
-            total_height = len(self.rows) * self.item_height
-            self.caret_height = max(10, int((self.rect.height / total_height) * self.rect.height))
+            scrollbar_offset = 0
 
-        max_scroll = total_height - self.rect.height
-        self.scroll_position = min(max(0, self.scroll_position), max_scroll)
+        rect = pygame.Rect(self.rect.x + self.padding, 
+                            self.rect.y + self.padding, 
+                            self.rect.x + self.rect.width - self.padding, 
+                            self.rect.height - 2 * self.padding)
+        screen.set_clip(rect)
+        # Draw each item in the list
 
-        pygame.draw.rect(screen, (0, 0, 0), 
-                        (self.rect.right - self.scrollbar_width - self.padding, 
-                        self.rect.y + self.padding, 
-                        self.scrollbar_width, 
-                        self.rect.height - 2 * self.padding))
+        for row in self.rows:
+            col_index = 0
+            for item in row.items:
+                # Apply the scrollbar's offset to the item's position
+                adjusted_y = self.rect.y + item.original_y + scrollbar_offset + self.padding
 
-        pygame.draw.rect(screen, (100, 100, 100), 
-                        (self.rect.right - self.scrollbar_width - self.padding, 
-                        self.rect.y + self.scroll_position + self.padding, 
-                        self.scrollbar_width, 
-                        self.caret_height))
-        
+                # Only draw the item if it falls within the visible area of the list
+                # if adjusted_y + item.rect.height >= self.rect.y and adjusted_y <= self.rect.y + self.rect.height:
+                item.rect.y = adjusted_y  # Update the item's y-coordinate
+                item.draw(screen)
+
+                # pygame.draw.rect(screen, (255,255,255), item.rect,1)
+                col_index += 1
+            
+            # Draw line only if its y-coordinate is within the visible area
+            line_bottom = item.rect.bottom
+            # if line_bottom >= self.rect.y + self.padding and line_bottom <= self.rect.y + self.rect.height - self.padding:
+            pygame.draw.line(screen, (200, 200, 200), (self.rect.x + self.padding, line_bottom), (self.rect.x + self.rect.width - self.padding - self.scrollbar.rect.width, line_bottom), 1)
+
+
+        screen.set_clip(None)            
+
+        if self.enable_scrollbar:
+            # Draw the scrollbar
+            self.scrollbar.draw(screen)
+
+
+
 
 
 def vertical_gradient(screen, top_color, bottom_color):
@@ -1787,6 +2102,7 @@ class UIPopupBase(UIContainer):
         self.hide()
 
     def handle_events(self, events_list):
+        
         events_list = pygame.event.get() if events_list is None else events_list        
         for event in events_list:
             if event.type == pygame.QUIT:
@@ -1807,4 +2123,5 @@ class UIPopupBase(UIContainer):
     def draw(self, screen):
         if self.is_visible:
             super().draw(screen)          
+
 

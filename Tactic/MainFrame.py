@@ -1,3 +1,4 @@
+import argparse
 from Lobby import Lobby
 import re
 import threading
@@ -12,33 +13,50 @@ import pygame
 from Connection import *
 from config import *
 import sys
+from UIConfigArmy import *
 
-class MainFrame():
+class MainFrame(UIManager):
+    _instance = None
     def __init__(self):
+        super().__init__()   
+        MainFrame._instance = self     
         self.init_graphics(True, False, None, 1500, 1280)
+        self.is_active = True
         self.connection = None
         self.waiting_for_match = False
         self.is_ai = False
         self.login_result = None
         self.current_screen = "Main Menu"
+        UIManager.ui_settings = ui_settings_army
+
         self.lobby = Lobby(init_pygame=False, full_screen=False, screen=self.screen)
         self.main_menu = MainMenu(False, False, self.screen)
         self.instructions = Instructions(init_pygame=False, full_screen=False, screen=self.screen)
         self.init_UI()
-        for i, arg in enumerate(sys.argv[1:]):
-            if arg=="-ai":
-                self.is_ai = True
+        self.fake_user = None
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-ai', type=int, default=None, help='Set the AI level.')
+        args = parser.parse_args()
+        if isinstance(args.ai, (int, float)):        
+            self.fake_user = fake_users[args.ai]
+            self.is_ai = True
+            self.init_multiplayer()
+            self.current_screen = "Main Menu"                
 
     def init_UI(self):
-        self.ui_manager = UIManager()
         UIManager.screen = self.screen
-        self.ui_manager.add_child_manager(self.main_menu.ui_manager)
+        self.add_child_manager(self.main_menu)
+        self.main_menu.is_active = True
+        self.main_menu.show()
+        self.add_child_manager(self.lobby)
+        self.lobby.is_active = False
         self.login_popup = UILoginPopup(0,0,0,0, screen=self.screen)
         self.msg_box = UIMessageBox(" ", 0, 0, screen=self.screen)
         self.display_Name_popup = DisplayNamePopup(0,0, screen=self.screen)
-        self.ui_manager.add_container(self.display_Name_popup)
-        self.ui_manager.add_container(self.login_popup)
-        self.ui_manager.add_container(self.msg_box)
+        self.add_container(self.display_Name_popup)
+        self.add_container(self.login_popup)
+        self.add_container(self.msg_box)
 
 
     def init_graphics(self, init_pygame, full_screen, screen, width, height):
@@ -67,16 +85,17 @@ class MainFrame():
             try:
                 command_type, receiver, data = connection.receive_command()
                 self.incoming_messages.put((command_type, data))
+                result = json.loads(data)
 
                 if command_type == "login":
-                    result = json.loads(data)
                     message = result["message"]
                     if result["success"] == "positive":
                         self.login_result = True
                         #self.waiting_for_match = False
                         
                         user_settings["token"] = message["token"]
-                        save_user_settings()
+                        if not self.is_ai:
+                            save_user_settings()
                         self.on_login_success()
                     else:
                         self.msg_box.show(f"Login failed:\n{message}")
@@ -84,22 +103,39 @@ class MainFrame():
                 elif command_type == "new_match_created":
                     self.waiting_for_match = False
                 elif command_type == "token":
-                    result = json.loads(data)
                     message = result["message"]
                     user = message["user"]
                     if result["success"] == "positive":
-                        self.display_Name_popup.name_field.deserialize(user["display_name"])
+                        if "display_name" in user and user["display_name"]:
+                            self.display_Name_popup.name_field.deserialize(user["display_name"])
                         self.on_login_success()
                     else:
                         self.msg_box.show(result["message"], self.token_failed_message_ok)
                 elif command_type =="display_name":
-                    result = json.loads(data)
                     if result["success"] == "positive":
-                        # save display_name in player.json                        
-                        save_user_settings()                                    
+                        # save display_name in player.json 
+                        if not self.is_ai:                                           
+                            save_user_settings()                                    
                         self.current_screen = "Lobby"
+                        self.lobby.is_active = True
+                        self.main_menu.is_active = False
+                        self.connection.send_command("get_users_list", "system", data=None)
                     else:
-                        self.msg_box.show(message)    
+                        self.msg_box.show(message)
+                elif command_type == "users_list":
+                    if result["success"] == "positive":
+                        self.lobby.update_player_list(result["message"])
+                elif command_type == "register":
+                    if result["success"] == "positive":
+                        self.msg_box.show("Registration successful. \nPlease check your email for the activation link.")
+                    else:
+                        self.msg_box.show(result["message"])
+                elif command_type == "user_connected":
+                    self.lobby.add_player(result["message"])
+                elif command_type == "user_disconnected":
+                    guid = result["message"]
+                    self.lobby.remove_player(guid)
+
             except Exception as e:
                 print(f"Error receiving command: {e}")
                 self.msg_box.show("Login failed")
@@ -128,12 +164,20 @@ class MainFrame():
 
     def init_multiplayer(self):
         token = None
-        if "token" in user_settings:
-            token = user_settings["token"]
-        if "email" in user_settings: 
-            self.email = user_settings["email"]
-        if "password" in user_settings: # Don't store password in user_settings, for debugging purposes;p
-            self.password = user_settings["password"]
+        if self.fake_user:
+            self.email = self.fake_user["email"]
+            self.password = self.fake_user["password"]
+        else:
+            if "token" in user_settings:
+                token = user_settings["token"]
+            if "email" in user_settings: 
+                self.email = user_settings["email"]
+            if "password" in user_settings: # Don't store password in user_settings, for debugging purposes;p
+                self.password = user_settings["password"]
+
+        self.login_popup.email_field.set_text(self.email)
+        self.login_popup.password_field.set_text(self.password)
+
         try:
             self.connection = Connection(host=server_ip, port=server_port)._last_instance
             self.connection.connect_to_server()
@@ -153,8 +197,7 @@ class MainFrame():
             self.waiting_for_match = True
             #team_builder = TeamBuilder(1, False, False, self.screen)
 
-        self.login_popup.email_field.set_text(self.email)
-        self.login_popup.password_field.set_text(self.password)
+
 
 
     def multiplayer(self):
@@ -184,52 +227,38 @@ class MainFrame():
             self.screen.fill((0,0,0))
             UITextBox.mouse_over_textbox = False
             UIButton.mouse_over_button = False
-            if self.is_ai:
-                self.multiplayer()
-            else:
-                events_list = []
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        pygame.quit()
-                        self.running =  False
-                        return
-                    self.ui_manager.handle_event(event)
-                    events_list.append(event)
+
+            events_list = []
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    self.running =  False
+                    return
+                self.handle_event(event)
+                events_list.append(event)
 
 
-                if(self.current_screen == "Main Menu"):
-                        selected_menu_item = self.main_menu.run_frame(events_list)
-                        if selected_menu_item:
-                            if(selected_menu_item == "Instructions"):
-                                self.current_screen = selected_menu_item
-                                screen = self.instructions
-                                screen.running = True
-                            elif(selected_menu_item == "Multi-Player"):
-                                self.init_multiplayer()
-                                self.current_screen = "Main Menu"
-                            elif(selected_menu_item == "Quit"):       
-                                self.running =  False
-                                return
-                            self.main_menu.selected_menu_item = None                                                         
-                            
-                elif(self.current_screen == "Instructions"): 
-                    running = self.instructions.run_frame(events_list)
-                    if not running:
-                        self.current_screen = "Main Menu"
-                elif(self.current_screen == "TeamBuilder"):
-                    selected_team = self.team_builder.run_frame(events_list)
-                    if selected_team:
-                        self.current_screen = "Game"
-                        #self.game = StrategyGame(selected_team1, selected_team2, False, False, self.screen)
-                        #self.game.game_loop()
-                elif(self.current_screen == "Lobby"):
-                    self.lobby.run_frame(events_list)
+            if(self.current_screen == "Main Menu"):
+                    selected_menu_item = self.main_menu.run_frame(events_list)
+                    if selected_menu_item:
+                        if(selected_menu_item == "Instructions"):
+                            self.current_screen = selected_menu_item
+                            screen = self.instructions
+                            screen.running = True
+                        elif(selected_menu_item == "Multi-Player"):
+                            self.init_multiplayer()
+                            self.current_screen = "Main Menu"
+                        elif(selected_menu_item == "Quit"):       
+                            self.running =  False
+                            return
+                        self.main_menu.selected_menu_item = None                                                         
+                        
 
-                if self.waiting_for_match:
-                    pass
+            if self.waiting_for_match:
+                pass
 
 
-            self.ui_manager.draw(self.screen)
+            self.draw(self.screen)
 
             
             if UITextBox.mouse_over_textbox:
@@ -276,7 +305,6 @@ class UILoginPopup(UIPopupBase):
         self.inner_container.add_element(self.password_field)
         self.inner_container.adjust_to_content()
         self.adjust_to_content()
-
 
     def cancel_button_clicked(self, button):
         self.cancel_login()
@@ -366,6 +394,13 @@ class UILoginPopup(UIPopupBase):
         self.connection.send_command(command_type="login", receiver="system", data=data)
         self.hide()
         self.return_result = True
+    
+    def show(self, y):
+        super().show(y)
+        if MainFrame._instance.is_ai:
+            self.perform_login()
+
+        
 
 
 class DisplayNamePopup(UIPopupBase):
@@ -375,7 +410,8 @@ class DisplayNamePopup(UIPopupBase):
         self.name_label = UILabel(0,0, "Display Name:", font_size=25)
         self.name_label.original_y = 100
         self.name_field = UITextBox(0, 30, 350, 40, font_size=30, enable_color_picker=True)
-        
+        self.name_field.create_tooltip("Select text and choose color")
+
         self.inner_container.add_element(self.name_label)
         self.inner_container.add_element(self.name_field)
         self.inner_container.id = "InnerContainer"
@@ -390,7 +426,13 @@ class DisplayNamePopup(UIPopupBase):
                 "email": user_settings["email"]
                 }
         self.connection.send_command(command_type="display_name", receiver="system", data=data)
-        self.hide()            
+        self.hide()
+
+    def show(self, position_y=None):
+        super().show(position_y)
+        if MainFrame._instance.is_ai:
+            self.name_field.text = MainFrame._instance.fake_user["display_name"]
+            self.ok_button_clicked(None)
 
 main = MainFrame()
 main.run()

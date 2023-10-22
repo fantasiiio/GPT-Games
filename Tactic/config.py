@@ -78,7 +78,7 @@ GameStateString = {
 
 def find_object_by_property(array, property_name, value):
     for obj in array:
-        if getattr(obj, property_name, None) == value:
+        if obj[property_name] == value:
             return obj
     return None
 
@@ -103,17 +103,18 @@ def load_image_from_url(url):
     else:
         print(f"Failed to load image from {url}. Status code: {response.status_code}")
         return None
+    
 image_cache = {}
 
-def get_country_image(alpha2, countries):
+def get_country_image(alpha2):
     # Check if the image is already in the cache
     if alpha2 in image_cache:
         return image_cache[alpha2]
 
     # Otherwise, load the image from the URL and store it in the cache
     for country in countries:
-        if country["alpha2"] == alpha2:
-            image = load_image_from_url(country["image"])
+        if "alpha2" in country and country["alpha2"] == alpha2:
+            image = pygame.image.load(f"{base_path}\\data\\flags\\{country['name']}.png")
             if image:  # Store only if the image was successfully loaded
                 image_cache[alpha2] = image
             return image
@@ -140,3 +141,7 @@ with open(f"{base_path}\\data\\player.json", 'r') as file:
 def save_user_settings():
     with open(f"{base_path}\\data\\player.json", 'w') as file:
         json.dump(user_settings, file, indent=4)
+
+fake_users = None
+with open(f"{base_path}\\data\\fake_users.json", 'r') as file:
+    fake_users = json.load(file)

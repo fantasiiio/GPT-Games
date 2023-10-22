@@ -34,7 +34,7 @@ class StrategyGame:
         self.selected_team[2] = selected_team2
         pygame.display.set_caption('Strategy Game')
         #self.manager = pygame_gui.UIManager((self.grid.grid_width, self.grid.grid_height))
-        self.grid = Grid(pygame, self.screen, f"{base_path}\\assets\\maps\\terrain2.tmx")
+        self.grid = Grid(self.screen, f"{base_path}\\assets\\maps\\terrain2.tmx")
         self.item_list = []
         self.coin_animation = Animation(self.screen, f"{base_path}\\assets\\images","", "Coin", -1, (32,32), 0, frame_duration=100) 
 

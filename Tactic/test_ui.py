@@ -6,7 +6,7 @@ pygame.init()
 
 # Create the screen
 screen = pygame.display.set_mode((800, 600))
-
+UIManager.screen = screen
 # UI Manager
 ui_manager = UIManager()
 
