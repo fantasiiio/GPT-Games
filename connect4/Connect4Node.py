@@ -15,7 +15,44 @@ step = itertools.count(1)
 SHIFT_VALUES = [[2 * (row * 7 + col) for col in range(7)] for row in range(7)]
 
 class Connect4Node(Node):
+    """
+    Class to represent a node in the game tree for Connect4.
+    
+    Attributes:
+        board (int): Binary encoding of the game board.
+        player (int): The current player (1 or 2).  
+        is_terminal (bool): Whether this node represents a terminal state.
+        reward (dict): The reward for each player at this node.
+        last_move (int): The column where the last piece was dropped.
+        history (list): The sequence of moves made so far.
+        children (list): Child nodes explored from this node.
+        winner (int): The winning player if the game is over.
+        Q (dict): The Q value for each player at this node.
+        N (dict): The visit count for each player at this node.  
+        visited (bool): Whether this node has been visited.
+        win_count (dict): Number of wins for each player below this node.
+        visit_count (int): Total number of visits to this node.
+        depth (int): Depth of this node in the game tree.
+        simulation_paths (list): Paths traversed during simulations from this node.
+        simulated (bool): Whether this node has been simulated. 
+        uct_value (dict): UCT value for each player used in selection.
+        hash (int): Hash value for node board state and history.
+    
+    """
     def __init__(self, board = None, player = 1, is_terminal = False, last_move=None, history=[], winner=None, resnet = None):
+        """
+        Initialize a new Connect4 node.
+        
+        Args:
+            board: Starting board state.   
+            player: The current player.
+            is_terminal: Whether node is terminal.
+            last_move: The last move made.
+            history: Moves made so far.
+            winner: The winner if game is over.
+            resnet: Residual network for evaluating board.
+        
+        """
         if board is not None:
             type = self.detect_board_type(board)
             if(type == "ndarray"):
@@ -43,6 +80,16 @@ class Connect4Node(Node):
         self.hash = hash((self.board, tuple(self.history)))
 
     def update_node(self, board, last_move, new_player, winner=None):
+        """
+        Update node attributes after simulating playout.
+        
+        Args:
+            board: Updated board state.
+            last_move: Last move made in simulation. 
+            new_player: Player to move next.
+            winner: Winner if game ended.
+        
+        """
         if board is not None:
             type = self.detect_board_type(board)
             if(type == "ndarray"):
@@ -55,6 +102,17 @@ class Connect4Node(Node):
         self.winner = winner
 
     def create_from_existing(self, existing_node, resnet):
+        """
+        Create a new node using an existing node's attributes.
+        
+        Args:
+            existing_node: The existing Connect4Node.
+            resnet: Residual network for evaluating board.
+            
+        Returns:
+            A new Connect4Node initialized with attributes copied from existing_node.
+        
+        """
         # Create a new node with attributes from the existing node
         new_node = Connect4Node(board=existing_node.board.copy(),
                                 player=existing_node.player,
@@ -68,9 +126,26 @@ class Connect4Node(Node):
 
 
     def detect_board_type(self, board):
+        """
+        Detect the type of board representation.
+        
+        Args:
+            board: The board state.
+            
+        Returns:
+            The type of board representation as a string.
+        
+        """
         return type(board).__name__
 
     def int_to_board(self):
+        """
+        Convert integer encoding of board to numpy array.
+        
+        Returns: 
+            Numpy array representation of the board.
+        
+        """
         rows, cols = 6, 7
         board = np.zeros((rows, cols), dtype=np.int8)
         mask = 0b11  # Mask to extract 2 bits
@@ -85,6 +160,16 @@ class Connect4Node(Node):
         return board
 
     def board_to_int(self, board):
+        """
+        Convert numpy array board to integer encoding. 
+        
+        Args:
+            board: Numpy array board representation.
+            
+        Returns:
+            Integer encoding of the board state. 
+        
+        """
         board_int = 0
         for row in range(6):
             for col in range(7):
@@ -97,25 +182,70 @@ class Connect4Node(Node):
 
     @lru_cache(maxsize=None)
     def get_cell(self, row, col):
+        """
+        Get value of a cell in the board.
+        
+        Args:
+            row: Row index of cell.
+            col: Column index of cell.
+            
+        Returns:
+            Value at given row and column.
+        
+        """
         shift_value = 2 * (row * 7 + col)
         mask = 0b11 << shift_value
         return (self.board & mask) >> shift_value
 
     def set_cell(self, row, col, value):
+        """
+        Set value of a cell on the board.
+        
+        Args:
+            row: Row index of cell.
+            col: Column index of cell.
+            value: Value to assign to cell.
+        
+        """
         mask = 0b11 << (2 * (row * 7 + col))
         board = (self.board & ~mask) | (value << (2 * (row * 7 + col)))
         self.board = int(board)
 
     def drop_piece(self, col, piece):
+        """
+        Drop a game piece into the given column.
+        
+        Args:
+            col: Column to drop piece in.
+            piece: Game piece to drop (1 or 2).
+        
+        """
         row = self.get_next_open_row(col)
         self.set_cell(row, col, piece)
 
     def get_next_open_row(self, col):
+        """
+        Get the next open row in a given column.
+        
+        Args:
+            col: Column to check.
+            
+        Returns: 
+            Index of next open row in column. 
+        
+        """
         for r in range(6):
             if self.get_cell(r,col) == 0:
                 return r
 
     def create_children(self):
+        """
+        Generate child nodes by simulating all possible next moves.
+        
+        Returns:
+            List of generated child nodes.
+        
+        """
         if self.is_terminal():
             return []
         for col in range(7):
@@ -146,6 +276,13 @@ class Connect4Node(Node):
 
 
     def check_terminal(self):
+        """
+        Check if current node represents a terminal game state.
+        
+        Returns: 
+            (is_terminal, player_won) tuple indicating terminal status and winner.
+        
+        """
         directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
         rows, cols = 6, 7
 
@@ -181,6 +318,13 @@ class Connect4Node(Node):
 
 
     def is_board_full(self):
+        """
+        Check if board is completely full.
+        
+        Returns:
+            True if board is full, False otherwise.
+        
+        """
         mask = 0b11  # Binary mask for two bits
         for i in range(42):  # Total cells in a 6x7 board
             cell_value = (self.board >> (2 * i)) & mask
@@ -189,17 +333,48 @@ class Connect4Node(Node):
         return True
 
     def is_terminal(self):
+        """
+        Check if this node is a terminal state.
+        
+        Returns:
+            True if node is terminal, False otherwise.
+        
+        """
         return self._is_terminal
 
     def __eq__(self, other):
+        """
+        Compare two nodes by board state and history.
+        
+        Args:
+            other: The other Connect4Node to compare against.
+            
+        Returns: 
+            True if nodes have same board and history, False otherwise.
+        
+        """
         if isinstance(other, Connect4Node):
             return self.board == other.board and self.history == other.history
         return False
 
     def __hash__(self):
+        """
+        Generate hash value from board state and move history.
+        
+        Returns:
+            Hash value for the node.
+        
+        """
         return self.hash
 
     def get_valid_moves(self):
+        """
+        Get list of child nodes with valid moves.
+        
+        Returns:
+            List of child nodes that represent valid moves.
+        
+        """
         rows, cols = 6, 7
         valid_moves = []
 
@@ -212,9 +387,26 @@ class Connect4Node(Node):
         return valid_moves
 
     def is_valid_location(self, col):
+        """
+        Check if a column has space for a move.
+        
+        Args:
+            col: Column to check.
+            
+        Returns:
+            True if column has space for a move, False otherwise.
+        
+        """
         return self.get_cell(5, col) == 0
 
     def find_random_child(self):
+        """
+        Select a random child node from current children.
+        
+        Returns:
+            Random child node.
+        
+        """
         if self.is_terminal():
             return None
         if not self.children:
@@ -226,6 +418,16 @@ class Connect4Node(Node):
             return best_child
 
     def _uct_select(self, nodeList):
+        """
+        Select child node using UCT formula.
+        
+        Args:
+            nodeList: List of child nodes to select from.
+            
+        Returns:
+            Child node with maximum UCT value.
+        
+        """
         total_simulations = self.N[1] + self.N[2]
         total_simulations = 1 if total_simulations == 0 else total_simulations
         log_N = math.log(total_simulations)
@@ -254,6 +456,18 @@ class Connect4Node(Node):
 
     #  This function counts the number of potential patterns of a given length that could be extended to 4-in-a-line on a board.
     def count_potential_patterns(self, player, length, debug=False):
+        """
+        Count potential 4-in-a-row patterns for a player.
+        
+        Args:
+            player: Player to check patterns for.
+            length: Length of pattern.
+            debug: Whether to print debug output.
+            
+        Returns: 
+            Number of potential patterns found.
+        
+        """
         count = 0
         rows, cols = 6, 7
         directions = [(1, 0), (0, 1), (1, 1), (1, -1)]  # (dx, dy) for horizontal, vertical, and both diagonals
@@ -292,6 +506,13 @@ class Connect4Node(Node):
 
 
     def evaluate_board(self):
+        """
+        Evaluate board position for the current player.
+        
+        Returns:
+            Score evaluating strength of player's position.
+        
+        """
         score = 0
 
         PATTERN_SCORES = {
@@ -308,5 +529,12 @@ class Connect4Node(Node):
         return score
 
     def update_win_count(self, winner):
+        """
+        Update win count for given winner.
+        
+        Args:
+            winner: The player who won.
+        
+        """
         if winner in self.win_count:
             self.win_count[winner] += 1

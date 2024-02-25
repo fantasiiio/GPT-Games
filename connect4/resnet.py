@@ -7,7 +7,23 @@ from Connect4Node import Connect4Node
 from MCTS import MCTS
 
 class ResidualBlock(nn.Module):
+    """
+    Residual block class for ResNet.
+    
+    Args:
+    - in_channels: Number of input channels 
+    - out_channels: Number of output channels
+    - stride: Stride for convolution
+    
+    """
     def __init__(self, in_channels, out_channels, stride=1):
+        """
+        Initializes the trainer.
+        
+        Args:
+        - model: Connect4ResNet model to train
+        
+        """
         super(ResidualBlock, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels)
@@ -21,6 +37,16 @@ class ResidualBlock(nn.Module):
             )
 
     def forward(self, x):
+        """
+        Runs the forward pass.
+        
+        Args:
+        - x: Input tensor
+        
+        Returns: 
+        - out: Output tensor
+        
+        """
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
         out += self.shortcut(x)
@@ -30,6 +56,13 @@ class ResidualBlock(nn.Module):
 # Define a basic ResNet architecture
 class ResNet(nn.Module):
     def __init__(self, num_blocks):
+        """
+        Initializes the trainer.
+        
+        Args:
+        - model: Connect4ResNet model to train
+        
+        """
         super(ResNet, self).__init__()
         self.in_channels = 64
         self.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1, bias=False)
@@ -41,6 +74,18 @@ class ResNet(nn.Module):
         self.fc = nn.Linear(512, 1)
 
     def _make_layer(self, out_channels, num_blocks, stride):
+        """
+        Builds a ResNet layer with the given parameters.
+        
+        Args:
+        - block: Residual block class
+        - out_channels: Number of output channels 
+        - blocks: Number of residual blocks
+        - stride: Stride for first convolution
+        
+        Returns: nn.Sequential containing the ResNet layer
+        
+        """
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for stride in strides:
@@ -49,6 +94,16 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        """
+        Runs the forward pass.
+        
+        Args:
+        - x: Input tensor
+        
+        Returns: 
+        - out: Output tensor
+        
+        """
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
@@ -64,7 +119,17 @@ class ResNet(nn.Module):
 # print(model)
 
 class Connect4ResNet(nn.Module):
+    """
+    Connect4ResNet class. Implements a ResNet architecture for Connect4 game.
+    """
     def __init__(self, block, layers):
+        """
+        Initializes the trainer.
+        
+        Args:
+        - model: Connect4ResNet model to train
+        
+        """
         super(Connect4ResNet, self).__init__()
 
         self.conv1 = nn.Conv2d(1, 64, kernel_size=3, stride=1, padding=1)
@@ -78,6 +143,18 @@ class Connect4ResNet(nn.Module):
         self.fc_value = nn.Linear(64 * 6 * 7, 1)
 
     def _make_layer(self, block, out_channels, blocks, stride=1):
+        """
+        Builds a ResNet layer with the given parameters.
+        
+        Args:
+        - block: Residual block class
+        - out_channels: Number of output channels 
+        - blocks: Number of residual blocks
+        - stride: Stride for first convolution
+        
+        Returns: nn.Sequential containing the ResNet layer
+        
+        """
         layers = []
         layers.append(block(64, out_channels, stride))
         for _ in range(1, blocks):
@@ -85,6 +162,16 @@ class Connect4ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        """
+        Runs the forward pass.
+        
+        Args:
+        - x: Input tensor
+        
+        Returns: 
+        - out: Output tensor
+        
+        """
         x = self.relu(self.bn1(self.conv1(x)))
 
         x = self.layer1(x)
@@ -100,16 +187,43 @@ class Connect4ResNet(nn.Module):
 
 
 class Connect4ResNetTrainer:
+    """
+    Trainer class for Connect4ResNet.
+    """
     def __init__(self, model):
+        """
+        Initializes the trainer.
+        
+        Args:
+        - model: Connect4ResNet model to train
+        
+        """
         self.model = model
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
         self.criterion_policy = nn.CrossEntropyLoss()
         self.criterion_value = nn.MSELoss()
 
     def create_board(self):
+        """
+        Creates an empty Connect4 board.
+        
+        Returns: 
+        - board: Numpy array for empty board
+        
+        """
         return np.zeros((6, 7), int)
 
     def generate_data(self, num_games):
+        """
+        Generates training data via self-play.
+        
+        Args:  
+        - num_games: Number of games to play for data
+        
+        Returns:
+        - data_list: List of generated training data
+        
+        """
         data_list = []
         for _ in range(num_games):
             game_history = []
@@ -129,6 +243,16 @@ class Connect4ResNetTrainer:
 
 
     def int_to_board(self, board_int):
+        """
+        Converts board integer encoding to numpy array.
+        
+        Args:
+        - board_int: Board encoded as integer
+        
+        Returns: 
+        - board: Numpy array representation
+        
+        """
         rows, cols = 6, 7
         board = np.zeros((rows, cols), dtype=np.int8)
         mask = 0b11  # Mask to extract 2 bits
@@ -143,6 +267,14 @@ class Connect4ResNetTrainer:
         return board
 
     def train_resnet(self, data, epochs=5):
+        """
+        Trains the ResNet model on given data.
+        
+        Args:
+        - data: List of training data
+        - epochs: Number of epochs to train for
+        
+        """
         for epoch in range(epochs):
             for state, action, winner in data:
                 self.optimizer.zero_grad()
@@ -167,6 +299,15 @@ class Connect4ResNetTrainer:
                 self.optimizer.step()
                 
     def self_play_train(self, iterations=1, num_games=1, epochs=1):
+        """
+        Trains ResNet model using self-play data.
+        
+        Args:
+        - iterations: Number of self-play iterations
+        - num_games: Number of games per iteration   
+        - epochs: Number of epochs to train per iteration
+        
+        """
         for _ in range(iterations):
             data = self.generate_data(num_games)
             self.train_resnet(data, epochs)

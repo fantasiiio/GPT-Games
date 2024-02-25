@@ -1,4 +1,5 @@
 '''
+AstroUI is a Python library for creating user interfaces (UIs) in Pygame. It is designed to be easy to use and flexible, allowing you to quickly implement UIs for your games.
 
 - **UIElement**: 
     - Base class for all user interface (UI) elements in the framework. 
@@ -159,15 +160,16 @@ class UIManager:
         if not self.is_active:
             return
 
-        # First, give the event to the child managers
-        for manager in reversed(self.child_managers):
-            if manager.handle_event(event):
-                return True
-
         # If no child manager handled the event, give it to the containers
         for container in reversed(self.containers):
             if container.is_visible and container.handle_event(event):
                     return True
+
+        # First, give the event to the child managers
+        for manager in reversed(self.child_managers):
+            if manager.is_active and manager.handle_event(event):
+                return True
+
 
         return False  # If no child manager or container handled the event, return False
 
@@ -300,7 +302,8 @@ class UIElement:
             self.rect.x += self.parent.padding
             self.rect.y += self.parent.padding
             for element in self.elements:
-                element.set_parent(self)
+                if not element.parent:
+                    element.set_parent(self)
 
     def generate_id(self):
             id = UIElement.global_id 
@@ -417,17 +420,18 @@ class UIColorPicker(UIElement):
     def handle_event(self, event):
         super().handle_event(event)
         if not self.is_visible:
-            return None
+            return False
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             self.handle_mouse_click(event)
+            return True
         elif event.type == pygame.MOUSEMOTION:
             if event.buttons[0]:
                 self.handle_mouse_click(event)
-
+                return True
         self.color_value_textbox.handle_event(event)
 
-        return None
+        return False
 
     def update_hex_color(self):
         r, g, b = self.currentColor[:3]
@@ -718,77 +722,83 @@ class UITextBox(UIElement):
             self.selection_start = None
             self.selection_end = None
 
-   
+    
     def handle_event(self, event):
         self.color_picker_button.handle_event(event)
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             x, y = event.pos
-            if event.button == 1:                
+            if event.button == 1:
                 # Check if the click is on the color_picker_button
                 if self.color_picker_button.rect.collidepoint(x, y):
-                    return
+                    return False
                 if self.rect.collidepoint(x, y):
                     closest_char_index = self.get_mouse_position(event.pos)
                     self.cursor_pos = closest_char_index
                     self.update_button_color()
                     self.selection_start = None
                     self.selection_end = None
-
                     # Start the selection
                     self.selection_start = closest_char_index
                     self.selection_end = closest_char_index  # Do not add one here
-
                     self.is_focused = True
                     self.set_focus(self.focus_manager)
+                    return True
                 else:
                     self.is_focused = False
                     if self.end_edit_callback:
                         self.end_edit_callback(self.text)
+                    return False
 
         elif event.type == pygame.MOUSEMOTION:
             if event.buttons[0] and self.rect.collidepoint(event.pos):
                 closest_char_index = self.get_mouse_position(event.pos)
                 self.selection_end = closest_char_index  # Do not add one here
+                return True
 
-        elif event.type == pygame.KEYDOWN:
-            if event.key in [pygame.K_LEFT, pygame.K_RIGHT] and pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                if self.selection_start is None:
-                    self.selection_start = self.cursor_pos
-                self.cursor_pos = max(0, min(len(self.text), self.cursor_pos + (1 if event.key == pygame.K_RIGHT else -1)))
-                self.selection_end = self.cursor_pos
+        if self.is_focused:
+            if event.type == pygame.KEYDOWN:
+                if event.key in [pygame.K_LEFT, pygame.K_RIGHT] and pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                    if self.selection_start is None:
+                        self.selection_start = self.cursor_pos
+                    self.cursor_pos = max(0, min(len(self.text), self.cursor_pos + (1 if event.key == pygame.K_RIGHT else -1)))
+                    self.selection_end = self.cursor_pos
+                    return True
 
-            else:
-                if event.key == pygame.K_BACKSPACE:
-                    if self.selection_start is not None and self.selection_end is not None:
-                        self.replace_selection('')
-                    else:
-                        self.remove_char('backspace')
+                else:
+                    if event.key == pygame.K_BACKSPACE:
+                        if self.selection_start is not None and self.selection_end is not None:
+                            self.replace_selection('')
+                        else:
+                            self.remove_char('backspace')
+                        return True
 
-                elif event.key == pygame.K_DELETE:
-                    if self.selection_start is not None and self.selection_end is not None:
-                        self.replace_selection('')
-                    else:
-                        self.remove_char('delete')
+                    elif event.key == pygame.K_DELETE:
+                        if self.selection_start is not None and self.selection_end is not None:
+                            self.replace_selection('')
+                        else:
+                            self.remove_char('delete')
+                        return True
 
-                elif event.key == pygame.K_LEFT:
-                    self.cursor_pos = max(0, self.cursor_pos - 1)
-                    self.update_button_color()
-                elif event.key == pygame.K_RIGHT:
-                    self.cursor_pos = min(len(self.text), self.cursor_pos + 1)
-                    self.update_button_color()
-                elif event.unicode:
-                    if self.selection_start is not None and self.selection_end is not None:
-                        start = min(self.selection_start, self.selection_end)
-                        end = max(self.selection_start, self.selection_end)
-                        self.text = self.text[:start] + event.unicode + self.text[end:]
-                        self.cursor_pos = start + 1
-                        self.selection_start = None
-                        self.selection_end = None
-
-                    else:
-                        self.add_char(event.unicode)
-
+                    elif event.key == pygame.K_LEFT:
+                        self.cursor_pos = max(0, self.cursor_pos - 1)
+                        self.update_button_color()
+                        return True
+                    elif event.key == pygame.K_RIGHT:
+                        self.cursor_pos = min(len(self.text), self.cursor_pos + 1)
+                        self.update_button_color()
+                        return True
+                    elif event.unicode:
+                        if self.selection_start is not None and self.selection_end is not None:
+                            start = min(self.selection_start, self.selection_end)
+                            end = max(self.selection_start, self.selection_end)
+                            self.text = self.text[:start] + event.unicode + self.text[end:]
+                            self.cursor_pos = start + 1
+                            self.selection_start = None
+                            self.selection_end = None
+                        else:
+                            self.add_char(event.unicode)
+                        return True
         else:
             super().handle_event(event)
 
@@ -796,7 +806,9 @@ class UITextBox(UIElement):
             picked_color = self.color_picker.handle_event(event)
             if picked_color:
                 self.set_selection_color(picked_color)
-      
+
+        return False
+
 
 
     def update_button_color(self):
@@ -932,6 +944,7 @@ class UIImage(UIElement):
             if event.button == 1 and self.is_mouse_is_over(event.pos):
                 if self.callback:
                     self.callback(self)
+                return True
 
     def is_mouse_is_over(self, mouse_pos):
         adjusted_mouse_pos = list(mouse_pos)
@@ -997,6 +1010,8 @@ class UILabel(UIImage):
     def set_text(self, text):
         self.text = text
         self.color_list = [{'index': 0, 'color': self.text_color}]  # Initialize with default text color
+        char_surface = self.font.render(text, True, self.text_color)
+        self.rect = char_surface.get_rect()
 
 
     def draw(self, screen):
@@ -1166,26 +1181,33 @@ class UIButton(UIElement):
         super().handle_event(event)
 
         if not self.enabled:
-            return
-        
+            return False  
+
         if event.type == pygame.KEYDOWN:
             if event.key == self.trigger_key:
                 if self.callback:
                     self.callback(self)
+                    return True 
 
         if event.type == pygame.MOUSEMOTION:
             if self.is_mouse_is_over(event.pos):
-                if not self.is_hovered:  # If the button was not already hovered
+                if not self.is_hovered: 
                     self.on_hover()
+                return True 
             else:
-                if self.is_hovered:  # If the button was hovered previously
+                if self.is_hovered:
                     self.on_unhover()
+                return False 
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 if self.is_mouse_is_over(event.pos):
                     if self.callback:
                         self.callback(self)
+                        return True 
+
+        return False 
+
 
     def is_mouse_is_over(self, mouse_pos):
         adjusted_mouse_pos = list(mouse_pos)
@@ -1351,41 +1373,52 @@ class UIContainer(UIElement):
             return    
         self.rect = self.get_bounding_rectangle(self.padding)
 
+
     def handle_event(self, event):
         if self.can_handle_events:
-            #super().handle_event(event)
+            # super().handle_event(event)
 
             mouse_pos = pygame.mouse.get_pos()
-            
+
             # Handle Scrollbar and Caret Events
             scrollbar_rect = pygame.Rect(self.rect.right - 20, self.rect.y + self.scroll_position, 20, self.caret_height)
             # Handle mouse wheel scrolling
-            if event.type == pygame.MOUSEBUTTONDOWN :
+            if event.type == pygame.MOUSEBUTTONDOWN:
                 if self.scrollable:
                     if event.button == 4:  # Scroll up
                         self.scroll_position = max(self.scroll_position - 50, 0)
+                        return True
                     elif event.button == 5:  # Scroll down
-                        self.scroll_position = min(self.scroll_position + 50, self.rect.height - self.caret_height) 
+                        self.scroll_position = min(self.scroll_position + 50, self.rect.height - self.caret_height)
+                        return True
                     elif event.button == 0:
                         if scrollbar_rect.collidepoint(mouse_pos):
                             self.dragging_caret = True
-                            self.mouse_offset = mouse_pos[1] - self.rect.y - self.scroll_position    
+                            self.mouse_offset = mouse_pos[1] - self.rect.y - self.scroll_position
+                            return True
                 elif event.type == pygame.MOUSEBUTTONUP:
                     self.dragging_caret = False
+                    return True
                 elif event.type == pygame.MOUSEMOTION and self.dragging_caret:
                     new_scroll_position = mouse_pos[1] - self.rect.y - self.mouse_offset
                     max_scroll = self.rect.height - self.caret_height
                     self.scroll_position = min(max(0, new_scroll_position), max_scroll)
-            
+                    return True
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_TAB:
-                    self.focus_manager.next()  
+                    self.focus_manager.next()
+                    return True
 
+        handled = False
         for element in self.elements:
             # Update the y-position based on the scroll position
             if self.scrollable:
                 element.rect.y = element.original_y - self.scroll_position
-            element.handle_event(event)
+            if element.handle_event(event):
+                handled = True
+
+        return handled
 
 
     def draw(self, screen):
@@ -1450,7 +1483,7 @@ class UITooltip(UIContainer):
             if self.rect.collidepoint(event.pos):
                 self.visible = True
             else:
-                self.visible = False        
+                self.visible = False     
 
 
 class UIMessageBox(UIContainer):
@@ -1474,10 +1507,13 @@ class UIMessageBox(UIContainer):
             self.ok_callback(self)
         
     def handle_event(self, event):
-        super().handle_event(event)
+        handled = super().handle_event(event)
 
         for element in self.elements:
-            element.handle_event(event)
+            if element.handle_event(event):
+                handled = True
+
+        return handled
     
     def show(self, message="", ok_callback=UNSET):
         self.message_label.set_text(message)
@@ -1706,15 +1742,21 @@ class UIScrollBar(UIElement):
             self.list_observer.on_scroll_update()
 
     def handle_event(self, event):
-        super().handle_event(event)
+        handled = super().handle_event(event)
 
         mouse_pos = pygame.mouse.get_pos()
         if event.type == pygame.MOUSEBUTTONDOWN:
-            self._handle_mouse_down(event, mouse_pos)
+            if self._handle_mouse_down(event, mouse_pos):
+                handled = True
         elif event.type == pygame.MOUSEBUTTONUP:
-            self._handle_mouse_up(event)
+            if self._handle_mouse_up(event):
+                handled = True
         elif event.type == pygame.MOUSEMOTION:
-            self._handle_mouse_motion(event, mouse_pos)
+            if self._handle_mouse_motion(event, mouse_pos):
+                handled = True
+
+        return handled
+
 
     def _handle_mouse_down(self, event, mouse_pos):
         scroll_increment = 10
@@ -1940,15 +1982,20 @@ class UIList(UIElement):
         return None
     
     def handle_event(self, event):
-        super().handle_event(event)
+        handled = super().handle_event(event)
 
-        if self.enable_scrollbar:        
-            self.scrollbar.handle_event(event)
+        if self.enable_scrollbar:
+            if self.scrollbar.handle_event(event):
+                handled = True
             self.item_offset_y = self.scrollbar.item_offset_y
 
         for row in self.rows:
             for item in row.items:
-                item.handle_event(event)
+                if item.handle_event(event):
+                    handled = True
+
+        return handled
+
 
     def draw(self, screen):
         if self.header:
@@ -2101,14 +2148,20 @@ class UIPopupBase(UIContainer):
         self.return_result = False
         self.hide()
 
-    def handle_events(self, events_list):
-        
-        events_list = pygame.event.get() if events_list is None else events_list        
+    def handle_events(self, events_list):        
+        events_list = pygame.event.get() if events_list is None else events_list
+        handled = False
+
         for event in events_list:
             if event.type == pygame.QUIT:
-                self.hide()   
+                self.hide()
+                handled = True
 
-            super().handle_event(event)
+            if super().handle_event(event):
+                handled = True
+
+        return handled
+
 
     def show(self, position_y=UNSET):
         self.ok_button.reset_hover()

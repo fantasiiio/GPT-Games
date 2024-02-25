@@ -10,6 +10,36 @@ selection_list_clicked = pygame.USEREVENT + 1
 testing = False
 
 class MCTSTree:
+    """
+    MCTSTree class to visualize an MCTS tree using pygame.
+    
+    Attributes:
+      - root_node: Root node of the tree 
+      - show_hidden_nodes: Whether to show nodes marked as hidden
+      - WIDTH, HEIGHT: Dimensions of the pygame screen
+      - PANEL_WIDTH: Width of the side panel
+      - screen: Pygame screen surface
+      - clock: Pygame clock 
+      - manager: Pygame GUI manager
+      - list_box: List box UI element to show node data
+      - toggle_button: Button to toggle showing hidden nodes
+      - plotter: TreePlotter instance to handle rendering the tree
+    
+    Methods:
+      - __init__: Initialize the pygame screen, GUI elements, and tree plotter
+      - on_event: Handle pygame events
+      - update_view: Redraw the screen
+      - node_selected: Callback when a node is clicked, updates the list box
+      - custom_label: Custom node label formatter 
+      - custom_color: Custom node color formatter
+      - draw_board: Draw a board visualization 
+      - draw_legend: Draw the legend for node colors
+      - select_path: Select a path in the tree
+      - deselect_all: Deselect currently selected nodes
+      - on_select_list_item: Callback when list box item is selected
+      - start: Start the main loop
+    
+    """
     def __init__(self, root_node=None):
         pygame.init()
         self.show_hidden_nodes = False
@@ -189,6 +219,16 @@ class MCTSTree:
 
 
 def generate_tree(max_depth, num_children):
+    """
+    Recursively generate a test tree up to a given depth.
+    
+    Arguments:
+      - max_depth: Maximum depth of the tree
+      - num_children: Number of children each node should have
+    
+    Returns the root node of the generated tree.
+    
+    """
     def create_node(level, path = []):
         # Base case: if the maximum depth is reached, return None
         if level > max_depth:
@@ -215,6 +255,9 @@ def generate_tree(max_depth, num_children):
 
 
 def init_tree():
+    """
+    Initialize a sample MCTS tree for testing.
+    """
     root_node = generate_tree(8, 2)
     return root_node
     

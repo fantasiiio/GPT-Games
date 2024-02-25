@@ -31,10 +31,10 @@ class Match:
         self.connections.append(conn)
         conn.match = self
 
-    def broadcast(self, command_type, data=None, exclude_conn=None, receiver="others"):
+    def broadcast(self, command_type, data=None, exclude_conn=None):
         for conn in self.connections:
             if conn is not exclude_conn:
-                conn.send_command(command_type, receiver = receiver, data=data)
+                conn.send_command(command_type, data=data)
 
     def get_others(self, exclude_conn):
         others = []

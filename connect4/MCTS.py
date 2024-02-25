@@ -16,14 +16,36 @@ import math
 
 import ete3
 class MCTS:
+    """
+    Monte Carlo Tree Search class. Used to traverse a tree of nodes 
+    representing game states to find optimal moves.
+    """
     "Monte Carlo tree searcher. First rollout the tree then choose a move."
 
     def __init__(self, Q = defaultdict(int), N = defaultdict(int), root_node = None, exploration_weight=1):
+        """
+        Initialize the MCTS object.
+        
+        Parameters:
+        Q (defaultdict): Action value for each player.
+        N (defaultdict): Visit count for each player.  
+        root_node (Node): Root node of the tree.
+        exploration_weight (float): Weight for exploration term in UCT.
+        """
         self.root_node = root_node
         self.exploration_weight = exploration_weight
 
 
     def choose(self, node):
+        """
+        Choose the best child node from the given node.
+        
+        Parameters:
+        node (Node): Node to choose a child from.
+        
+        Returns: 
+        Node: Best child based on UCT.
+        """
         "Choose the best successor of node. (Choose a move in the game)"
         if node.is_terminal():
             raise RuntimeError(f"choose called on terminal node {node}")
@@ -40,6 +62,12 @@ class MCTS:
         return max(node.children, key=score)
 
     def do_rollout(self, node):        
+        """
+        Perform one MCTS iteration from the given node.
+        
+        Parameters:
+        node (Node): Node to start rollout from.
+        """
         if self.root_node is None:
             self.root_node = node
         "Make the tree one layer better. (Train for one iteration.)"
@@ -50,6 +78,15 @@ class MCTS:
         self._backpropagate(path, reward, winner)
 
     def _select(self, node):
+        """
+        Select a leaf node for expansion.
+        
+        Parameters:
+        node (Node): Node to start selection from. 
+        
+        Returns:
+        list: Path of nodes traversed to reach leaf.
+        """
         "Find an unexplored descendant of `node`"
         path = []
 
@@ -76,6 +113,12 @@ class MCTS:
 
 
     def _expand(self, node):
+        """
+        Expand the given node by generating its children.
+        
+        Parameters:
+        node (Node): Node to expand.
+        """
         "Update the `children` dict with the children of `node`"
         if node.children:
             return  # already expanded
@@ -83,6 +126,16 @@ class MCTS:
         node = node
     
     def _simulate(self, node):
+        """
+        Run a simulated playout from the given node.
+        
+        Parameters:
+        node (Node): Node to start simulation from.
+        
+        Returns:
+        reward (float): Reward achieved in simulation.  
+        winner (int): Winner player of simulation.
+        """
         path = []
         starting_node = node
         while True:
@@ -100,6 +153,16 @@ class MCTS:
 
 
     def find_nodes_by_path(self, node, path):
+        """
+        Find nodes along a given path in the tree.
+        
+        Parameters:
+        node (Node): Node to start looking from.
+        path (list): Path of moves to follow.
+        
+        Returns:
+        list: Nodes along the path.
+        """
         result = []
         
         # Base case: if the path is empty, return the current node
@@ -122,6 +185,17 @@ class MCTS:
 
 
     def back_propagate_simulation_reward(self, path, starting_node, gamma=0.9):
+        """
+        Backpropagate discounted reward along a path.
+        
+        Parameters:
+        path (list): Path of nodes to backpropagate along.
+        starting_node (Node): Origin node of path.  
+        gamma (float): Discount factor.
+        
+        Returns:
+        dict: Total discounted reward for each player.
+        """
         total_reward = {1: 0, 2:0}
         nodes = self.find_nodes_by_path(starting_node, path)
         for node in reversed(nodes):
@@ -132,6 +206,14 @@ class MCTS:
         return total_reward
 
     def _backpropagate(self, path, reward, winner, gamma = 0.9):
+        """
+        Backpropagate simulation results up the tree.
+        
+        Parameters:
+        path (list): Path of nodes traversed in simulation.  
+        reward (float): Reward achieved in simulation.
+        winner (int): Winner player of simulation.
+        """
         "Send the reward back up to the ancestors of the leaf"
         total_reward = {1: 0, 2:0}# reward
         for node in reversed(path):
@@ -166,6 +248,15 @@ class MCTS:
 
 
     def mcts_to_tree_node(self, mcts_node):
+        """
+        Convert an MCTS node to a tree node for visualization.
+        
+        Parameters: 
+        mcts_node (Node): MCTS node to convert.
+        
+        Returns:
+        TreeNode: Equivalent tree node.
+        """
         tree_node = TreeNode(mcts_node)
         tree_node.data = mcts_node.simulation_paths
         tree_node.set_visible(mcts_node.visited)
@@ -177,6 +268,9 @@ class MCTS:
         return tree_node
 
     def draw_tree(self, root_node):
+        """
+        Draw the MCTS tree for visualization.
+        """
         root_node = root_node if root_node is None else self.root_node
         tree_root = self.mcts_to_tree_node(root_node)
         tree_plotter = MCTSTree(tree_root)

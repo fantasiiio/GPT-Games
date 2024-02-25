@@ -223,6 +223,7 @@ class MainFrame(UIManager):
     def run(self):
         self.running = True
         events_list = []
+        frame_count = 0
         while self.running:
             self.screen.fill((0,0,0))
             UITextBox.mouse_over_textbox = False
@@ -239,7 +240,7 @@ class MainFrame(UIManager):
 
 
             if(self.current_screen == "Main Menu"):
-                    selected_menu_item = self.main_menu.run_frame(events_list)
+                    selected_menu_item = self.main_menu.selected_menu_item
                     if selected_menu_item:
                         if(selected_menu_item == "Instructions"):
                             self.current_screen = selected_menu_item
@@ -271,6 +272,7 @@ class MainFrame(UIManager):
 
 
             pygame.display.flip()
+            frame_count += 1
 
 class UILoginPopup(UIPopupBase):
     def __init__(self, x, y, width, height, screen):

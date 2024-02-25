@@ -25,24 +25,30 @@
             <span id="target-value">100</span>
         </p>
         <p>
-            Kp: <input type="range" id="Kp" min="0" max="0.01" step="0.00001" value="0.003" oninput="updatePID()">
+            Kp: <input type="range" id="Kp" min="0" max="20" step="0.00001" value="20" oninput="updatePID()">
             <span id="Kp-value">0.1</span>
         </p>
         <p>
-            Ki: <input type="range" id="Ki" min="0" max="0.01" step="0.00001" value="0.0" oninput="updatePID()">
+            Ki: <input type="range" id="Ki" min="0" max="2" step="0.00001" value="2" oninput="updatePID()">
             <span id="Ki-value">0.002</span>
         </p>
         <p>
-            Kd: <input type="range" id="Kd" min="0" max="0.2" step="0.00001" value="0.1" oninput="updatePID()">
+            Kd: <input type="range" id="Kd" min="0" max="60" step="0.00001" value="60" oninput="updatePID()">
             <span id="Kd-value">0.1</span>
         </p>
 
         <p>
-            Max Acceleration: <input type="text" id="maxAcceleration" value="0.1">
+            Max Acceleration: <input type="text" id="maxAcceleration" value="2">
         </p>
         <p>
-            Max Velocity: <input type="text" id="maxVelocity" value="1000">
+            Max Velocity: <input type="text" id="maxVelocity" value="7">
         </p>
+        <p>
+            Max Acceleration Negative: <input type="text" id="maxAccelerationNeg" value="2">
+        </p>
+        <p>
+            Max Velocity Negative: <input type="text" id="maxVelocityNeg" value="1">
+        </p>        
         <p>
             Num Iterations: <input type="text" id="numIterations" value="1000">
         </p>
@@ -245,15 +251,25 @@
             let velocity = 0;
             let maxAcceleration = parseFloat(document.getElementById("maxAcceleration").value);
             let maxVelocity = parseFloat(document.getElementById("maxVelocity").value);
+            let maxAccelerationNeg = parseFloat(document.getElementById("maxAccelerationNeg").value);
+            let maxVelocityNeg = parseFloat(document.getElementById("maxVelocityNeg").value);
             let numIterations = parseInt(document.getElementById("numIterations").value);
             data.length = 0;
 
             for (let i = 0; i < numIterations; i++) {
                 acceleration = pid.compute(position, target);
-                acceleration = Math.max(-maxAcceleration, Math.min(maxAcceleration, acceleration));
+                if(acceleration > 0) {
+                    acceleration = Math.max(0, Math.min(maxAcceleration, acceleration));
+                } else {
+                    acceleration = Math.min(0, Math.max(-maxAccelerationNeg, acceleration));
+                }
 
                 velocity += acceleration;
-                velocity = Math.max(-maxVelocity, Math.min(velocity, maxVelocity));
+                if(velocity > 0) {
+                    velocity = Math.max(0, Math.min(maxVelocity, velocity));
+                } else {
+                    velocity = Math.min(0, Math.max(-maxVelocityNeg, velocity));
+                }
                 // add noise to velocity
                 //velocity += (Math.random() - 0.5) * 0.5;
                 position += velocity;

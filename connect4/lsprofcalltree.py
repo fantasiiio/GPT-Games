@@ -18,6 +18,16 @@ except ImportError:
     raise SystemExit("This script requires cProfile from Python 2.5")
 
 def label(code):
+    """
+    Get label string for a code object.
+    
+    Arguments:
+      code: Code object
+    
+    Returns:
+      Label string  
+    
+    """
     if isinstance(code, str):
         return ('~', 0, code)    # built-in functions ('~' sorts at the end)
     else:
@@ -26,11 +36,33 @@ def label(code):
                              code.co_firstlineno)
 
 class KCacheGrind(object):
+    """
+    KCacheGrind class to handle profiling data and output it in KCacheGrind format.
+    
+    Attributes:
+      data: Profiling data
+      out_file: Output file object
+    
+    """
     def __init__(self, profiler):
+        """
+        Initialize the KCacheGrind object.
+        
+        Arguments:
+          profiler: Profiler object containing profiling data
+        
+        """
         self.data = profiler.getstats()
         self.out_file = None
 
     def output(self, out_file):
+        """
+        Output the profiling data to a file in KCacheGrind format.
+        
+        Arguments:
+          out_file: File object to write output to
+        
+        """
         self.out_file = out_file
         print(u'events: Ticks', file=out_file)
         self._print_summary()
@@ -45,6 +77,13 @@ class KCacheGrind(object):
         print(u'summary: %d' % (max_cost,), file=self.out_file) 
 
     def _entry(self, entry):
+        """
+        Print profiling data for a single entry.
+        
+        Arguments:
+          entry: Profiling entry
+        
+        """
         out_file = self.out_file
 
         code = entry.code
@@ -79,6 +118,14 @@ class KCacheGrind(object):
         print(u'', file=out_file)
 
     def _subentry(self, lineno, subentry):
+        """
+        Print profiling data for a subentry. 
+        
+        Arguments:
+          lineno: Line number
+          subentry: Subentry profiling data
+        
+        """
         out_file = self.out_file
         code = subentry.code
         #print(u'cob=%s' % (code.co_filename,), file=out_file)
@@ -95,6 +142,13 @@ class KCacheGrind(object):
         print(u'%d %d' % (lineno, totaltime), file=out_file)
 
 def main(args):
+    """
+    Main function to run profiling and output KCacheGrind data.
+    
+    Arguments:
+      args: Command line arguments
+    
+    """
     usage = "%s [-o output_file_path] scriptfile [arg] ..."
     parser = optparse.OptionParser(usage=usage % sys.argv[0])
     parser.allow_interspersed_args = False

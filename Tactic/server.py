@@ -29,6 +29,12 @@ class Server:
         self.email_sender = EmailSender(gmail_user=email_sender, gmail_app_password=email_sender_password)
 
 
+    def broadcast(self, command_type, data, exclude_conn=None):
+        exclude_conn = 
+        for player_conn in self.connected_players:
+            if player_conn != exclude_conn:
+                player_conn.send_command(command_type, data=data)
+
     def run_web_service(self):
         web_service = WebApi(self.database, self.users)
         web_service.run()        
@@ -127,7 +133,7 @@ class Server:
                                 client_conn.send_command('login', data=result.serialize())
                                 client_conn.player = connected_user
                                 client_conn.is_logged_in = True
-                                self.broadcast("user_connected", receiver="others", data=connected_user)  
+                                self.broadcast("user_connected", data=connected_user)  
                                 continue
                     elif command_type == "token":    
                         token = data
@@ -146,7 +152,7 @@ class Server:
                                 client_conn.send_command('token', data=result.serialize())
                                 client_conn.is_logged_in = True
                                 client_conn.player = connected_user
-                                self.broadcast("user_connected", receiver="others", data=connected_user)                                 
+                                self.broadcast("user_connected", data=connected_user)                                 
                             else:
                                 result = Result('Invalid token', "negative")
                                 client_conn.send_command('token', data=result.serialize())
@@ -214,10 +220,15 @@ class Server:
             #     match = client_conn.match            
             #     if match:
             #         match.broadcast("end")
-
-            if client_conn in self.waiting_list:
-                self.waiting_list.remove(client_conn)                
-
+            try:
+                
+                if client_conn.is_logged_in:
+                    self.broadcast("user_disconnected", data=client_conn.player["guid"], exclude_conn=client_conn)  
+                
+                if client_conn in self.waiting_list:
+                    self.waiting_list.remove(client_conn)                
+            except Exception as e:
+                print(e)
 
 
     def middleman_server(self):

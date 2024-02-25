@@ -2,6 +2,23 @@ import pygame
 from pygame import Event
 import sys
 class TreeNode:
+    """
+    Class to represent a node in a tree data structure.
+    
+        Attributes:
+            value (any): The data stored in this node.
+            children (list): The child nodes of this node.
+            expanded (bool): Whether this node is expanded to show children.
+            visible (bool): Whether this node is visible.
+            color (tuple): The RGB color of this node.
+            total_width (int): The total width of this node and its children.
+            selected (bool): Whether this node is selected.
+            path_list (list): The path from the root node to this node.
+            data (any): Any additional data associated with this node.
+            pos (tuple): The (x, y) position of this node for drawing.
+            index (int): The index of this node in its parent's children list.
+        
+    """
     def __init__(self, value):
         self.value = value
         self.children = []
@@ -24,6 +41,27 @@ class TreeNode:
         self.children.append(child_node)
 
 class TreePlotter:
+    """
+    Class to visualize a tree data structure.
+    
+        Handles drawing, panning, zooming, node selection, etc.
+    
+        Attributes:
+            root (TreeNode): The root node of the tree.
+            zoom_level (float): The current zoom level.
+            canvas_width (int): Width of the canvas in pixels. 
+            canvas_height (int): Height of the canvas in pixels.
+            node_width (int): Default width of a node in pixels.
+            node_height (int): Default height of a node in pixels.
+            vertical_spacing (int): Vertical spacing between nodes. 
+            horizontal_spacing (int): Horizontal spacing between nodes.
+            label_func (callable): Function to call to get a node's label.
+            color_func (callable): Function to call to get a node's color.
+            select_node_func (callable): Callback when a node is selected.
+            update_view_func (callable): Callback to update the view.
+            on_event_func (callable): Callback for events.
+        
+    """
     def __init__(self, root, zoom_level=1.0, canvas_width=1000, canvas_height=1000, clip_rect = None,label_func=None, color_func=None, select_node_func=None, update_view_func=None, on_event_func=None):
         pygame.init()
         self.clip_rect = clip_rect if clip_rect is not None else pygame.Rect(0,0,canvas_width, canvas_height)

@@ -113,36 +113,18 @@ class MainMenu(UIManager):
         self.running = False
         self.selected_menu_item = button.text
 
-    def handle_input(self, events_list):
-        events_list = pygame.event.get() if events_list is None else events_list
-        for event in events_list:
-            self.menu_container.handle_event(event)
-            if event.type == pygame.QUIT:
-                self.running = False
-                
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                pass
-                
-            if event.type == pygame.MOUSEMOTION:
-                pass
-                
-            if event.type == pygame.MOUSEBUTTONUP:
-                pass
-                
+        
+    def draw(self, screen):
         self.inputs.update()
-
-    def update(self):
         self.grid.update(self.inputs)
         self.tank.update(self.inputs)
-        
-    def render(self, no_flip=False):
+
         self.screen.fill((60, 60, 60))  
         self.grid.draw_grid(self.inputs, False)
         self.tank.draw()
         self.menu_container.draw(self.screen)
         self.top_container.draw(self.screen)
-        if not no_flip:
-            pygame.display.flip()
+
         
     def run_frame(self, events_list=None):
         self.handle_input(events_list)
